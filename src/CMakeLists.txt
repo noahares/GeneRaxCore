@@ -5,7 +5,7 @@ if (GSL_FOUND)
     add_definitions(-DWITH_GSL)
 endif()
 
-set(generaxcore_SOURCES 
+set(generaxcore_SOURCES
   branchlengths/ReconciliationBLEstimator.cpp
   ccp/ConditionalClades.cpp
   ccp/RootedSpeciesSplitScore.cpp
@@ -22,6 +22,7 @@ set(generaxcore_SOURCES
   IO/LibpllParsers.cpp
   IO/ParallelOfstream.cpp
   IO/ReconciliationWriter.cpp
+  IO/IniParser.cpp
   likelihoods/LibpllEvaluation.cpp
   likelihoods/ReconciliationEvaluation.cpp
   likelihoods/reconciliation_models/BaseReconciliationModel.cpp
@@ -80,4 +81,3 @@ add_subdirectory(tests)
 target_include_directories(generaxcore
   PUBLIC ${GENERAXCORE_INCLUDE_DIRS}
   )
-

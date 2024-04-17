@@ -31,7 +31,8 @@ struct OptimizationSettings {
     verbose(false),
     individualParamOpt(false),
     individualParamOptMinImprovement(10.0),
-    individualParamOptMaxIt(3)
+    individualParamOptMaxIt(3),
+    optimize_ll(false)
   {}
 
   RecOpt strategy;
@@ -45,11 +46,16 @@ struct OptimizationSettings {
   double individualParamOptMinImprovement;
   unsigned int individualParamOptMaxIt;
   std::vector<DTLOptimizerListener *> listeners;
+  bool optimize_ll;
 
   void onBetterParametersFoundCallback() {
     for (auto listener: listeners) {
       listener->onBetterParametersFoundCallback();
     }
+  }
+
+  void use_for_ll() {
+    optimize_ll = true;
   }
 
 };
