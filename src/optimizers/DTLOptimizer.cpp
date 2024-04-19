@@ -108,8 +108,8 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
   targetFunction.n = startingParameters.dimensions();
   void *params = &targetFunction;
 
-  float factr = settings.optimize_ll ? parser.getValue("lbfgsb.factr") : 1.0;
-  float pgtol = settings.optimize_ll ? parser.getValue("lbfgsb.pgtol") : 0.001;
+  float factr = parser.getValue("lbfgsb.factr");
+  float pgtol = parser.getValue("lbfgsb.pgtol");
   corax_opt_minimize_lbfgsb(&x[0],
       &xmin[0],
       &xmax[0],
