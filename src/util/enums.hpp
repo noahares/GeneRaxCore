@@ -78,6 +78,7 @@ enum class ReconciliationEventType {
   EVENT_S = 0,  // speciation
   EVENT_SL,     // speciation and loss
   EVENT_D,      // duplication
+  EVENT_DL,     // duplication and loss
   EVENT_T,      // horizontal gene transfer
   EVENT_TL,     // horizontal gene transfer and loss
   EVENT_L,      // loss
@@ -230,7 +231,7 @@ public:
 
 
   static const char *getEventName(ReconciliationEventType type) {
-    static const char *eventNames[]  = {"S", "SL", "D", "T", "TL", "L", "Leaf", "Invalid"};
+    static const char *eventNames[]  = {"S", "SL", "D", "DL", "T", "TL", "L", "Leaf", "Invalid"};
     return eventNames[static_cast<int>(type)];
   }
   

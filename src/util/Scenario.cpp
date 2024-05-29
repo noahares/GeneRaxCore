@@ -117,6 +117,9 @@ void Scenario::gatherReconciliationStatistics(PerSpeciesEvents &perSpeciesEvents
       case ReconciliationEventType::EVENT_D:
         speciesEvents.DCount++;
         break;
+      case ReconciliationEventType::EVENT_DL:
+        speciesEvents.DLCount++;
+        break;
       case ReconciliationEventType::EVENT_T:
         speciesEvents.TCount++;
         break;
@@ -202,6 +205,10 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename, bool mast
         break;
       case ReconciliationEventType::EVENT_D:
         eventCount[1]++;
+        break;
+      case ReconciliationEventType::EVENT_DL:
+        eventCount[1]++;
+        eventCount[2]++;
         break;
       case ReconciliationEventType::EVENT_T:
         eventCount[3]++;
@@ -391,6 +398,7 @@ void Scenario::countTransfers(const StringToUint &labelToId,
     case ReconciliationEventType::EVENT_SL:
     case ReconciliationEventType::EVENT_L:
     case ReconciliationEventType::EVENT_D:
+    case ReconciliationEventType::EVENT_DL:
     case ReconciliationEventType::EVENT_None:
     case ReconciliationEventType::EVENT_Invalid:
       break;
@@ -426,6 +434,7 @@ void Scenario::countOrigins(const StringToUint &labelToId,
     case ReconciliationEventType::EVENT_TL:
     case ReconciliationEventType::EVENT_L:
     case ReconciliationEventType::EVENT_D:
+    case ReconciliationEventType::EVENT_DL:
     case ReconciliationEventType::EVENT_None:
     case ReconciliationEventType::EVENT_Invalid:
       break;
@@ -629,6 +638,7 @@ OrthoGroup *Scenario::getLargestOrthoGroupRec(corax_unode_t *geneNode, bool isVi
         assert(false);
       }
     case ReconciliationEventType::EVENT_TL:
+    case ReconciliationEventType::EVENT_DL:
     case ReconciliationEventType::EVENT_None:
     case ReconciliationEventType::EVENT_SL:
     case ReconciliationEventType::EVENT_L:
@@ -706,6 +716,7 @@ void Scenario::getAllOrthoGroupRec(corax_unode_t *geneNode,
       }
       break;
     case ReconciliationEventType::EVENT_TL:
+    case ReconciliationEventType::EVENT_DL:
     case ReconciliationEventType::EVENT_None:
     case ReconciliationEventType::EVENT_SL:
     case ReconciliationEventType::EVENT_L:

@@ -23,6 +23,7 @@ typedef std::vector<OrthoGroupPtr> OrthoGroups;
 struct SpeciesEvents {
   unsigned int LeafCount;
   unsigned int DCount;
+  unsigned int DLCount;
   unsigned int SCount;
   unsigned int SLCount;
   unsigned int TCount;
@@ -30,6 +31,7 @@ struct SpeciesEvents {
   SpeciesEvents():
     LeafCount(0), 
     DCount(0), 
+    DLCount(0), 
     SCount(0),
     SLCount(0),
     TCount(0),

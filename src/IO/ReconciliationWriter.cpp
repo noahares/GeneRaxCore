@@ -11,7 +11,7 @@ static void printEventNHX(const Scenario::Event &event, corax_rtree_t *speciesTr
     if (speciesTree->nodes[event.speciesNode]->label) {
       os << ":S=" << speciesTree->nodes[event.speciesNode]->label;
     }
-    os << ":D=" << (event.type == ReconciliationEventType::EVENT_D ? "Y" : "N" );
+    os << ":D=" << (event.type == ReconciliationEventType::EVENT_D  || event.type == ReconciliationEventType::EVENT_DL ? "Y" : "N" );
     os << ":H=" << 
       (event.type == ReconciliationEventType::EVENT_T || event.type == ReconciliationEventType::EVENT_TL ?
        "Y" : "N" );
@@ -86,6 +86,7 @@ static void printEventALE(const Scenario::Event &event, corax_rtree_t *speciesTr
         os << label;
         break;
       case ReconciliationEventType::EVENT_D:
+      case ReconciliationEventType::EVENT_DL:
         os << "D@" << label;
         break;
       case ReconciliationEventType::EVENT_T:
@@ -207,7 +208,7 @@ static void writeEventRecPhyloXML(unsigned int geneIndex,
   case ReconciliationEventType::EVENT_S: case ReconciliationEventType::EVENT_SL:
     os << indent << "\t<speciation speciesLocation=\"" << species->label << "\"/>" << std::endl;
     break;
-  case ReconciliationEventType::EVENT_D:
+  case ReconciliationEventType::EVENT_D: case ReconciliationEventType::EVENT_DL:
     os << indent << "\t<duplication speciesLocation=\"" << species->label << "\"/>" << std::endl;
     break;
   case ReconciliationEventType::EVENT_T: case ReconciliationEventType::EVENT_TL:
@@ -257,7 +258,7 @@ static void recursivelySaveGeneTreeRecPhyloXML(unsigned int geneIndex,
       indent.pop_back();
       os << indent << "</clade>" << std::endl;
     } else {
-      assert(false); 
+      assert(event.type == ReconciliationEventType::EVENT_DL); 
     }
   }
 
