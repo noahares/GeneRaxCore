@@ -69,7 +69,7 @@ public:
 
   void ensurePositivity() {
     for (auto &p: _parameters) {
-      p = std::max(0.0000001, p);
+      p = std::max(0.0000000001, p);
       //p = std::min(1.0, p);
     }
   }
@@ -128,7 +128,7 @@ public:
     }
     return res;
   }
-  
+
   inline double distance(const Parameters &v) const {
     double d = 0.0;
     for (unsigned int i = 0; i < dimensions(); ++i) {

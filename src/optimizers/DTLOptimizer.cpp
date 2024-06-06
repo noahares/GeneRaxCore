@@ -96,12 +96,14 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
 {
   IniParser& parser = IniParser::getInstance();
   unsigned int n = startingParameters.dimensions();
-  std::vector<double> xmin(n, 0.001);
-  std::vector<double> xmax(n, 2.0);
-  std::vector<double> x(n, 0.5);
-  for (unsigned int i = 0; i < n; ++i) {
-    x[i] = startingParameters[i];
-  }
+  float lb = parser.getValue("optimizer.lb");
+  float ub = parser.getValue("optimizer.ub");
+  std::vector<double> xmin(n, lb);
+  std::vector<double> xmax(n, ub);
+  std::vector<double> x(n, (ub - lb) / 2.0);
+  // for (unsigned int i = 0; i < n; ++i) {
+  //   x[i] = startingParameters[i];
+  // }
   std::vector<int> bound(n, CORAX_OPT_LBFGSB_BOUND_BOTH);
   TargetParam targetFunction;
   targetFunction.function = &function;
