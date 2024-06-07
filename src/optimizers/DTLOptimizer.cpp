@@ -94,24 +94,28 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
     const Parameters &startingParameters,
     OptimizationSettings settings)
 {
-  IniParser& parser = IniParser::getInstance();
+  // IniParser& parser = IniParser::getInstance();
   unsigned int n = startingParameters.dimensions();
-  float lb = parser.getValue("optimizer.lb");
-  float ub = parser.getValue("optimizer.ub");
+  // float lb = parser.getValue("optimizer.lb");
+  // float ub = parser.getValue("optimizer.ub");
+  float lb = 1.0e-10;
+  float ub = 1.0;
   std::vector<double> xmin(n, lb);
   std::vector<double> xmax(n, ub);
   std::vector<double> x(n, (ub - lb) / 2.0);
-  // for (unsigned int i = 0; i < n; ++i) {
-  //   x[i] = startingParameters[i];
-  // }
+  for (unsigned int i = 0; i < n; ++i) {
+    x[i] = startingParameters[i];
+  }
   std::vector<int> bound(n, CORAX_OPT_LBFGSB_BOUND_BOTH);
   TargetParam targetFunction;
   targetFunction.function = &function;
   targetFunction.n = startingParameters.dimensions();
   void *params = &targetFunction;
 
-  float factr = parser.getValue("lbfgsb.factr");
-  float pgtol = parser.getValue("lbfgsb.pgtol");
+  // float factr = parser.getValue("lbfgsb.factr");
+  // float pgtol = parser.getValue("lbfgsb.pgtol");
+  float factr = 1.0;
+  float pgtol = 0.001;
   corax_opt_minimize_lbfgsb(&x[0],
       &xmin[0],
       &xmax[0],
