@@ -8,7 +8,7 @@
 #include <map>
 #include <sstream>
 
-const char *Scenario::eventNames[]  = {"S", "SL", "D", "T", "TL", "L", "Leaf", "Invalid"};
+const char *Scenario::eventNames[]  = {"S", "SL", "D", "DL", "T", "TL", "L", "Leaf", "Invalid"};
 
 const unsigned int Scenario::EVENT_TYPE_NUMBER = 6;
 
@@ -36,6 +36,7 @@ void PerSpeciesEvents::parallelSum()
   {
     ParallelContext::sumUInt(speciesEvents.LeafCount);
     ParallelContext::sumUInt(speciesEvents.DCount);
+    ParallelContext::sumUInt(speciesEvents.DLCount);
     ParallelContext::sumUInt(speciesEvents.SCount);
     ParallelContext::sumUInt(speciesEvents.SLCount);
     ParallelContext::sumUInt(speciesEvents.TCount);

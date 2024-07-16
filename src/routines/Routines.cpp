@@ -318,7 +318,7 @@ void Routines::inferReconciliation(
       forceTransfers);
     PLLRootedTree speciesTree(speciesTreeFile);
     ParallelOfstream os(FileSystem::joinPaths(outputDir, "per_species_event_counts.txt"));
-    os << "#S #SL #D #T #TL" << std::endl;
+    os << "#S #SL #D #DL #T #TL" << std::endl;
     for (unsigned int e = 0; e < events.events.size(); ++e) {
       std::string label(speciesTree.getNode(e)->label);
       auto &eventCount = events.events[e];
@@ -326,6 +326,7 @@ void Routines::inferReconciliation(
       os << "S=" << eventCount.SCount + eventCount.LeafCount << " ";
       os << "SL=" << eventCount.SLCount << " ";
       os << "D=" << eventCount.DCount << " ";
+      os << "DL=" << eventCount.DLCount << " ";
       os << "T=" << eventCount.TCount << " ";
       os << "TL=" << eventCount.TLCount << std::endl;
     }
