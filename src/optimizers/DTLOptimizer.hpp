@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 class JointTree;
 class PerCoreGeneTrees;
 #include <likelihoods/ReconciliationEvaluation.hpp>
@@ -32,7 +33,9 @@ struct OptimizationSettings {
     individualParamOpt(false),
     individualParamOptMinImprovement(10.0),
     individualParamOptMaxIt(3),
-    optimize_ll(false)
+    optimize_ll(false),
+    required_ll(std::numeric_limits<double>::max()),
+    onlyIndividualOpt(false)
   {}
 
   RecOpt strategy;
@@ -47,6 +50,8 @@ struct OptimizationSettings {
   unsigned int individualParamOptMaxIt;
   std::vector<DTLOptimizerListener *> listeners;
   bool optimize_ll;
+  double required_ll;
+  bool onlyIndividualOpt;
 
   void onBetterParametersFoundCallback() {
     for (auto listener: listeners) {

@@ -1,6 +1,7 @@
 #include <optimizers/DTLOptimizer.hpp>
 #include <IO/IniParser.h>
 #include <iomanip>
+#include <ostream>
 #include <parallelization/ParallelContext.hpp>
 #include <IO/Logger.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
@@ -18,6 +19,25 @@ static bool isValidLikelihood(double ll) {
   return std::isnormal(ll) && ll < -0.0000001;
 }
 
+void generateCombinations(Parameters& current, double x, double y, double m, int n, int depth, std::vector<Parameters>& results) {
+    if (depth == n) {
+        results.push_back(current);
+        return;
+    }
+
+    for (double value = x; value <= y; value += m) {
+        current[depth] = value;
+        generateCombinations(current, x, y, m, n, depth + 1, results);
+    }
+}
+
+
+std::vector<Parameters> gridSearch(double x, double y, double m, int n) {
+    std::vector<Parameters> results;
+    Parameters current(n); 
+    generateCombinations(current, x, y, m, n, 0, results);
+    return results;
+}
 
 
 static bool lineSearchParameters(FunctionToOptimize &function,
@@ -89,6 +109,29 @@ double myTargetFunction(void *function, double *value)
   return -v;
 }
 
+Parameters optimizeParametersGrid(FunctionToOptimize &function, 
+    const Parameters &startingParameters,
+    OptimizationSettings settings)
+{
+  unsigned int n = startingParameters.dimensions();
+  float lb = 1.0e-10;
+  float ub = 0.1;
+  float step_size = 0.001;
+  auto params = gridSearch(lb, ub, step_size, n);
+  Parameters best = params[0];
+  best.setScore(-10000000000);
+  Logger::info << "Doing grid parameter search" << std::endl;
+  for (auto &p : params) {
+    function.evaluate(p);
+    Logger::info << p << std::setprecision(10) << std::endl;
+    if (p.getScore() > best.getScore()) {
+      best = p;
+      best.setScore(p.getScore());
+    }
+  }
+  Logger::info << "optx = " << best << std::setprecision(10) << std::endl;
+  return best;
+}
 
 Parameters optimizeParametersLBFGSB(FunctionToOptimize &function, 
     const Parameters &startingParameters,
@@ -498,36 +541,45 @@ Parameters DTLOptimizer::optimizeParameters(FunctionToOptimize &function,
     OptimizationSettings settings)
 {
   auto res = startingParameters;
-  switch(settings.strategy) {
-    case RecOpt::Gradient:
-      res = optimizeParametersGradient(function, 
-          startingParameters, 
-          settings);
-      break;
-    case RecOpt::LBFGSB:
-      res = optimizeParametersLBFGSB(function, 
-          startingParameters, 
-          settings);
-      break;
-    case RecOpt::GSL_SIMPLEX:
+  if (!settings.onlyIndividualOpt) {
+    switch(settings.strategy) {
+      case RecOpt::Grid:
+        res = optimizeParametersGrid(function, 
+            startingParameters, 
+            settings);
+        break;
+      case RecOpt::Gradient:
+        res = optimizeParametersGradient(function, 
+            startingParameters, 
+            settings);
+        break;
+      case RecOpt::LBFGSB:
+        res = optimizeParametersLBFGSB(function, 
+            startingParameters, 
+            settings);
+        break;
+      case RecOpt::GSL_SIMPLEX:
 #ifdef WITH_GSL
-      res = optimizeParametersGSLSimplex(function, 
-          startingParameters, 
-          settings);
+        res = optimizeParametersGSLSimplex(function, 
+            startingParameters, 
+            settings);
 #else
-      std::cerr << "Error, GSL routine not available, please install GSL and recompile" << std::endl;
+        std::cerr << "Error, GSL routine not available, please install GSL and recompile" << std::endl;
 #endif
-      break;
-    case RecOpt::Simplex:
-      res = optimizeParametersNelderMear(function, 
-          startingParameters);
-      break;
-    default:
-      assert(false);
-      break;
+        break;
+      case RecOpt::Simplex:
+        res = optimizeParametersNelderMear(function, 
+            startingParameters);
+        break;
+      default:
+        assert(false);
+        break;
+    }
+  } else {
+    function.evaluate(res);
   }
 
-  if (settings.individualParamOpt && startingParameters.dimensions() > 1) {
+  if (settings.onlyIndividualOpt || (settings.individualParamOpt && startingParameters.dimensions() > 1)) {
     double diff = 0.0;
     unsigned int it = 0;
     do {
