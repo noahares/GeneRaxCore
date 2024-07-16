@@ -63,6 +63,13 @@ static bool lineSearchParameters(FunctionToOptimize &function,
     function.evaluate(proposal);
     llComputationsLine++;
     auto improvement = proposal.getScore() - currentRates.getScore();
+    if (proposal.getScore() > settings.required_ll) {
+      currentRates = proposal;
+      if (settings.verbose) {
+        Logger::info << "Achieved required improvement, p=" << proposal << std::endl;
+      }
+      return false;
+    }
     if (improvement > 0) {
       if (settings.verbose) {
         Logger::info << "Improv alpha=" << alpha << " score=" << proposal.getScore() << " p=" << proposal << std::endl;
@@ -157,7 +164,7 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
 
   // float factr = parser.getValue("lbfgsb.factr");
   // float pgtol = parser.getValue("lbfgsb.pgtol");
-  float factr = 1.0;
+  float factr = settings.optimize_ll ? 1e7 : 1.0;
   float pgtol = 0.001;
   corax_opt_minimize_lbfgsb(&x[0],
       &xmin[0],
@@ -223,7 +230,7 @@ static Parameters optimizeParametersGradient(FunctionToOptimize &function,
     Logger::info << "Computing gradient epsilon = " << epsilon << "..." << std::endl;
   }
   bool stop = false;
-  while (!stop) {
+  do {
     std::vector<Parameters> closeRates(dimensions, currentRates);
     for (unsigned int i = 0; i < dimensions; ++i) {
       Parameters closeRates = currentRates;
@@ -238,7 +245,7 @@ static Parameters optimizeParametersGradient(FunctionToOptimize &function,
     if (!stop) {
       settings.onBetterParametersFoundCallback();
     }
-  }
+  } while (!stop && dimensions > 1);
   function.evaluate(currentRates);
   return currentRates;
 }
@@ -254,6 +261,7 @@ static Parameters optimizeParametersIndividually(FunctionToOptimize &function,
   const unsigned int N = startingParameters.dimensions();
   Parameters currentParameters(startingParameters);
   settings.optimizationMinImprovement = 1000000.0; // we only want one iteration
+  settings.onlyIndividualOpt = false;
   Logger::timed << "Starting individual parameter optimization on " << N << " parameters" << std::endl;
   for (unsigned int i = 0; i < N; ++i) {
     FunctionOneDim fun(currentParameters, i, function);
