@@ -5,7 +5,7 @@
 
 IniParser& IniParser::getInstance() {
     static IniParser instance; // Static instance ensures single creation
-    instance.load("AleRax/optimizer_params.ini");
+    instance.load("optimizer_params.ini");
     return instance;
 }
 
@@ -56,10 +56,11 @@ bool IniParser::load(const std::string& filename) {
   return true;
 }
 
-float IniParser::getValue(const std::string& key) const {
+// TODO: make this generic over the value type
+float IniParser::getValue(const std::string& key, const double default_value) const {
   auto it = data.find(key);
   if (it != data.end()) {
     return it->second;
   }
-  return 0.0f;
+  return default_value;
 }

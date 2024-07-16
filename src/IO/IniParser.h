@@ -8,7 +8,7 @@ class IniParser {
 public:
   static IniParser &getInstance(); // Singleton instance getter
   bool load(const std::string &filename);
-  float getValue(const std::string &key) const;
+  float getValue(const std::string &key, const double default_value) const;
 
 private:
   IniParser() : is_loaded(false) {}                         // Private constructor for singleton
