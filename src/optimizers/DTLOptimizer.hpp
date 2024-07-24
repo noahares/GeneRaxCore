@@ -21,6 +21,12 @@ class DTLOptimizerListener {
     virtual void onBetterParametersFoundCallback() = 0;
 };
 
+enum class LBFGSBPrecision: int64_t {
+  HIGH = 1,
+  MEDIUM = (int64_t) 1e7,
+  LOW = (int64_t) 1e12,
+};
+
 struct OptimizationSettings {
   OptimizationSettings(): 
     strategy(RecOpt::Gradient),
@@ -33,7 +39,7 @@ struct OptimizationSettings {
     individualParamOpt(false),
     individualParamOptMinImprovement(10.0),
     individualParamOptMaxIt(3),
-    optimize_ll(false),
+    factr(LBFGSBPrecision::HIGH),
     required_ll(std::numeric_limits<double>::max()),
     onlyIndividualOpt(false)
   {}
@@ -49,7 +55,7 @@ struct OptimizationSettings {
   double individualParamOptMinImprovement;
   unsigned int individualParamOptMaxIt;
   std::vector<DTLOptimizerListener *> listeners;
-  bool optimize_ll;
+  LBFGSBPrecision factr;
   double required_ll;
   bool onlyIndividualOpt;
 
@@ -57,10 +63,6 @@ struct OptimizationSettings {
     for (auto listener: listeners) {
       listener->onBetterParametersFoundCallback();
     }
-  }
-
-  void use_for_ll() {
-    optimize_ll = true;
   }
 
 };
