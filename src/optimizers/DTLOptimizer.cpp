@@ -1,5 +1,4 @@
 #include <optimizers/DTLOptimizer.hpp>
-#include <IO/IniParser.h>
 #include <iomanip>
 #include <ostream>
 #include <parallelization/ParallelContext.hpp>
@@ -144,15 +143,12 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
     const Parameters &startingParameters,
     OptimizationSettings settings)
 {
-  // IniParser& parser = IniParser::getInstance();
   unsigned int n = startingParameters.dimensions();
-  // float lb = parser.getValue("optimizer.lb");
-  // float ub = parser.getValue("optimizer.ub");
   float lb = 1.0e-10;
-  float ub = 1.0;
+  float ub = 2.0;
   std::vector<double> xmin(n, lb);
   std::vector<double> xmax(n, ub);
-  std::vector<double> x(n, (ub - lb) / 2.0);
+  std::vector<double> x(n, 0.5);
   for (unsigned int i = 0; i < n; ++i) {
     x[i] = startingParameters[i];
   }
