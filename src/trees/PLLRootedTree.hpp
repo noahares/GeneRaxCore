@@ -129,11 +129,19 @@ public:
   std::string getNewickString() const;
 
   /**
-   * Replace null branch lengths with minBL
+   *  Replace null branch lengths with minBL
    */
-  void setMissingBranchLengths(double minBL = 1.0); 
+  void setMissingBranchLengths(double minBL = 1.0);
 
-  void ensureUniqueLabels();
+  /**
+   *  Set all branch lengths to stdBL
+   */
+  void equalizeBranchLengths(double stdBL = 1.0);
+
+  /**
+   *  Rename internal nodes having invalidated, missing or duplicated names
+   */
+  void ensureUniqueLabels(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate = nullptr);
 
   /**
    *  Change the label of the node indexed with nodeIndex

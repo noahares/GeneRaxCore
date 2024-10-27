@@ -177,27 +177,27 @@ corax_rtree_t *LibpllParsers::readRootedFromStr(const std::string &newickString)
 {
   return readRooted(newickString, false);
 }
-  
-void LibpllParsers::saveUtree(const corax_unode_t *utree, 
-  const std::string &fileName, 
-  bool append)
+
+void LibpllParsers::saveUtree(const corax_unode_t *utree,
+    const std::string &fileName,
+    bool append)
 {
   std::ofstream os(fileName, (append ? std::ofstream::app : std::ofstream::out));
   char *newick = corax_utree_export_newick_rooted(utree, utree->length);
-  os << newick;
+  os << newick << std::endl;
   os.close();
   free(newick);
 }
-void LibpllParsers::saveRtree(const corax_rnode_t *rtree, 
+
+void LibpllParsers::saveRtree(const corax_rnode_t *rtree,
     const std::string &fileName)
 {
   std::ofstream os(fileName, std::ofstream::out);
   char *newick = corax_rtree_export_newick(rtree, 0);
-  os << newick;
+  os << newick << std::endl;
   os.close();
   free(newick);
 }
-  
 
 void LibpllParsers::getUnodeNewickString(const corax_unode_t *rnode, std::string &newick)
 {
