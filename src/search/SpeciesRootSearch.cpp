@@ -118,7 +118,7 @@ double SpeciesRootSearch::rootSearch(
   movesHistory.push_back(1);
   double temp1 = bestLL;
   double temp2 = bestLL;
-  DatedTree::Backup bestDatedBackup;
+  auto bestDatedBackup = speciesTree.getDatedTree().getBackup();
   rootSearchAux(speciesTree,
       evaluator,
       searchState,
