@@ -20,20 +20,19 @@ static bool isValidLikelihood(double ll) {
 
 
 static bool lineSearchParameters(FunctionToOptimize &function,
-    Parameters &currentRates, 
-    const Parameters &gradient, 
+    Parameters &currentRates,
+    const Parameters &gradient,
     unsigned int &llComputationsLine,
-    OptimizationSettings &settings
-    )
+    OptimizationSettings &settings)
 {
   // alpha controls the current size step
-  double alpha = settings.startingAlpha; 
+  double alpha = settings.startingAlpha;
   // we stop the search when alpha < minAlpha
   const double minAlpha = settings.minAlpha;
   bool noImprovement = true;
   if (settings.verbose) {
     Logger::info << "lineSearch from ll=" << currentRates.getScore()  << std::endl;
-    Logger::info << "gradient = " << gradient << std::endl;
+    Logger::info << "gradient=" << gradient << std::endl;
   }
   while (alpha > minAlpha) {
     Parameters normalizedGradient(gradient);
@@ -44,8 +43,8 @@ static bool lineSearchParameters(FunctionToOptimize &function,
     auto improvement = proposal.getScore() - currentRates.getScore();
     if (improvement > 0) {
       if (settings.verbose) {
-        Logger::info << "Improv alpha=" << alpha << " score=" << proposal.getScore() << " p=" << proposal << std::endl;
-      }      
+        Logger::info << "improv: alpha=" << alpha << ", params=" << proposal << std::endl;
+      }
       currentRates = proposal;
       alpha *= 1.5;
       if (improvement > settings.lineSearchMinImprovement) {
@@ -53,7 +52,7 @@ static bool lineSearchParameters(FunctionToOptimize &function,
       }
     } else {
       if (settings.verbose) {
-        Logger::info << "No improv alpha=" << alpha << " score=" << proposal.getScore() << " p=" << proposal << std::endl;
+        Logger::info << "no improv: alpha=" << alpha << ", params=" << proposal << std::endl;
       }
       alpha *= 0.5;
       if (!noImprovement && proposal.dimensions() > 1) {
@@ -70,6 +69,7 @@ static bool lineSearchParameters(FunctionToOptimize &function,
 struct TargetParam {
   FunctionToOptimize *function;
   unsigned int n;
+  bool verbose;
 };
 
 
@@ -78,18 +78,20 @@ double myTargetFunction(void *function, double *value)
   auto targetParam = (TargetParam *)(function);
   auto f = (FunctionToOptimize *)(targetParam->function);
   unsigned int n = targetParam->n;
-
+  bool verbose = targetParam->verbose;
   Parameters param(n);
   for (unsigned int i = 0; i < n; ++i) {
     param[i] = value[i];
   }
   auto v = f->evaluate(param);
-  Logger::timed << param << std::endl;
+  if (verbose) {
+    Logger::info << "params=" << param << std::endl;
+  }
   return -v;
 }
 
 
-Parameters optimizeParametersLBFGSB(FunctionToOptimize &function, 
+Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
     const Parameters &startingParameters,
     OptimizationSettings settings)
 {
@@ -106,19 +108,22 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
   TargetParam targetFunction;
   targetFunction.function = &function;
   targetFunction.n = startingParameters.dimensions();
+  targetFunction.verbose = settings.verbose;
   void *params = &targetFunction;
-
   // float factr = parser.getValue("lbfgsb.factr");
   // float pgtol = parser.getValue("lbfgsb.pgtol");
   float factr = static_cast<float>(settings.factr);
   float pgtol = 0.001;
+  if (settings.verbose) {
+    Logger::timed << "Starting LBFGSB search" << std::endl;
+  }
   corax_opt_minimize_lbfgsb(&x[0],
       &xmin[0],
       &xmax[0],
       &bound[0],
       n,
-      factr, // convergence tolerance 
-      pgtol, // gradient epsilon 
+      factr, // convergence tolerance
+      pgtol, // gradient epsilon
       params,
       myTargetFunction);
   Parameters res(n);
@@ -126,7 +131,9 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
     res[i] = x[i];
   }
   function.evaluate(res);
-  Logger::timed << "optx = " << res << std::endl;
+  if (settings.verbose) {
+    Logger::timed << "opt_params=" << res << std::endl;
+  }
   return res;
 }
 
@@ -173,7 +180,8 @@ static Parameters optimizeParametersGradient(FunctionToOptimize &function,
   unsigned int dimensions = startingParameters.dimensions();
   Parameters gradient(dimensions);
   if (settings.verbose) {
-    Logger::info << "Computing gradient epsilon = " << epsilon << "..." << std::endl;
+    Logger::timed << "Starting gradient descent search" << std::endl;
+    Logger::info << "gradient epsilon=" << epsilon << std::endl;
   }
   bool stop = false;
   while (!stop) {
@@ -192,8 +200,12 @@ static Parameters optimizeParametersGradient(FunctionToOptimize &function,
       settings.onBetterParametersFoundCallback();
     }
   }
-  function.evaluate(currentRates);
-  return currentRates;
+  auto res = currentRates;
+  function.evaluate(res);
+  if (settings.verbose) {
+    Logger::timed << "opt_params=" << res << std::endl;
+  }
+  return res;
 }
 
 static Parameters optimizeParametersIndividually(FunctionToOptimize &function,
@@ -207,7 +219,9 @@ static Parameters optimizeParametersIndividually(FunctionToOptimize &function,
   const unsigned int N = startingParameters.dimensions();
   Parameters currentParameters(startingParameters);
   settings.optimizationMinImprovement = 1000000.0; // we only want one iteration
-  Logger::timed << "Starting individual parameter optimization on " << N << " parameters" << std::endl;
+  if (settings.verbose) {
+    Logger::timed << "Starting individual parameter optimization on " << N << " parameters" << std::endl;
+  }
   for (unsigned int i = 0; i < N; ++i) {
     FunctionOneDim fun(currentParameters, i, function);
     Parameters individualParam(1);
@@ -215,8 +229,11 @@ static Parameters optimizeParametersIndividually(FunctionToOptimize &function,
     individualParam[0] = currentParameters[i];
     individualParam.setScore(currentParameters.getScore());
     individualParam = DTLOptimizer::optimizeParameters(fun, individualParam, settings);
-    Logger::timed << "Individual opt i=" << i << " pbefore=" << currentParameters[i] << " pafter=" << individualParam[0] 
-      << " lldfiff=" << individualParam.getScore() - currentParameters.getScore() << std::endl;
+    if (settings.verbose) {
+      Logger::info << "Individual opt i=" << i << ": pbefore=" << currentParameters[i]
+                   << ", pafter=" << individualParam[0] << ", llDiff="
+                   << individualParam.getScore() - currentParameters.getScore() << std::endl;
+    }
     currentParameters[i] = individualParam[0];
     currentParameters.setScore(individualParam.getScore());
     settings.onBetterParametersFoundCallback();
@@ -368,7 +385,7 @@ static Parameters findBestPointNelderMear(Parameters r1,
 
 
 
-static Parameters optimizeParametersNelderMear(FunctionToOptimize &function, 
+static Parameters optimizeParametersNelderMear(FunctionToOptimize &function,
     const Parameters &startingParameters)
 {
   std::vector<Parameters> rates;
@@ -381,13 +398,11 @@ static Parameters optimizeParametersNelderMear(FunctionToOptimize &function,
   }
   // n + 1 points for n dimensions
   assert(rates.size() == N + 1);
-
   for (auto &r: rates) {
     function.evaluate(r);
   }
   Parameters worstRate = startingParameters;
   unsigned int currentIt = 0;
-
   while (worstRate.distance(rates.back()) > 0.005) {
     std::sort(rates.begin(), rates.end());
     worstRate = rates.back();
@@ -398,8 +413,8 @@ static Parameters optimizeParametersNelderMear(FunctionToOptimize &function,
     }
     x0 = x0 / double(rates.size() - 1);
     // reflexion, exansion and contraction at the same time
-    Parameters x1 = x0 - (x0 - rates.back()) * 0.5;  
-    Parameters x2 = x0 + (x0 - rates.back()) * 1.5;  
+    Parameters x1 = x0 - (x0 - rates.back()) * 0.5;
+    Parameters x2 = x0 + (x0 - rates.back()) * 1.5;
     unsigned int iterations = 8;
     Parameters xr = findBestPointNelderMear(x1, x2, iterations, function);
     if (xr < rates[rates.size() - 1] ) {
@@ -496,44 +511,45 @@ Parameters DTLOptimizer::optimizeParameters(FunctionToOptimize &function,
   auto res = startingParameters;
   switch(settings.strategy) {
     case RecOpt::Gradient:
-      res = optimizeParametersGradient(function, 
-          startingParameters, 
+      res = optimizeParametersGradient(function,
+          startingParameters,
           settings);
       break;
     case RecOpt::LBFGSB:
-      res = optimizeParametersLBFGSB(function, 
-          startingParameters, 
+      res = optimizeParametersLBFGSB(function,
+          startingParameters,
           settings);
       break;
     case RecOpt::GSL_SIMPLEX:
 #ifdef WITH_GSL
-      res = optimizeParametersGSLSimplex(function, 
-          startingParameters, 
+      res = optimizeParametersGSLSimplex(function,
+          startingParameters,
           settings);
 #else
       std::cerr << "Error, GSL routine not available, please install GSL and recompile" << std::endl;
 #endif
       break;
     case RecOpt::Simplex:
-      res = optimizeParametersNelderMear(function, 
+      res = optimizeParametersNelderMear(function,
           startingParameters);
       break;
     default:
       assert(false);
       break;
   }
-
   if (settings.individualParamOpt && startingParameters.dimensions() > 1) {
-    double diff = 0.0;
+    double llDiff = 0.0;
     unsigned int it = 0;
     do {
       auto ll = res.getScore();
       res = optimizeParametersIndividually(function, res, settings);
-      diff = res.getScore() - ll;
+      llDiff = res.getScore() - ll;
       ll = res.getScore();
       ++it;
-      Logger::timed << "lldiff after one round of individual opt: " << diff << std::endl;
-    } while (diff > settings.individualParamOptMinImprovement && it < settings.individualParamOptMaxIt);
+      if (settings.verbose) {
+        Logger::timed << "llDiff after one round of individual opt: " << llDiff << std::endl;
+      }
+    } while (llDiff > settings.individualParamOptMinImprovement && it < settings.individualParamOptMaxIt);
   }
   return res;
 }

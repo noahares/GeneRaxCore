@@ -77,24 +77,28 @@ private:
   std::vector<RootBoot> _bootstraps;
 };
 
+
+
 /**
  *  Interface for classes that are used by the search
- *  algorithms to evaluate the reconciliation likelihood and 
+ *  algorithms to evaluate the reconciliation likelihood and
  *  to describe the reconciliation model.
  */
 class SpeciesTreeLikelihoodEvaluatorInterface {
 public:
-  virtual ~SpeciesTreeLikelihoodEvaluatorInterface() {};
+  virtual ~SpeciesTreeLikelihoodEvaluatorInterface()
+  {}
+
   /**
-   * Computes and return the likelihood
+   *  Compute and return the likelihood
    *
-   * If perFam is set, fill perFamLL with the per-family log-likelihoods
-   * from the current parralel core 
+   *  If perFam is set, fill perFamLL with the per-family log-likelihoods
+   *  from the current parallel core
    */
   virtual double computeLikelihood(PerFamLL *perFamLL = nullptr) = 0;
 
   /**
-   *  Fast but approximated version of the likelihood
+   *  Fast, but approximated version of the likelihood
    *  computation
    */
   virtual double computeLikelihoodFast() = 0;
@@ -112,47 +116,54 @@ public:
   virtual bool isDated() const = 0;
 
   /**
-   *  Optimize model rates, such as DTL rates.
+   *  Optimize model rates, such as DTL rates
    */
   virtual double optimizeModelRates(bool thorough = false) = 0;
 
   /**
-   *  Save in a stack what needs to be saved in case 
+   *  Save in a stack what needs to be saved in case
    *  of the rollback of a species tree operation
    */
   virtual void pushRollback() = 0;
 
   /**
-   * Pop the upper state and apply it after a rollback
-   * of a species tree operation
+   *  Pop the upper state and apply it after a rollback
+   *  of a species tree operation
    */
   virtual void popAndApplyRollback() = 0;
-  
+
   virtual void getTransferInformation(SpeciesTree &speciesTree,
     TransferFrequencies &frequencies,
     PerSpeciesEvents &perSpeciesEvents,
     PerCorePotentialTransfers &potentialTransfers) = 0;
-  
-  
+
   /**
    *  Are we in prune species tree mode?
    */
   virtual bool pruneSpeciesTree() const = 0;
 
   /**
+   *  Should be called when the species tree dates (speciation orders)
+   *  are updated
+   */
+  virtual void onSpeciesDatesChange() {}
+
+  /**
    *  Should be called when the species tree is updated
    */
-  virtual void onSpeciesTreeChange(
-      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+  virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
+  {
     (void)(nodesToInvalidate);
   }
 
   /**
-   *  Should be called when the species tree dates (speciation orders)
-   *  change
+   *  Should the optimization routines print verbose logs?
    */
-  virtual void onSpeciesDatesChange() {};
+  virtual bool isVerbose() const {return false;}
+
 };
+
+
 
 /**
  *  Structure that describes the current state of the
