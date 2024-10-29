@@ -1,4 +1,5 @@
 #include "util/Scenario.hpp"
+#include "util/enums.hpp"
 #include <IO/Logger.hpp>
 #include <IO/FileSystem.hpp>
 #include <IO/ReconciliationWriter.hpp>
@@ -10,7 +11,7 @@
 
 const char *Scenario::eventNames[]  = {"S", "SL", "D", "DL", "T", "TL", "L", "Leaf", "Invalid"};
 
-const unsigned int Scenario::EVENT_TYPE_NUMBER = 6;
+const unsigned int Scenario::EVENT_TYPE_NUMBER = 8;
 
 struct TransferPair {
   double count;
@@ -138,7 +139,7 @@ static void dumpSpeciesEventCountVector(ParallelOfstream &os,
     const std::vector<double> &eventCounts,
     const std::vector<std::string> &indexToLabel)
 {
-  os << "species_label, speciations, duplications, losses, transfers, presence, origination" << std::endl;
+  os << "species_label, speciations, duplications, losses, transfers, presence, origination, gene copy, singleton" << std::endl;
   auto N = indexToLabel.size();
   assert(Scenario::EVENT_TYPE_NUMBER * N == eventCounts.size());
   for (unsigned int i = 0; i < N; ++i) {
@@ -159,7 +160,7 @@ static void dumpSpeciesEventCountVector(ParallelOfstream &os,
 static void dumpSpeciesToEventCount(ParallelOfstream &os,
     const std::unordered_map<std::string, std::vector<double> > &speciesToEventCount)
 {
-  os << "species_label, speciations, duplications, losses, transfers, presence, origination" << std::endl;
+  os << "species_label, speciations, duplications, losses, transfers, presence, origination, gene copy, singleton" << std::endl;
   std::vector<double> defaultCount(6, 0.0);
   for (auto &it: speciesToEventCount) {
     if (defaultCount == it.second) {
@@ -179,17 +180,23 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename, bool mast
   
   ParallelOfstream os(filename, masterRankOnly);
   std::unordered_map<std::string, std::vector<double> > speciesToEventCount;
-  std::vector<double> defaultCount(6, 0);
+  std::vector<double> defaultCount(EVENT_TYPE_NUMBER, 0);
   for (unsigned int e = 0; e < _speciesTree->tip_count + _speciesTree->inner_count; ++e) {
     assert(_speciesTree->nodes[e]->label);
     speciesToEventCount.insert({std::string(_speciesTree->nodes[e]->label), defaultCount});
   }
+  auto is_speciation_event = [](ReconciliationEventType type) { 
+    return type == ReconciliationEventType::EVENT_S 
+        || type == ReconciliationEventType::EVENT_SL;
+  };
   // 0: speciation (or numbero of gene copies)
   // 1: duplication
   // 2: loss:
   // 3: transfer
   // 4: presence (1 or 0)
   // 5: origination
+  // 6: gene copies
+  // 7: singletons
   for (auto &event: _events) {
     auto &eventCount = speciesToEventCount[_speciesTree->nodes[event.speciesNode]->label];
     switch (event.type) {
@@ -197,10 +204,14 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename, bool mast
       case ReconciliationEventType::EVENT_None:
         eventCount[0]++;
         eventCount[4] = 1;
+        eventCount[6]++;
+        if (is_speciation_event(event.previous_event_type)) eventCount[7]++; 
         break;
       case ReconciliationEventType::EVENT_SL: 
         eventCount[0]++;
         eventCount[4] = 1;
+        eventCount[6]++;
+        if (is_speciation_event(event.previous_event_type)) eventCount[7]++; 
         // count the loss
         speciesToEventCount[event.pllLostSpeciesNode->label][2]++;
         break;
