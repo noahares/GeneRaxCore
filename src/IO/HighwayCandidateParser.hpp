@@ -13,16 +13,20 @@ struct Highway {
   corax_rnode_t *src;
   corax_rnode_t *dest;
   double proba;
-  
+
   friend std::ostream& operator<<(std::ostream& os, const Highway &h) {
     os << "(" << h.src->label << " -> " << h.dest->label << ")";
     return os;
   }
+
+  bool operator==(const Highway &other) const {
+    return src == other.src && dest == other.dest;
+  }
 };
-  
+
 
 /**
- *  Functions to parse a file containing a list of candidate 
+ *  Functions to parse a file containing a list of candidate
  *  transfer hightways to test. Example file:
  *
  *  from1,to1

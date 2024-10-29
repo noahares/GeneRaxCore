@@ -1,5 +1,4 @@
 #include <optimizers/DTLOptimizer.hpp>
-#include <IO/IniParser.h>
 #include <iomanip>
 #include <parallelization/ParallelContext.hpp>
 #include <IO/Logger.hpp>
@@ -94,15 +93,12 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
     const Parameters &startingParameters,
     OptimizationSettings settings)
 {
-  // IniParser& parser = IniParser::getInstance();
   unsigned int n = startingParameters.dimensions();
-  // float lb = parser.getValue("optimizer.lb");
-  // float ub = parser.getValue("optimizer.ub");
   float lb = 1.0e-10;
-  float ub = 1.0;
+  float ub = 2.0;
   std::vector<double> xmin(n, lb);
   std::vector<double> xmax(n, ub);
-  std::vector<double> x(n, (ub - lb) / 2.0);
+  std::vector<double> x(n, 0.5);
   for (unsigned int i = 0; i < n; ++i) {
     x[i] = startingParameters[i];
   }
@@ -114,7 +110,7 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
 
   // float factr = parser.getValue("lbfgsb.factr");
   // float pgtol = parser.getValue("lbfgsb.pgtol");
-  float factr = 1.0;
+  float factr = static_cast<float>(settings.factr);
   float pgtol = 0.001;
   corax_opt_minimize_lbfgsb(&x[0],
       &xmin[0],
