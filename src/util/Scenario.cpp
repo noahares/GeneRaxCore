@@ -161,13 +161,13 @@ static void dumpSpeciesToEventCount(ParallelOfstream &os,
     const std::unordered_map<std::string, std::vector<double> > &speciesToEventCount)
 {
   os << "species_label, speciations, duplications, losses, transfers, presence, origination, copies, singletons" << std::endl;
-  std::vector<double> defaultCount(6, 0.0);
+  std::vector<double> defaultCount(Scenario::EVENT_TYPE_NUMBER, 0.0);
   for (auto &it: speciesToEventCount) {
     if (defaultCount == it.second) {
       // do not write species without any event
       continue;
     }
-    assert(it.second.size() == 6);
+    assert(it.second.size() == Scenario::EVENT_TYPE_NUMBER);
     os << it.first;
     for (auto v: it.second) {
       os << ", " << v;
