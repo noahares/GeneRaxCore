@@ -17,7 +17,32 @@ static bool isValidLikelihood(double ll) {
   return std::isnormal(ll) && ll < -0.0000001;
 }
 
-
+Parameters optimizeParametersGrid(FunctionToOptimize &function, 
+    const Parameters &startingParameters,
+    OptimizationSettings settings)
+{
+  auto params = std::vector<Parameters>();
+  params.push_back(Parameters(std::vector<double>(1,1e-10)));
+  for (int i = 1; i <= 40; ++i) {
+    params.push_back(Parameters( std::vector<double>(1, i * 0.05)));
+  }
+  params.push_back(Parameters(std::vector<double>(1,3.0)));
+  params.push_back(Parameters(std::vector<double>(1,5.0)));
+  params.push_back(Parameters(std::vector<double>(1,10.0)));
+  Parameters best = params[0];
+  best.setScore(-10000000000);
+  Logger::info << "Doing grid parameter search" << std::endl;
+  for (auto &p : params) {
+    function.evaluate(p);
+    Logger::info << p << std::setprecision(10) << std::endl;
+    if (p.getScore() > best.getScore()) {
+      best = p;
+      best.setScore(p.getScore());
+    }
+  }
+  Logger::info << "optx = " << best << std::setprecision(10) << std::endl;
+  return best;
+}
 
 static bool lineSearchParameters(FunctionToOptimize &function,
     Parameters &currentRates, 
@@ -495,6 +520,11 @@ Parameters DTLOptimizer::optimizeParameters(FunctionToOptimize &function,
 {
   auto res = startingParameters;
   switch(settings.strategy) {
+    case RecOpt::Grid:
+      res = optimizeParametersGrid(function, 
+          startingParameters, 
+          settings);
+      break;
     case RecOpt::Gradient:
       res = optimizeParametersGradient(function, 
           startingParameters, 
