@@ -22,13 +22,13 @@ Parameters optimizeParametersGrid(FunctionToOptimize &function,
     OptimizationSettings settings)
 {
   auto params = std::vector<Parameters>();
-  params.push_back(Parameters(std::vector<double>(1,1e-10)));
-  for (int i = 1; i <= 40; ++i) {
+  // params.push_back(Parameters(std::vector<double>(1,1e-10)));
+  for (int i = 10; i <= 70; ++i) {
     params.push_back(Parameters( std::vector<double>(1, i * 0.05)));
   }
-  params.push_back(Parameters(std::vector<double>(1,3.0)));
-  params.push_back(Parameters(std::vector<double>(1,5.0)));
-  params.push_back(Parameters(std::vector<double>(1,10.0)));
+  // params.push_back(Parameters(std::vector<double>(1,3.0)));
+  // params.push_back(Parameters(std::vector<double>(1,5.0)));
+  // params.push_back(Parameters(std::vector<double>(1,10.0)));
   Parameters best = params[0];
   best.setScore(-10000000000);
   Logger::info << "Doing grid parameter search" << std::endl;
