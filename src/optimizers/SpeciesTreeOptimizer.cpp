@@ -1,18 +1,16 @@
 #include "SpeciesTreeOptimizer.hpp"
 
-#include <util/Paths.hpp>
-#include <optimizers/DTLOptimizer.hpp>
+#include <algorithm>
+#include <cstdio>
+#include <fstream>
+#include "DTLOptimizer.hpp"
 #include <IO/FileSystem.hpp>
 #include <routines/Routines.hpp>
-#include <algorithm>
-#include <likelihoods/reconciliation_models/UndatedDTLModel.hpp>
-#include <fstream>
-#include <DistanceMethods/MiniNJ.hpp>
-#include <DistanceMethods/NeighborJoining.hpp>
-#include <cstdio>
-#include <support/ICCalculator.hpp>
 #include <search/SpeciesSPRSearch.hpp>
 #include <search/SpeciesTransferSearch.hpp>
+#include <support/ICCalculator.hpp>
+#include <util/Paths.hpp>
+
 
 static std::unique_ptr<SpeciesTree> makeSpeciesTree(const std::string &speciesTreeFile,
     const Families &initialFamilies)
@@ -129,12 +127,13 @@ SpeciesTreeOptimizer::~SpeciesTreeOptimizer()
 {
   _speciesTree->removeListener(this);
 }
-  
+
 double SpeciesTreeOptimizer::rootSearch(unsigned int maxDepth,
     bool outputConsel)
 {
-  TreePerFamLLVec treePerFamLLVec;  
+  TreePerFamLLVec treePerFamLLVec;
   RootLikelihoods rootLikelihoods(_evaluations.size());
+  Logger::info << std::endl;
   SpeciesRootSearch::rootSearch(
       *_speciesTree,
       _evaluator,
@@ -146,34 +145,32 @@ double SpeciesTreeOptimizer::rootSearch(unsigned int maxDepth,
   saveCurrentSpeciesTreeId();
   {
     auto newick = _speciesTree->getTree().getNewickString();
-    PLLRootedTree tree(newick, false); 
+    PLLRootedTree tree(newick, false);
     rootLikelihoods.fillTree(tree);
-    auto out = Paths::getSpeciesTreeFile(_outputDir, 
+    auto out = Paths::getSpeciesTreeFile(_outputDir,
         "species_tree_llr.newick");
     tree.save(out);
   }
   {
     auto newick = _speciesTree->getTree().getNewickString();
-    PLLRootedTree tree(newick, false); 
+    PLLRootedTree tree(newick, false);
     rootLikelihoods.fillTreeBootstraps(tree);
-    auto out = Paths::getSpeciesTreeFile(_outputDir, 
+    auto out = Paths::getSpeciesTreeFile(_outputDir,
         "species_tree_root_support.newick");
     tree.save(out);
   }
   if (outputConsel) {
-    std::string treesOutput = Paths::getConselTreeList(_outputDir, 
-        "roots"); 
-    std::string llOutput  = Paths::getConselLikelihoods(_outputDir, 
-        "roots"); 
+    std::string treesOutput = Paths::getConselTreeList(_outputDir,
+        "roots");
+    std::string llOutput  = Paths::getConselLikelihoods(_outputDir,
+        "roots");
     savePerFamilyLikelihoods(treePerFamLLVec,
       treesOutput,
       llOutput);
-    
   }
   auto ll = computeRecLikelihood();
   return ll;
 }
-
 
 std::vector<double> SpeciesTreeOptimizer::_getSupport()
 {
@@ -193,27 +190,26 @@ std::vector<double> SpeciesTreeOptimizer::_getSupport()
   return idToSupport;
 }
 
-
-
 double SpeciesTreeOptimizer::transferSearch()
 {
+  Logger::info << std::endl;
   SpeciesTransferSearch::transferSearch(
       *_speciesTree,
-    _evaluator,
-    _searchState);
+      _evaluator,
+      _searchState);
   return _searchState.bestLL;
 }
 
 double SpeciesTreeOptimizer::sprSearch(unsigned int radius)
 {
-  SpeciesSPRSearch::SPRSearch(*_speciesTree,
-    _evaluator,
-    _searchState,
-    radius);
+  Logger::info << std::endl;
+  SpeciesSPRSearch::SPRSearch(
+      *_speciesTree,
+      _evaluator,
+      _searchState,
+      radius);
   return _searchState.bestLL;
 }
- 
-
 
 std::string SpeciesTreeOptimizer::saveCurrentSpeciesTreeId(std::string name, bool masterRankOnly)
 {

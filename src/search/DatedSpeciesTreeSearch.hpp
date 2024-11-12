@@ -6,48 +6,51 @@ class SpeciesTree;
 class SpeciesTreeLikelihoodEvaluatorInterface;
 class SpeciesSearchState;
 
+
 struct ScoredBackup {
   DatedTree::Backup backup;
   double score;
-
-  ScoredBackup(): score(0.0) {}
-
-  ScoredBackup(DatedTree &datedTree, double score):
-    backup(datedTree.getBackup()), score(score) 
+  ScoredBackup():
+    score(0.0)
   {}
-
+  ScoredBackup(DatedTree &datedTree, double score):
+    backup(datedTree.getBackup()),
+    score(score)
+  {}
   bool operator < (const ScoredBackup &other) const {
     return score < other.score;
   }
 };
+
 using ScoredBackups = std::vector<ScoredBackup>;
+
+
 
 class DatedSpeciesTreeSearch {
 public:
   /**
-   * Searchf or the speciation order (dating) that optimizes
-   * the score returned by evaluation. If the score gets higher than
-   * searchState.bestLL and if searchState.pathToBestSpeciesTree
-   * is set, saves the new best tree and update bestLL
+   *  Search of the speciation order (dating) that optimizes
+   *  the score returned by the evaluator. If the score gets higher
+   *  than searchState.bestLL and if searchState.pathToBestSpeciesTree
+   *  is set, save the new best tree and update bestLL.
    *
-   * If thorough is not set, we only apply one naive round.
-   * Otherwise, we conduct a more thorough search
+   *  If thorough is not set, we only apply one naive round.
+   *  Otherwise, we conduct a more thorough search
    */
   static double optimizeDates(SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+      SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
       SpeciesSearchState &searchState,
-      double currentLL,
       bool thorough);
 
   /**
    *
    */
-  static ScoredBackups optimizeDatesFromReconciliation(SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+  static ScoredBackups optimizeDatesFromReconciliation(
+      SpeciesTree &speciesTree,
+      SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
       unsigned int searches,
       unsigned int toEvaluate = 10);
 
 };
-
 
 

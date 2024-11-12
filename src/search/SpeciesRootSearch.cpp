@@ -1,21 +1,23 @@
 #include "SpeciesRootSearch.hpp"
-#include <trees/SpeciesTree.hpp>
-#include <trees/PLLRootedTree.hpp>
-#include "DatedSpeciesTreeSearch.hpp"
-#include <numeric>
 
-static void rootSearchAux(SpeciesTree &speciesTree, 
+#include <numeric>
+#include "DatedSpeciesTreeSearch.hpp"
+#include <trees/PLLRootedTree.hpp>
+#include <trees/SpeciesTree.hpp>
+
+
+static void rootSearchAux(SpeciesTree &speciesTree,
     SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
     SpeciesSearchState &searchState,
-    std::vector<unsigned int> &movesHistory, 
-    std::vector<unsigned int> &bestMovesHistory, 
+    std::vector<unsigned int> &movesHistory,
+    std::vector<unsigned int> &bestMovesHistory,
     DatedTree::Backup &bestDatedBackup,
-    double &bestLL, 
-    double bestLLStack, 
+    double &bestLL,
+    double bestLLStack,
     unsigned int &visits,
-    unsigned int maxDepth, 
+    unsigned int maxDepth,
     RootLikelihoods *rootLikelihoods,
-    TreePerFamLLVec *treePerFamLLVec) 
+    TreePerFamLLVec *treePerFamLLVec)
 {
   if (movesHistory.size() > maxDepth) {
     return;
@@ -31,18 +33,16 @@ static void rootSearchAux(SpeciesTree &speciesTree,
     movesHistory.push_back(direction);
     evaluator.pushRollback();
     SpeciesTreeOperator::changeRoot(speciesTree, direction);
-    double ll = evaluator.computeLikelihood();
-    ll = DatedSpeciesTreeSearch::optimizeDates(speciesTree,
+    double ll = DatedSpeciesTreeSearch::optimizeDates(speciesTree,
         evaluator,
         searchState,
-        ll,
         searchState.farFromPlausible);
     PerFamLL perFamLL;
     ll = evaluator.computeLikelihood(&perFamLL);
     if (treePerFamLLVec) {
       PerFamLL globalPerFamLL;
       ParallelContext::concatenateHetherogeneousDoubleVectors(
-        perFamLL, globalPerFamLL);
+          perFamLL, globalPerFamLL);
       auto newick = speciesTree.getTree().getNewickString();
       treePerFamLLVec->push_back({newick, globalPerFamLL});
     }
@@ -61,18 +61,18 @@ static void rootSearchAux(SpeciesTree &speciesTree,
       bestLL = ll;
       bestMovesHistory = movesHistory;
       bestDatedBackup = speciesTree.getDatedTree().getBackup();
-      Logger::info << "Found better root " << ll << std::endl;
+      Logger::timed << "\tbetter root: LL=" << ll << std::endl;
       searchState.betterTreeCallback(ll, perFamLL);
     }
     auto newMaxDepth = maxDepth;
     if (additionalDepth) {
       newMaxDepth = movesHistory.size() + additionalDepth;
     }
-    rootSearchAux(speciesTree, 
+    rootSearchAux(speciesTree,
         evaluator,
         searchState,
-        movesHistory, 
-        bestMovesHistory, 
+        movesHistory,
+        bestMovesHistory,
         bestDatedBackup,
         bestLL,
         bestLLStack,
@@ -95,7 +95,6 @@ double SpeciesRootSearch::rootSearch(
     RootLikelihoods *rootLikelihoods,
     TreePerFamLLVec *treePerFamLLVec)
 {
-  Logger::info << std::endl;
   Logger::timed << "[Species search] Root search with depth=" << maxDepth << std::endl;
   std::vector<unsigned int> movesHistory;
   std::vector<unsigned int> bestMovesHistory;
@@ -118,24 +117,24 @@ double SpeciesRootSearch::rootSearch(
   movesHistory.push_back(1);
   double temp1 = bestLL;
   double temp2 = bestLL;
-  DatedTree::Backup bestDatedBackup;
+  auto bestDatedBackup = speciesTree.getDatedTree().getBackup();
   rootSearchAux(speciesTree,
       evaluator,
       searchState,
-      movesHistory, 
-      bestMovesHistory, 
+      movesHistory,
+      bestMovesHistory,
       bestDatedBackup,
       bestLL,
       temp1,
-      visits, 
+      visits,
       maxDepth,
       rootLikelihoods,
       treePerFamLLVec);
   movesHistory[0] = 0;
-  rootSearchAux(speciesTree, 
+  rootSearchAux(speciesTree,
       evaluator,
       searchState,
-      movesHistory, 
+      movesHistory,
       bestMovesHistory,
       bestDatedBackup,
       bestLL,
@@ -150,15 +149,11 @@ double SpeciesRootSearch::rootSearch(
   speciesTree.getDatedTree().restore(bestDatedBackup);
   if (rootLikelihoods) {
     auto newick = speciesTree.getTree().getNewickString();
-    PLLRootedTree tree(newick, false); 
+    PLLRootedTree tree(newick, false);
     rootLikelihoods->fillTree(tree);
   }
   Logger::timed << "[Species search] After root search: LL=" << bestLL << " " << std::endl;
   return bestLL;
 }
-
-
-
-
 
 

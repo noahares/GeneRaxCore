@@ -481,16 +481,20 @@ void ParallelContext::barrier()
 }
 
 void ParallelContext::abort(int errorCode)
-{ 
+{
   if (!_mpiEnabled) {
     exit(errorCode);
   }
 #ifdef WITH_MPI
   if (_ownsMPIContextStack.top()) {
-    MPI_Finalize();
+    if (!errorCode) {
+      // exit code 0 is to be sent by all ranks,
+      // we can finalize
+      MPI_Finalize();
+    }
     exit(errorCode);
   } else {
-    throw ParallelException(errorCode); 
+    throw ParallelException(errorCode);
   }
 #else
   assert(false);

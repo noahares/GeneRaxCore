@@ -1,8 +1,8 @@
 
 find_package(GSL)
 if (GSL_FOUND)
-    set(WITH_GSL TRUE)
-    add_definitions(-DWITH_GSL)
+  set(WITH_GSL TRUE)
+  add_definitions(-DWITH_GSL)
 endif()
 
 set(generaxcore_SOURCES
@@ -20,7 +20,6 @@ set(generaxcore_SOURCES
   IO/GeneSpeciesMapping.cpp
   IO/FamiliesFileParser.cpp
   IO/LibpllParsers.cpp
-  IO/ParallelOfstream.cpp
   IO/ReconciliationWriter.cpp
   likelihoods/LibpllEvaluation.cpp
   likelihoods/ReconciliationEvaluation.cpp
@@ -73,10 +72,11 @@ set(generaxcore_SOURCES
 
 add_library(generaxcore STATIC ${generaxcore_SOURCES})
 if (GSL_FOUND)
-  target_link_libraries(generaxcore GSL::gsl )
+  target_link_libraries(generaxcore GSL::gsl)
 endif()
 
 add_subdirectory(tests)
 target_include_directories(generaxcore
   PUBLIC ${GENERAXCORE_INCLUDE_DIRS}
   )
+

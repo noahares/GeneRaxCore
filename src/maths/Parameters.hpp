@@ -8,14 +8,18 @@
 #include <cmath>
 #include <cassert>
 
+
+
 class Parameters {
 public:
-  Parameters(): _score(0.0) {}
-  
-  Parameters(unsigned int dimensions): _parameters(dimensions, 0.0),
+  Parameters():
     _score(0.0)
-  {
-  }
+  {}
+
+  Parameters(unsigned int dimensions):
+    _parameters(dimensions, 0.0),
+    _score(0.0)
+  {}
 
   Parameters(unsigned int number, const Parameters &initValue):
     _score(0.0)
@@ -28,32 +32,42 @@ public:
       }
     }
   }
-  
-  Parameters(double d, double l): _score(0.0) {
+
+  Parameters(double d, double l):
+    _score(0.0)
+  {
     _parameters.push_back(d);
     _parameters.push_back(l);
   }
-  
-  Parameters(double d, double l, double t): _score(0.0) {
+
+  Parameters(double d, double l, double t):
+    _score(0.0)
+  {
     _parameters.push_back(d);
     _parameters.push_back(l);
     _parameters.push_back(t);
   }
-  
-  Parameters(double d, double l, double t, double i): _score(0.0) {
+
+  Parameters(double d, double l, double t, double i):
+    _score(0.0)
+  {
     _parameters.push_back(d);
     _parameters.push_back(l);
     _parameters.push_back(t);
     _parameters.push_back(i);
   }
 
-  Parameters(const std::vector<double> &parameters): _parameters(parameters),
+  Parameters(const std::vector<double> &parameters):
+    _parameters(parameters),
+    _score(0.0)
+  {}
+
+  Parameters(const std::string &src):
     _score(0.0)
   {
+    load(src);
   }
 
-  Parameters(const std::string &src): _score(0.0) {load(src);} 
-  
   inline unsigned int dimensions() const {
     return static_cast<unsigned int>(_parameters.size());
   }
@@ -63,8 +77,8 @@ public:
   }
 
   inline Parameters getSubParameters(unsigned int begin, unsigned int size) const {
-    return Parameters(std::vector<double>(_parameters.begin() + begin, 
-          _parameters.begin() + begin + size));
+    return Parameters(std::vector<double>(_parameters.begin() + begin,
+        _parameters.begin() + begin + size));
   }
 
   void ensurePositivity() {
@@ -73,7 +87,7 @@ public:
       //p = std::min(1.0, p);
     }
   }
-  
+
   void constrain(double min, double max) {
     for (auto &p: _parameters) {
       p = std::max(min, p);
@@ -81,21 +95,21 @@ public:
     }
   }
 
-  double operator [](unsigned int i) const    {return _parameters[i];}
+  double operator [](unsigned int i) const {return _parameters[i];}
   double & operator [](unsigned int i) {return _parameters[i];}
-  
+
   inline double getScore() const {return _score;}
   inline void setScore(double score) {_score = score;}
-  
+
   inline bool operator <(const Parameters& v) const {
     return getScore() > v.getScore();
   }
-  
+
   inline bool operator <=(const Parameters& v) const {
-    return getScore() >=  v.getScore();
+    return getScore() >= v.getScore();
   }
-  
-  inline Parameters operator+(const Parameters& v) const {
+
+  inline Parameters operator +(const Parameters& v) const {
     assert(dimensions() == v.dimensions());
     Parameters res(*this);
     for (unsigned int i = 0; i < dimensions(); ++i) {
@@ -103,8 +117,8 @@ public:
     }
     return res;
   }
-  
-  inline Parameters operator-(const Parameters& v) const {
+
+  inline Parameters operator -(const Parameters& v) const {
     assert(dimensions() == v.dimensions());
     Parameters res(*this);
     for (unsigned int i = 0; i < dimensions(); ++i) {
@@ -112,16 +126,16 @@ public:
     }
     return res;
   }
-  
-  inline Parameters operator*(double v) const {
+
+  inline Parameters operator *(double v) const {
     Parameters res(*this);
     for (unsigned int i = 0; i < dimensions(); ++i) {
       res._parameters[i] *= v;
     }
     return res;
   }
-  
-  inline Parameters operator/(double v) const {
+
+  inline Parameters operator /(double v) const {
     Parameters res(*this);
     for (unsigned int i = 0; i < dimensions(); ++i) {
       res._parameters[i] /= v;
@@ -141,25 +155,28 @@ public:
     double av = distance(Parameters(dimensions()));
     *this = *this * (norm / av);
   }
-  
-  friend std::ostream& operator<<(std::ostream& os, const Parameters &v) {
+
+  friend std::ostream& operator <<(std::ostream& os, const Parameters &v) {
     os << "(";
     for (auto value: v._parameters) {
       os << value << ", ";
     }
-    os << "score = " << v.getScore() << ")";
+    os << "score=" << v.getScore() << ")";
     return os;
   }
-  
-  void save(const std::string &dest) 
+
+  void save(const std::string &dest)
   {
     ParallelOfstream os(dest);
-    for (auto &r: _parameters) {
-      os << r << " ";
+    for (unsigned int i = 0; i < dimensions(); ++i) {
+      if (i != 0) os << " ";
+      os << _parameters[i];
     }
+    os << std::endl;
+    os.close();
   }
 
-  void load(const std::string &src) 
+  void load(const std::string &src)
   {
     _parameters.clear();
     std::ifstream is2(src);
@@ -168,8 +185,8 @@ public:
     std::ifstream is(src);
     if (!is.good()) {
       std::cerr << "Cannot read parameters from " << src << std::endl;
+      assert(false);
     }
-    assert(is.good());
     while (!is.eof()) {
       double a = -42;
       is >> a;
@@ -181,10 +198,11 @@ public:
   }
 
   const std::vector<double> &getVector() const {return _parameters;}
+
 private:
   std::vector<double> _parameters;
   double _score;
-};
 
+};
 
 
