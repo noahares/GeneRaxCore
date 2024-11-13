@@ -5,17 +5,17 @@
 struct Highway {
   Highway():src(nullptr), dest(nullptr), proba(0.0) {}
 
-  Highway(corax_rnode_t *src, corax_rnode_t *dest):
+  Highway(corax_rnode_t *src, corax_rnode_t *dest, double proba = 0.01):
     src(src),
     dest(dest),
-    proba(0.1)
+    proba(proba)
   {}
   corax_rnode_t *src;
   corax_rnode_t *dest;
   double proba;
 
   friend std::ostream& operator<<(std::ostream& os, const Highway &h) {
-    os << "(" << h.src->label << " -> " << h.dest->label << ")";
+    os << h.src->label << "->" << h.dest->label;
     return os;
   }
 
@@ -31,7 +31,7 @@ struct Highway {
  *
  *  from1,to1
  *  from2,to2
- *  from3,to3
+ *  from3,to3,rate
  */
 class HighwayCandidateParser {
 public:

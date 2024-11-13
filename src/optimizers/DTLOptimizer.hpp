@@ -28,7 +28,7 @@ enum class LBFGSBPrecision: int64_t {
 
 struct OptimizationSettings {
   OptimizationSettings(): 
-    strategy(RecOpt::Gradient),
+    strategy(RecOpt::LBFGSB),
     lineSearchMinImprovement(0.1),
     optimizationMinImprovement(3.0),
     minAlpha(0.0000001),

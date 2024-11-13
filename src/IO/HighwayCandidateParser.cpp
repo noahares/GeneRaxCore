@@ -1,43 +1,9 @@
 #include "HighwayCandidateParser.hpp"
-#include <sstream>
-#include <algorithm>
 #include <IO/IO.hpp>
+#include <sstream>
+#include <string>
 
-
-bool readTaxa(std::stringstream &iss, 
-    std::vector<corax_rnode_t *> &nodes,
-    const std::string &candidateFile,
-    unsigned int lineNumber,
-    const std::unordered_map<std::string, corax_rnode_t *> &labelToNode,
-    bool from) 
-{
-  std::string str;
-  char delimiter = from ? ',' : '\n';
-  std::string fromToString = from ? "from" : "to";
-  if (!std::getline(iss, str, delimiter)) {
-    Logger::info << "Error: can't read the " << fromToString << " from species at line " << lineNumber << " of file " << candidateFile << std::endl;
-    return false;
-  }  
-  IO::removeSpaces(str);
-  if (str == "*") {
-    for (auto it: labelToNode) {
-      nodes.push_back(it.second);
-    }
-    return true;
-  }
-  auto it = labelToNode.find(str);
-  if (it == labelToNode.end()) {
-    Logger::info << "Error: " << fromToString << " label " << str << 
-      " not found in the species tree. Check line " 
-      << lineNumber << " of file " << candidateFile << std::endl;
-    return false;
-  }
-  nodes.push_back(it->second);
-  return true;
-}
-
-bool isParent(corax_rnode_t *parent, corax_rnode_t *child)
-{
+bool isParent(corax_rnode_t *parent, corax_rnode_t *child) {
   while (child) {
     if (parent == child) {
       return true;
@@ -47,10 +13,56 @@ bool isParent(corax_rnode_t *parent, corax_rnode_t *child)
   return false;
 }
 
-std::vector<Highway> HighwayCandidateParser::parse(
-    const std::string &candidateFile,
-    PLLRootedTree &speciesTree)
-{
+bool readTaxa(
+    std::stringstream &iss, std::vector<Highway> &highways,
+    const std::unordered_map<std::string, corax_rnode_t *> &labelToNode) {
+  std::string source, target, rate_s;
+  std::vector<corax_rnode_t *> source_nodes;
+  std::vector<corax_rnode_t *> target_nodes;
+
+  if (!std::getline(iss, source, ',') || !std::getline(iss, target, ',')) {
+    return false;
+  }
+  auto parse_node = [&](std::string &str, std::vector<corax_rnode_t *> &nodes) {
+    IO::removeSpaces(str);
+    if (str == "*") {
+      for (auto it : labelToNode) {
+        nodes.push_back(it.second);
+      }
+    } else {
+      auto node = labelToNode.find(str);
+      if (node == labelToNode.end()) {
+        return false;
+      }
+      nodes.push_back(node->second);
+    }
+    return true;
+  };
+  if (!parse_node(source, source_nodes) || !parse_node(target, target_nodes))
+    return false;
+  for (auto from : source_nodes) {
+    for (auto to : target_nodes) {
+      if (!isParent(to, from)) {
+        highways.push_back(Highway(from, to));
+      }
+    }
+  }
+  if (std::getline(iss, rate_s, '\n')) {
+    try {
+      double rate = std::stod(rate_s);
+      for (auto &hw : highways) {
+        hw.proba = rate;
+      }
+    } catch (std::exception &err) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::vector<Highway>
+HighwayCandidateParser::parse(const std::string &candidateFile,
+                              PLLRootedTree &speciesTree) {
   std::vector<Highway> candidates;
   auto labelToNode = speciesTree.getLabelToNode(false);
   std::ifstream is(candidateFile);
@@ -62,30 +74,15 @@ std::vector<Highway> HighwayCandidateParser::parse(
       continue;
     }
     IO::removeSpaces(line);
-    if (line[0] =='#') {
+    if (line[0] == '#') {
       continue;
     }
-    bool ok = true;
     std::stringstream iss(line);
-    std::vector<corax_rnode_t *> froms;
-    std::vector<corax_rnode_t *> tos;
-    ok &= readTaxa(iss, froms, candidateFile, lineNumber, labelToNode, true);
-  
-    ok &= readTaxa(iss, tos, candidateFile, lineNumber, labelToNode, false);
-    if (!ok) {
-      candidates.clear();
-      return candidates;
+    if (!readTaxa(iss, candidates, labelToNode)) {
+      Logger::info << "Failed to parse line " << lineNumber
+                   << " of highways file " << candidateFile
+                   << "! Continuing with next line" << std::endl;
     }
-    for (auto from: froms) {
-      for(auto to: tos) {
-        if (!isParent(to, from)) {
-          candidates.push_back(Highway(from, to));
-        }
-      }
-
-    } 
   }
-
   return candidates;
 }
-
