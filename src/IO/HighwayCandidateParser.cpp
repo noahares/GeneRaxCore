@@ -19,6 +19,7 @@ bool readTaxa(
   std::string source, target, rate_s;
   std::vector<corax_rnode_t *> source_nodes;
   std::vector<corax_rnode_t *> target_nodes;
+  double rate = 0.01;
 
   if (!std::getline(iss, source, ',') || !std::getline(iss, target, ',')) {
     return false;
@@ -40,24 +41,20 @@ bool readTaxa(
   };
   if (!parse_node(source, source_nodes) || !parse_node(target, target_nodes))
     return false;
-  for (auto from : source_nodes) {
-    for (auto to : target_nodes) {
-      if (!isParent(to, from)) {
-        highways.push_back(Highway(from, to));
-      }
-    }
-  }
   if (std::getline(iss, rate_s, '\n')) {
     try {
-      double rate = std::stod(rate_s);
-      for (auto &hw : highways) {
-        hw.proba = rate;
-      }
+      rate = std::stod(rate_s);
     } catch (std::exception &err) {
-      return false;
     }
   }
   return true;
+  for (auto from : source_nodes) {
+    for (auto to : target_nodes) {
+      if (!isParent(to, from)) {
+        highways.push_back(Highway(from, to, rate));
+      }
+    }
+  }
 }
 
 std::vector<Highway>
