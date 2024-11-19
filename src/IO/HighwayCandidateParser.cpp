@@ -47,7 +47,6 @@ bool readTaxa(
     } catch (std::exception &err) {
     }
   }
-  return true;
   for (auto from : source_nodes) {
     for (auto to : target_nodes) {
       if (!isParent(to, from)) {
@@ -55,6 +54,7 @@ bool readTaxa(
       }
     }
   }
+  return true;
 }
 
 std::vector<Highway>
