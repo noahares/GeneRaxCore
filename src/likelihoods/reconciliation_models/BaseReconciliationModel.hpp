@@ -1,5 +1,6 @@
 #pragma once
 
+#include "IO/HighwayCandidateParser.hpp"
 #include <likelihoods/LibpllEvaluation.hpp>
 #include <IO/GeneSpeciesMapping.hpp>
 #include <util/Scenario.hpp>
@@ -45,6 +46,8 @@ public:
    * (incrementally) compute and return the likelihood of the gene tree 
    */
   virtual double computeLogLikelihood() = 0;
+
+  virtual double computeHighwayTerm(Highway &highway) {return 0.0;};
 
 
   /**
