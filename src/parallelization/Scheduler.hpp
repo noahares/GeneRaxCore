@@ -3,24 +3,29 @@
 #include <string>
 
 
+
 /**
- *  Schedule jobs with the external dependency MPIScheduler, 
- *  allowing to schedule independant jobs in parallel with a 
- *  specified number of cores per job. 
- *  @param outputDir the GeneRax run output directory
- *  @param commandFile command file path (see MPIScheduler 
- *                     documentation)
- *  @param splitImplem split or fork implementaiton (see 
- *                     MPIScheduler documentation)
- *  @param execPath the path to the executable to schedule
+ *  Schedules jobs with the external dependency MPIScheduler,
+ *  allowing to schedule independent jobs in parallel with a
+ *  specified number of cores per job.
+ *  @param outputDir The GeneRax run output directory
+ *  @param commandFile The path to the command file
+ *                     (see the MPIScheduler documentation)
+ *  @param splitImplem Split or fork implementation
+ *                     (see the MPIScheduler documentation)
+ *  @param execPath The path to the executable to schedule
  *                  (in practice, it will be the same as the
  *                  main executable, but with specific arguments)
  */
 class Scheduler {
 public:
   Scheduler() = delete;
-  static void schedule(const std::string &outputDir, 
-      const std::string &commandFile, 
-      bool splitImplem, 
+
+  static void schedule(const std::string &outputDir,
+      const std::string &commandFile,
+      bool splitImplem,
       const std::string &execPath);
+
 };
+
+
