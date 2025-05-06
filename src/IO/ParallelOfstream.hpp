@@ -1,24 +1,48 @@
 #pragma once
 
-#include <parallelization/ParallelContext.hpp>
 #include <fstream>
-#include <string>
 #include <memory>
+#include <string>
+#include <parallelization/ParallelContext.hpp>
+
 
 
 class ParallelOfstream {
 public:
-  ParallelOfstream(const std::string &fileName, bool masterRankOnly = true);
-  void close();
-  ~ParallelOfstream();
+  ParallelOfstream(const std::string &fileName, bool masterRankOnly = true):
+    _os(nullptr)
+  {
+    if (!ParallelContext::getRank() || !masterRankOnly) {
+      _os = std::make_unique<std::ofstream>(fileName);
+    } else {
+      _os = std::make_unique<std::ostream>(nullptr);
+    }
+  }
+
+  ~ParallelOfstream() {close();}
+
+  void close()
+  {
+    // force the _os destruction if it holds an ofstream
+    _os = std::make_unique<std::ostream>(nullptr);
+  }
+
+  template<typename T>
+  std::ostream& operator << (T input)
+  {
+    *_os << input;
+    return *_os;
+  }
+
+  std::ostream& operator << (std::ostream& (*manip)(std::ostream&))
+  {
+    manip(*_os);
+    return *_os;
+  }
+
 private:
-  template<typename T> friend std::ostream& operator<<(ParallelOfstream&, T);
   std::unique_ptr<std::ostream> _os;
+
 };
 
-template<typename T> 
-std::ostream& operator<<(ParallelOfstream& log, T op) {
-  *log._os << op;
-  return *log._os;
-}
 

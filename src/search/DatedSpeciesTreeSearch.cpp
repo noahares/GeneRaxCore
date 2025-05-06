@@ -1,12 +1,13 @@
 #include "DatedSpeciesTreeSearch.hpp"
+
+#include "SpeciesSearchCommon.hpp"
+#include "SpeciesTransferSearch.hpp"
 #include <IO/Logger.hpp>
 #include <trees/SpeciesTree.hpp>
-#include <optimizers/SpeciesTreeOptimizer.hpp>
-#include <search/SpeciesTransferSearch.hpp>
-  
+
 
 static void saveDatedTree(SpeciesTree &speciesTree,
-  const SpeciesSearchState &state)
+    const SpeciesSearchState &state)
 {
   if (state.pathToBestSpeciesTree.size() == 0) {
     return;
@@ -16,28 +17,27 @@ static void saveDatedTree(SpeciesTree &speciesTree,
   ParallelContext::barrier();
 }
 
-
 static double optimizeDatesLocal(SpeciesTree &speciesTree,
     SpeciesSearchState &state,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+    SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
     bool verbose)
 {
   auto &tree = speciesTree.getDatedTree();
   unsigned int max = tree.getOrderedSpeciations().size();
-  auto bestLL = evaluation.computeLikelihood();
+  auto bestLL = evaluator.computeLikelihood();
   bool tryAgain = true;
   if (verbose) {
-    Logger::timed << "Starting a new naive dating search from ll=" << bestLL << std::endl;
+    Logger::timed << "Starting new naive dating search from ll=" << bestLL << std::endl;
   }
   while (tryAgain) {
     tryAgain = false;
-    const double initialBestLL = bestLL; 
+    const double initialBestLL = bestLL;
     for (unsigned int rank = 0; rank < max; ++rank) {
       if (!tree.moveUp(rank)) {
         continue;
       }
-      evaluation.onSpeciesDatesChange();
-      auto ll = evaluation.computeLikelihood();
+      evaluator.onSpeciesDatesChange();
+      auto ll = evaluator.computeLikelihood();
       if (ll > state.bestLL) {
         // best tree over all search iterations, we save it!
         state.bestLL = ll;
@@ -59,19 +59,18 @@ static double optimizeDatesLocal(SpeciesTree &speciesTree,
       assert(tree.isConsistent());
     }
     if (verbose) {
-      Logger::timed << " end of round, ll= " << bestLL <<  std::endl;
+      Logger::timed << " end of round, ll=" << bestLL <<  std::endl;
     }
   }
-  evaluation.onSpeciesDatesChange();
+  evaluator.onSpeciesDatesChange();
   if (verbose) {
-    Logger::timed << "End of naive dating search, ll= " << bestLL <<  std::endl;
+    Logger::timed << "End of naive dating search, ll=" << bestLL <<  std::endl;
   }
   return bestLL;
 }
 
-
-// Randomly perturbate the order of speciation events in the dated 
-// species tree. The level of perturbation is proportional with 
+// Randomly perturbate the order of speciation events in the dated
+// species tree. The level of perturbation is proportional with
 // perturbation, which is typicall between 0 and 1 (but can be greater)
 static void perturbateDates(SpeciesTree &speciesTree, double perturbation = 1.0)
 {
@@ -108,18 +107,18 @@ static void perturbateDates(SpeciesTree &speciesTree, double perturbation = 1.0)
 
 double DatedSpeciesTreeSearch::optimizeDates(
       SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+      SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
       SpeciesSearchState &state,
-      double currentLL,
       bool thorough)
 {
-  auto bestLL = currentLL;
-  if (!evaluation.isDated()) {
+  bool verbose = evaluator.isVerbose();
+  auto bestLL = evaluator.computeLikelihood();
+  if (!evaluator.isDated()) {
     return bestLL;
   }
-  Logger::timed << "Optimizing dates, ll=" << bestLL << std::endl;
-  optimizeDatesLocal(speciesTree, state, evaluation, true); 
-  bestLL = evaluation.computeLikelihood();
+  Logger::timed << "[Species search] Optimizing dates, ll=" << bestLL << std::endl;
+  optimizeDatesLocal(speciesTree, state, evaluator, verbose);
+  bestLL = evaluator.computeLikelihood();
   unsigned int unsuccessfulTrials = 0;
   const unsigned int maxTrials = 2;
   auto &tree = speciesTree.getDatedTree();
@@ -127,26 +126,25 @@ double DatedSpeciesTreeSearch::optimizeDates(
     auto backup = tree.getBackup();
     double perturbation = 0.1;//double(unsuccessfulTrials + 1) / double(maxTrials);
     perturbateDates(speciesTree, perturbation);
-    evaluation.onSpeciesDatesChange();
-    auto ll = evaluation.computeLikelihood();
-    optimizeDatesLocal(speciesTree, state, evaluation, true);
-    ll = evaluation.computeLikelihood();
+    evaluator.onSpeciesDatesChange();
+    auto ll = evaluator.computeLikelihood();
+    optimizeDatesLocal(speciesTree, state, evaluator, verbose);
+    ll = evaluator.computeLikelihood();
     if (ll <= bestLL) {
       tree.restore(backup);
       unsuccessfulTrials++;
     } else {
       unsuccessfulTrials = 0;
       bestLL = ll;
-      Logger::timed << " better ll=" << bestLL << std::endl;
+      Logger::timed << "[Species search]   better ll=" << bestLL << std::endl;
     }
-  } 
-  Logger::timed << "after optimizating dates, ll = " << bestLL << std::endl;
+  }
+  Logger::timed << "[Species search]   After date opt, ll=" << bestLL << std::endl;
   return bestLL;
 }
 
-
 unsigned int getTransferScore(SpeciesTree &speciesTree,
-  const TransferFrequencies &frequencies)
+    const TransferFrequencies &frequencies)
 {
   std::unordered_map<std::string, unsigned int> labelsToIds;
   speciesTree.getLabelsToId(labelsToIds);
@@ -172,16 +170,15 @@ unsigned int getTransferScore(SpeciesTree &speciesTree,
 }
 
 class TransferScoreEvaluator: public SpeciesTreeLikelihoodEvaluatorInterface {
- private:
+private:
   SpeciesTree &_speciesTree;
   TransferFrequencies &_frequencies;
 public:
-  TransferScoreEvaluator(SpeciesTree &speciesTree, 
+  TransferScoreEvaluator(SpeciesTree &speciesTree,
       TransferFrequencies &frequencies):
     _speciesTree(speciesTree),
     _frequencies(frequencies)
   {}
-  
   virtual double computeLikelihood(PerFamLL *perFamLL = nullptr) {
     assert(!perFamLL);
     return computeLikelihoodFast();
@@ -197,29 +194,32 @@ public:
   virtual void pushRollback() {}
   virtual void popAndApplyRollback() {}
   virtual void getTransferInformation(SpeciesTree &,
-    TransferFrequencies &,
-    PerSpeciesEvents &,
-    PerCorePotentialTransfers &) {
-    assert(false); 
+      TransferFrequencies &,
+      PerSpeciesEvents &,
+      PerCorePotentialTransfers &)
+  {
+    assert(false);
   }
   virtual bool pruneSpeciesTree() const {return false;}
 };
 
-ScoredBackups DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-      unsigned int searches,
-      unsigned int toEvaluate)
+ScoredBackups DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(
+    SpeciesTree &speciesTree,
+    SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+    unsigned int searches,
+    unsigned int toEvaluate)
 {
+  bool verbose = evaluator.isVerbose();
   auto &tree = speciesTree.getDatedTree();
-  ScoredBackups scoredBackups; 
   auto reconciliationDatingBackup = tree.getBackup();
+  ScoredBackups scoredBackups;
   // get the transfers from reconciliations
   TransferFrequencies frequencies;
   PerSpeciesEvents perSpeciesEvents;
   PerCorePotentialTransfers potentialTransfers;
-  evaluation.getTransferInformation(speciesTree, frequencies,
+  evaluator.getTransferInformation(speciesTree, frequencies,
       perSpeciesEvents, potentialTransfers);
-  TransferScoreEvaluator fakeEvaluator(speciesTree, frequencies); 
+  TransferScoreEvaluator fakeEvaluator(speciesTree, frequencies);
   // start multiple searches from random datings
   for (unsigned int i = 0; i < searches; ++i) {
     // we should replace this with anything that would produce
@@ -231,14 +231,13 @@ ScoredBackups DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(SpeciesTre
     auto bestScore = optimizeDatesLocal(speciesTree,
         fakeState,
         fakeEvaluator,
-        false);      
-  
+        false);
     unsigned int unsuccessfulTrials = 0;
     const unsigned int maxTrials = 20;
     // Thorough round: at each step, randomly perturbate the tree
     // and perform a local search. If no better tree is found, start
-    // again with a greater perturbation, until maxTrials trials 
-    // without improvement. If there is an improvement, restart 
+    // again with a greater perturbation, until maxTrials trials
+    // without improvement. If there is an improvement, restart
     // the algorithm from the new best tree.
     while (unsuccessfulTrials < maxTrials) {
       auto backup = tree.getBackup();
@@ -255,24 +254,27 @@ ScoredBackups DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(SpeciesTre
         // better tree found, reset the algorithm
         unsuccessfulTrials = 0;
         bestScore = score;
-        //Logger::timed << " better score=" << bestScore  << std::endl;//" ll=" << evaluation.computeLikelihood()<< std::endl;
+        //Logger::timed << " better score=" << bestScore  << std::endl;//" ll=" << evaluator.computeLikelihood()<< std::endl;
       }
     }
     scoredBackups.push_back(ScoredBackup(tree, bestScore));
-    
-    Logger::timed << "End of iteration " << i << ", score=" << bestScore 
-      << std::endl;
-    //  << " ll=" << ll << std::endl;
-  } 
+    if (verbose) {
+      Logger::timed << "End of iteration " << i
+                    << ", score=" << bestScore << std::endl;
+      //            << ", ll=" << ll << std::endl;
+    }
+  }
   std::sort(scoredBackups.rbegin(), scoredBackups.rend());
   scoredBackups.resize(std::min<size_t>(scoredBackups.size(), toEvaluate));
   for (auto &sb: scoredBackups) {
     // now we compute the "real likelihood" (not the transfer score)
     // and map it to this dating
     speciesTree.getDatedTree().restore(sb.backup);
-    evaluation.onSpeciesDatesChange();
-    auto ll = evaluation.computeLikelihood();
-    Logger::info << "Score=" << sb.score << " ll=" << ll << std::endl;
+    evaluator.onSpeciesDatesChange();
+    auto ll = evaluator.computeLikelihood();
+    if (verbose) {
+      Logger::info << "score=" << sb.score << ", ll=" << ll << std::endl;
+    }
     sb.score = ll;
   }
   std::sort(scoredBackups.rbegin(), scoredBackups.rend());
@@ -280,3 +282,5 @@ ScoredBackups DatedSpeciesTreeSearch::optimizeDatesFromReconciliation(SpeciesTre
   tree.restore(reconciliationDatingBackup);
   return scoredBackups;
 }
+
+
