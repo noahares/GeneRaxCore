@@ -6,25 +6,18 @@ class SpeciesTree;
 class SpeciesTreeLikelihoodEvaluatorInterface;
 class SpeciesSearchState;
 
-
 struct ScoredBackup {
   DatedTree::Backup backup;
   double score;
-  ScoredBackup():
-    score(0.0)
-  {}
-  ScoredBackup(DatedTree &datedTree, double score):
-    backup(datedTree.getBackup()),
-    score(score)
-  {}
-  bool operator < (const ScoredBackup &other) const {
+  ScoredBackup() : score(0.0) {}
+  ScoredBackup(DatedTree &datedTree, double score)
+      : backup(datedTree.getBackup()), score(score) {}
+  bool operator<(const ScoredBackup &other) const {
     return score < other.score;
   }
 };
 
 using ScoredBackups = std::vector<ScoredBackup>;
-
-
 
 class DatedSpeciesTreeSearch {
 public:
@@ -37,20 +30,16 @@ public:
    *  If thorough is not set, we only apply one naive round.
    *  Otherwise, we conduct a more thorough search
    */
-  static double optimizeDates(SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
-      SpeciesSearchState &searchState,
-      bool thorough);
+  static double
+  optimizeDates(SpeciesTree &speciesTree,
+                SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+                SpeciesSearchState &searchState, bool thorough);
 
   /**
    *
    */
   static ScoredBackups optimizeDatesFromReconciliation(
       SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
-      unsigned int searches,
+      SpeciesTreeLikelihoodEvaluatorInterface &evaluator, unsigned int searches,
       unsigned int toEvaluate = 10);
-
 };
-
-

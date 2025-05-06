@@ -1,21 +1,19 @@
 #pragma once
 
-#include <string>
 #include <IO/Families.hpp>
-#include <util/types.hpp>
+#include <string>
 #include <trees/PLLUnrootedTree.hpp>
-#include <vector>
 #include <unordered_set>
+#include <util/types.hpp>
+#include <vector>
 
-#include <IO/Logger.hpp>
 #include <DistanceMethods/Astrid.hpp>
+#include <IO/Logger.hpp>
 
-
-class Asteroid: public BMEEvaluator {
+class Asteroid : public BMEEvaluator {
 public:
-  Asteroid(const PLLUnrootedTree &speciesTree, 
-      const Families &families,
-      double minbl);
+  Asteroid(const PLLUnrootedTree &speciesTree, const Families &families,
+           double minbl);
   virtual ~Asteroid() {}
   /*
    *  Computes the BME score of the species tree
@@ -30,26 +28,26 @@ public:
    *  between the current score and the new score
    */
   virtual void getBestSPR(PLLUnrootedTree &speciesTree,
-      unsigned int maxRadiusWithoutImprovement,
-      std::vector<SPRMove> &bestMoves);
+                          unsigned int maxRadiusWithoutImprovement,
+                          std::vector<SPRMove> &bestMoves);
 
 private:
   // _getBestSPRRecMissing[k][i][j] is the distance
   // between species i and j for the gene family k
-  // this value is only valid if 
+  // this value is only valid if
   // _geneDistanceDenominators[k][i][j] != 0.0
   std::vector<DistanceMatrix> _geneDistanceMatrices;
   // see _geneDistanceMatrices
   std::vector<DistanceMatrix> _geneDistanceDenominators;
   // number of species nodes
   size_t _N;
-  // number of families 
+  // number of families
   size_t _K;
   // _perFamilyCoverageStr[k] is the set of labels of the species
   // covered by the family k
-  std::vector<std::unordered_set<std::string> > _perFamilyCoverageStr;
+  std::vector<std::unordered_set<std::string>> _perFamilyCoverageStr;
   // _perFamilyCoverage[k][i] is true if the family k covers the species i
-  std::vector<std::vector<bool> > _perFamilyCoverage;
+  std::vector<std::vector<bool>> _perFamilyCoverage;
   // species label to species ID (which is NOT the node_index)
   StringToUint _speciesStringToSpeciesId;
   // _prunedSpeciesMatrices[k] is the internode distance for the
@@ -78,7 +76,7 @@ private:
     _subBMEs[index] = v;
   }
 #endif
-  
+
   // _hasChildren[i][k] == true if there is at least one leaf
   // under i that belongs to the species tree induced by the
   // family k
@@ -95,7 +93,7 @@ private:
     corax_unode_t *after;
     std::vector<corax_unode_t *> between;
     std::vector<corax_unode_t *> tempBetween;
-    SubBMEToUpdate() {reset();}
+    SubBMEToUpdate() { reset(); }
     void reset() {
       pruned = nullptr;
       before = nullptr;
@@ -107,7 +105,7 @@ private:
   SubBMEToUpdate _toUpdate;
 
   double _computeBMEPrune(const PLLUnrootedTree &speciesTree);
-  
+
   // O(n^2)
   void _computeSubBMEsPrune(const PLLUnrootedTree &speciesTree);
 
@@ -115,40 +113,31 @@ private:
     unsigned int maxRadius;
     unsigned int maxRadiusWithoutImprovement;
     unsigned int noImprovement;
-    StopCriterion(): maxRadius(99999),
-      maxRadiusWithoutImprovement(4),
-      noImprovement(0)
-      {}
+    StopCriterion()
+        : maxRadius(99999), maxRadiusWithoutImprovement(4), noImprovement(0) {}
   };
 
   // lot of copies hgre...
-  void _getBestSPRRecMissing(unsigned int s,
-     StopCriterion stopCriterion,
-     std::vector<unsigned int> sprime, 
-     std::vector<corax_unode_t *> W0s, 
-     corax_unode_t *Wp, 
-     corax_unode_t *Wsminus1, 
-     corax_unode_t *Vsminus1, 
-     std::vector<double> delta_Vsminus2_Wp, // previous deltaAB
-     corax_unode_t *Vs, 
-     double Lsminus1, // L_s-1
-     corax_unode_t *&bestRegraftNode,
-     SubBMEToUpdate &subBMEToUpdate,
-     double &bestLs,
-     unsigned int &bestS,
-     const BoolMatrix &belongsToPruned,
-     const BoolMatrix &hasChildren,
-     std::vector<bool> Vsminus2HasChildren, // does Vsminus2 have children after the previous moves
-     std::vector<bool> Vsminus1HasChildren); // does Vsminus1 have children after the previous moves
-   
+  void _getBestSPRRecMissing(
+      unsigned int s, StopCriterion stopCriterion,
+      std::vector<unsigned int> sprime, std::vector<corax_unode_t *> W0s,
+      corax_unode_t *Wp, corax_unode_t *Wsminus1, corax_unode_t *Vsminus1,
+      std::vector<double> delta_Vsminus2_Wp, // previous deltaAB
+      corax_unode_t *Vs,
+      double Lsminus1, // L_s-1
+      corax_unode_t *&bestRegraftNode, SubBMEToUpdate &subBMEToUpdate,
+      double &bestLs, unsigned int &bestS, const BoolMatrix &belongsToPruned,
+      const BoolMatrix &hasChildren,
+      std::vector<bool> Vsminus2HasChildren,  // does Vsminus2 have children
+                                              // after the previous moves
+      std::vector<bool> Vsminus1HasChildren); // does Vsminus1 have children
+                                              // after the previous moves
 
   // computes _subBMEs[k][i1][i2] for all k
-  void _computeSubBMEsPruneRec(corax_unode_t *n1,
-    corax_unode_t *n2,
-    BoolMatrix &treated);
-  bool  getBestSPRFromPrune(unsigned int maxRadiusWithoutImprovement,
-      corax_unode_t *prunedNode,
-      corax_unode_t *&bestRegraftNode,
-      double &bestDiff,
-      unsigned int &bestS);
+  void _computeSubBMEsPruneRec(corax_unode_t *n1, corax_unode_t *n2,
+                               BoolMatrix &treated);
+  bool getBestSPRFromPrune(unsigned int maxRadiusWithoutImprovement,
+                           corax_unode_t *prunedNode,
+                           corax_unode_t *&bestRegraftNode, double &bestDiff,
+                           unsigned int &bestS);
 };

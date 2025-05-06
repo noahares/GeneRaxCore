@@ -1,17 +1,14 @@
 #pragma once
 
-#include <vector>
 #include <likelihoods/LibpllEvaluation.hpp>
+#include <vector>
 
 class PLLRootedTree;
 class PLLUnrootedTree;
 
 class PolytomySolver {
-public:  
+public:
   static void solveSimpleInterface(
       PLLRootedTree &speciesTree,
-      std::map<std::string, unsigned int> &speciesLabelsToSolve
-      );
-
-
+      std::map<std::string, unsigned int> &speciesLabelsToSolve);
 };

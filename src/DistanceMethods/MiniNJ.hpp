@@ -1,21 +1,21 @@
 #pragma once
 
 #include <IO/Families.hpp>
-#include <trees/PLLRootedTree.hpp>
 #include <memory>
-#include <unordered_map>
-#include <vector>
 #include <string>
+#include <trees/PLLRootedTree.hpp>
+#include <unordered_map>
 #include <util/types.hpp>
+#include <vector>
 
 class PLLUnrootedTree;
 class PLLRootedTree;
 class GeneSpeciesMapping;
 
 /*
- * Naive NJ implementation. 
+ * Naive NJ implementation.
  *
- * Both distance matrix and NJ tree computations could be 
+ * Both distance matrix and NJ tree computations could be
  * implemented more efficiently if needed.
  */
 class MiniNJ {
@@ -26,40 +26,36 @@ public:
    * built in NJst (another NJ took).
    */
   static std::unique_ptr<PLLRootedTree> runMiniNJ(const Families &families);
-  
-  
+
   /**
    *  Run the original NJst algorithm
    */
   static std::unique_ptr<PLLRootedTree> runNJst(const Families &families);
   static std::unique_ptr<PLLRootedTree> runUstar(const Families &families);
   static std::unique_ptr<PLLRootedTree> runWMinNJ(const Families &families);
-  
-  static std::unique_ptr<PLLRootedTree> applyNJ(DistanceMatrix &distanceMatrix,
-    std::vector<std::string> &speciesIdToSpeciesString,
-    StringToUint &speciesStringToSpeciesId);
 
+  static std::unique_ptr<PLLRootedTree>
+  applyNJ(DistanceMatrix &distanceMatrix,
+          std::vector<std::string> &speciesIdToSpeciesString,
+          StringToUint &speciesStringToSpeciesId);
 
-  static void computeDistanceMatrix(const Families &families,
-      bool minMode, 
-      bool reweight,
-      bool ustar,
-      double contractBranchUnder,
-      DistanceMatrix &distanceMatrix,
-      std::vector<std::string> &speciesIdToSpeciesString,
-      StringToUint &speciesStringToSpeciesId);
-
+  static void
+  computeDistanceMatrix(const Families &families, bool minMode, bool reweight,
+                        bool ustar, double contractBranchUnder,
+                        DistanceMatrix &distanceMatrix,
+                        std::vector<std::string> &speciesIdToSpeciesString,
+                        StringToUint &speciesStringToSpeciesId);
 
   static void geneDistancesFromGeneTree(PLLUnrootedTree &geneTree,
-    GeneSpeciesMapping &mapping,
-    StringToUint &speciesStringToSpeciesId,
-    DistanceMatrix &distances,
-    DistanceMatrix &distancesDenominator,
-    bool minMode,
-    bool reweight,
-    bool ustar,
-    double contractBranchUnder = 0.0000011); 
+                                        GeneSpeciesMapping &mapping,
+                                        StringToUint &speciesStringToSpeciesId,
+                                        DistanceMatrix &distances,
+                                        DistanceMatrix &distancesDenominator,
+                                        bool minMode, bool reweight, bool ustar,
+                                        double contractBranchUnder = 0.0000011);
+
 private:
-  static std::unique_ptr<PLLRootedTree> geneTreeNJ(const Families &families, bool minAlgo, bool ustarAlgo = false, 
-      bool reweight = false, double contractBranchUnder = 0.0000011);
+  static std::unique_ptr<PLLRootedTree>
+  geneTreeNJ(const Families &families, bool minAlgo, bool ustarAlgo = false,
+             bool reweight = false, double contractBranchUnder = 0.0000011);
 };

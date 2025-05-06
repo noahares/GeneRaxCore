@@ -1,15 +1,16 @@
 #include "util/Scenario.hpp"
 #include "util/enums.hpp"
-#include <IO/Logger.hpp>
 #include <IO/FileSystem.hpp>
-#include <IO/ReconciliationWriter.hpp>
+#include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
-#include <vector>
-#include <string>
+#include <IO/ReconciliationWriter.hpp>
 #include <map>
 #include <sstream>
+#include <string>
+#include <vector>
 
-const char *Scenario::eventNames[]  = {"S", "SL", "D", "DL", "T", "TL", "L", "Leaf", "Invalid"};
+const char *Scenario::eventNames[] = {"S",  "SL", "D",    "DL",     "T",
+                                      "TL", "L",  "Leaf", "Invalid"};
 
 const unsigned int Scenario::EVENT_TYPE_NUMBER = 8;
 
@@ -17,10 +18,9 @@ struct TransferPair {
   double count;
   unsigned int id1;
   unsigned int id2;
-  TransferPair(double count, unsigned int id1, unsigned int id2):
-    count(count), id1(id1), id2(id2) {}
-  bool operator < (const TransferPair& p) const
-  {
+  TransferPair(double count, unsigned int id1, unsigned int id2)
+      : count(count), id1(id1), id2(id2) {}
+  bool operator<(const TransferPair &p) const {
     if (count != p.count) {
       return count < p.count;
     } else if (id1 != p.id1) {
@@ -30,11 +30,9 @@ struct TransferPair {
     }
   }
 };
-  
-void PerSpeciesEvents::parallelSum() 
-{
-  for (auto &speciesEvents: events) 
-  {
+
+void PerSpeciesEvents::parallelSum() {
+  for (auto &speciesEvents : events) {
     ParallelContext::sumUInt(speciesEvents.LeafCount);
     ParallelContext::sumUInt(speciesEvents.DCount);
     ParallelContext::sumUInt(speciesEvents.DLCount);
@@ -45,20 +43,16 @@ void PerSpeciesEvents::parallelSum()
   }
 }
 
-void Scenario::addEvent(ReconciliationEventType type, 
-    unsigned int geneNode, 
-    unsigned int speciesNode, 
-    unsigned int destSpeciesNode) 
-{
-  
+void Scenario::addEvent(ReconciliationEventType type, unsigned int geneNode,
+                        unsigned int speciesNode,
+                        unsigned int destSpeciesNode) {
+
   addTransfer(type, geneNode, speciesNode, destSpeciesNode);
 }
-  
-void Scenario::addTransfer(ReconciliationEventType type, 
-  unsigned int geneNode, 
-  unsigned int speciesNode, 
-  unsigned int destSpeciesNode)
-{
+
+void Scenario::addTransfer(ReconciliationEventType type, unsigned int geneNode,
+                           unsigned int speciesNode,
+                           unsigned int destSpeciesNode) {
   Event event;
   event.type = type;
   event.geneNode = geneNode;
@@ -66,80 +60,79 @@ void Scenario::addTransfer(ReconciliationEventType type,
   event.destSpeciesNode = destSpeciesNode;
   addEvent(event);
 }
-  
-void Scenario::addEvent(const Event &event)
-{
+
+void Scenario::addEvent(const Event &event) {
   _events.push_back(event);
   assert(static_cast<int>(event.type) >= 0);
-  _eventsCount[static_cast<unsigned int>(event.type)] ++;
+  _eventsCount[static_cast<unsigned int>(event.type)]++;
   if (_geneIdToEvents.size() <= static_cast<size_t>(event.geneNode)) {
     _geneIdToEvents.resize(event.geneNode + 1);
   }
   _geneIdToEvents[event.geneNode].push_back(event);
-
 }
 
-void Scenario::saveEventsCounts(const std::string &filename, bool masterRankOnly) {
+void Scenario::saveEventsCounts(const std::string &filename,
+                                bool masterRankOnly) {
   ParallelOfstream os(filename, masterRankOnly);
-  for (unsigned int i = 0; i < static_cast<unsigned int>(ReconciliationEventType::EVENT_Invalid); ++i) {
+  for (unsigned int i = 0;
+       i < static_cast<unsigned int>(ReconciliationEventType::EVENT_Invalid);
+       ++i) {
     os << eventNames[i] << ":" << _eventsCount[i] << std::endl;
   }
 }
 
-
-std::vector<unsigned int> Scenario::getPerSpeciesCopies() const
-{
+std::vector<unsigned int> Scenario::getPerSpeciesCopies() const {
   std::vector<unsigned int> copies(_rootedTree->getNodeNumber(), 0);
-  for (const auto &event: _events) {
-    if (event.type == ReconciliationEventType::EVENT_S
-        || event.type == ReconciliationEventType::EVENT_SL
-        || event.type == ReconciliationEventType::EVENT_None) {
+  for (const auto &event : _events) {
+    if (event.type == ReconciliationEventType::EVENT_S ||
+        event.type == ReconciliationEventType::EVENT_SL ||
+        event.type == ReconciliationEventType::EVENT_None) {
       copies[event.speciesNode]++;
     }
   }
   return copies;
 }
-  
 
-void Scenario::gatherReconciliationStatistics(PerSpeciesEvents &perSpeciesEvents) const
-{
-  for (auto &event: _events) {
+void Scenario::gatherReconciliationStatistics(
+    PerSpeciesEvents &perSpeciesEvents) const {
+  for (auto &event : _events) {
     auto e = event.speciesNode;
     auto &speciesEvents = perSpeciesEvents.events[e];
     switch (event.type) {
-      case ReconciliationEventType::EVENT_S: 
-        speciesEvents.SCount++;
-        break;
-      case ReconciliationEventType::EVENT_None:
-        speciesEvents.LeafCount++;
-        break;
-      case ReconciliationEventType::EVENT_SL: 
-        speciesEvents.SLCount++;
-        break;
-      case ReconciliationEventType::EVENT_D:
-        speciesEvents.DCount++;
-        break;
-      case ReconciliationEventType::EVENT_DL:
-        speciesEvents.DLCount++;
-        break;
-      case ReconciliationEventType::EVENT_T:
-        speciesEvents.TCount++;
-        break;
-      case ReconciliationEventType::EVENT_TL:
-        speciesEvents.TLCount++;
-        break;
-      default:
-        assert(false);
+    case ReconciliationEventType::EVENT_S:
+      speciesEvents.SCount++;
+      break;
+    case ReconciliationEventType::EVENT_None:
+      speciesEvents.LeafCount++;
+      break;
+    case ReconciliationEventType::EVENT_SL:
+      speciesEvents.SLCount++;
+      break;
+    case ReconciliationEventType::EVENT_D:
+      speciesEvents.DCount++;
+      break;
+    case ReconciliationEventType::EVENT_DL:
+      speciesEvents.DLCount++;
+      break;
+    case ReconciliationEventType::EVENT_T:
+      speciesEvents.TCount++;
+      break;
+    case ReconciliationEventType::EVENT_TL:
+      speciesEvents.TLCount++;
+      break;
+    default:
+      assert(false);
     }
   }
 }
 
-
-static void dumpSpeciesEventCountVector(ParallelOfstream &os,
-    const std::vector<double> &eventCounts,
-    const std::vector<std::string> &indexToLabel)
-{
-  os << "species_label, speciations, duplications, losses, transfers, presence, origination, copies, singletons" << std::endl;
+static void
+dumpSpeciesEventCountVector(ParallelOfstream &os,
+                            const std::vector<double> &eventCounts,
+                            const std::vector<std::string> &indexToLabel) {
+  os << "species_label, speciations, duplications, losses, transfers, "
+        "presence, origination, copies, singletons"
+     << std::endl;
   auto N = indexToLabel.size();
   assert(Scenario::EVENT_TYPE_NUMBER * N == eventCounts.size());
   for (unsigned int i = 0; i < N; ++i) {
@@ -150,44 +143,50 @@ static void dumpSpeciesEventCountVector(ParallelOfstream &os,
     if (print) {
       os << indexToLabel[i];
       for (unsigned int e = 0; e < Scenario::EVENT_TYPE_NUMBER; ++e) {
-        os << ", " <<  eventCounts[i * Scenario::EVENT_TYPE_NUMBER + e];
+        os << ", " << eventCounts[i * Scenario::EVENT_TYPE_NUMBER + e];
       }
       os << "\n";
     }
   }
 }
 
-static void dumpSpeciesToEventCount(ParallelOfstream &os,
-    const std::unordered_map<std::string, std::vector<double> > &speciesToEventCount)
-{
-  os << "species_label, speciations, duplications, losses, transfers, presence, origination, copies, singletons" << std::endl;
+static void dumpSpeciesToEventCount(
+    ParallelOfstream &os,
+    const std::unordered_map<std::string, std::vector<double>>
+        &speciesToEventCount) {
+  os << "species_label, speciations, duplications, losses, transfers, "
+        "presence, origination, copies, singletons"
+     << std::endl;
   std::vector<double> defaultCount(Scenario::EVENT_TYPE_NUMBER, 0.0);
-  for (auto &it: speciesToEventCount) {
+  for (auto &it : speciesToEventCount) {
     if (defaultCount == it.second) {
       // do not write species without any event
       continue;
     }
     assert(it.second.size() == Scenario::EVENT_TYPE_NUMBER);
     os << it.first;
-    for (auto v: it.second) {
+    for (auto v : it.second) {
       os << ", " << v;
     }
     os << "\n";
-  } 
+  }
 }
 
-void Scenario::savePerSpeciesEventsCounts(const std::string &filename, bool masterRankOnly) {
-  
+void Scenario::savePerSpeciesEventsCounts(const std::string &filename,
+                                          bool masterRankOnly) {
+
   ParallelOfstream os(filename, masterRankOnly);
-  std::unordered_map<std::string, std::vector<double> > speciesToEventCount;
+  std::unordered_map<std::string, std::vector<double>> speciesToEventCount;
   std::vector<double> defaultCount(EVENT_TYPE_NUMBER, 0);
-  for (unsigned int e = 0; e < _speciesTree->tip_count + _speciesTree->inner_count; ++e) {
+  for (unsigned int e = 0;
+       e < _speciesTree->tip_count + _speciesTree->inner_count; ++e) {
     assert(_speciesTree->nodes[e]->label);
-    speciesToEventCount.insert({std::string(_speciesTree->nodes[e]->label), defaultCount});
+    speciesToEventCount.insert(
+        {std::string(_speciesTree->nodes[e]->label), defaultCount});
   }
-  auto is_speciation_event = [](ReconciliationEventType type) { 
-    return type == ReconciliationEventType::EVENT_S 
-        || type == ReconciliationEventType::EVENT_SL;
+  auto is_speciation_event = [](ReconciliationEventType type) {
+    return type == ReconciliationEventType::EVENT_S ||
+           type == ReconciliationEventType::EVENT_SL;
   };
   // 0: speciation (or numbero of gene copies)
   // 1: duplication
@@ -197,40 +196,44 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename, bool mast
   // 5: origination
   // 6: gene copies
   // 7: singletons
-  for (auto &event: _events) {
-    auto &eventCount = speciesToEventCount[_speciesTree->nodes[event.speciesNode]->label];
+  for (auto &event : _events) {
+    auto &eventCount =
+        speciesToEventCount[_speciesTree->nodes[event.speciesNode]->label];
     switch (event.type) {
-      case ReconciliationEventType::EVENT_S: 
-      case ReconciliationEventType::EVENT_None:
-        eventCount[0]++;
-        eventCount[4] = 1;
-        eventCount[6]++;
-        if (is_speciation_event(event.previous_event_type)) eventCount[7]++; 
-        break;
-      case ReconciliationEventType::EVENT_SL: 
-        eventCount[0]++;
-        eventCount[4] = 1;
-        eventCount[6]++;
-        if (is_speciation_event(event.previous_event_type)) eventCount[7]++; 
-        // count the loss
-        speciesToEventCount[event.pllLostSpeciesNode->label][2]++;
-        break;
-      case ReconciliationEventType::EVENT_D:
-        eventCount[1]++;
-        break;
-      case ReconciliationEventType::EVENT_DL:
-        eventCount[1]++;
-        eventCount[2]++;
-        break;
-      case ReconciliationEventType::EVENT_T:
-        eventCount[3]++;
-        break;
-      case ReconciliationEventType::EVENT_TL:
-        eventCount[2]++;
-        eventCount[3]++;
-        break;
-      case ReconciliationEventType::EVENT_L: case ReconciliationEventType::EVENT_Invalid:
-        break;
+    case ReconciliationEventType::EVENT_S:
+    case ReconciliationEventType::EVENT_None:
+      eventCount[0]++;
+      eventCount[4] = 1;
+      eventCount[6]++;
+      if (is_speciation_event(event.previous_event_type))
+        eventCount[7]++;
+      break;
+    case ReconciliationEventType::EVENT_SL:
+      eventCount[0]++;
+      eventCount[4] = 1;
+      eventCount[6]++;
+      if (is_speciation_event(event.previous_event_type))
+        eventCount[7]++;
+      // count the loss
+      speciesToEventCount[event.pllLostSpeciesNode->label][2]++;
+      break;
+    case ReconciliationEventType::EVENT_D:
+      eventCount[1]++;
+      break;
+    case ReconciliationEventType::EVENT_DL:
+      eventCount[1]++;
+      eventCount[2]++;
+      break;
+    case ReconciliationEventType::EVENT_T:
+      eventCount[3]++;
+      break;
+    case ReconciliationEventType::EVENT_TL:
+      eventCount[2]++;
+      eventCount[3]++;
+      break;
+    case ReconciliationEventType::EVENT_L:
+    case ReconciliationEventType::EVENT_Invalid:
+      break;
     }
   }
   auto origin = getOriginationSpecies();
@@ -238,27 +241,24 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename, bool mast
   speciesToEventCount[origin->label][5] = 1.0;
   dumpSpeciesToEventCount(os, speciesToEventCount);
 }
-  
-corax_rnode_t *Scenario::getOriginationSpecies() const
-{
+
+corax_rnode_t *Scenario::getOriginationSpecies() const {
   auto &rootEvents = _geneIdToEvents[_virtualRootIndex];
   assert(rootEvents.size());
   return _speciesTree->nodes[rootEvents[0].speciesNode];
 }
 
 void Scenario::mergeTransfers(const PLLRootedTree &speciesTree,
-    const std::string &filename,
-    const std::vector<std::string> &filenames,
-    bool parallel,
-    bool normalize)
-{
+                              const std::string &filename,
+                              const std::vector<std::string> &filenames,
+                              bool parallel, bool normalize) {
   ParallelOfstream os(filename, parallel);
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
   const unsigned int N = labelToId.size();
   const VectorDouble zeros(N, 0.0);
   auto countMatrix = MatrixDouble(N, zeros);
-  for (const auto &f: filenames) {
+  for (const auto &f : filenames) {
     std::ifstream is(f);
     std::string line;
     while (std::getline(is, line)) {
@@ -294,25 +294,21 @@ void Scenario::mergeTransfers(const PLLRootedTree &speciesTree,
     }
   }
   std::sort(transfers.rbegin(), transfers.rend());
-  for (const auto &t: transfers) {
-    os << idToLabel[t.id1] << " " << idToLabel[t.id2] << " " << t.count << std::endl;
-
+  for (const auto &t : transfers) {
+    os << idToLabel[t.id1] << " " << idToLabel[t.id2] << " " << t.count
+       << std::endl;
   }
 }
 
-
-void Scenario::mergePerSpeciesEventCounts(const PLLRootedTree &speciesTree,
-    const std::string &filename,
-    const std::vector<std::string> &filenames,
-    bool parallel,
-    bool normalize)
-{
+void Scenario::mergePerSpeciesEventCounts(
+    const PLLRootedTree &speciesTree, const std::string &filename,
+    const std::vector<std::string> &filenames, bool parallel, bool normalize) {
   ParallelOfstream os(filename, parallel);
   auto speciesLabelToIndex = speciesTree.getDeterministicLabelToId();
   auto speciesIndexToLabel = speciesTree.getDeterministicIdToLabel();
   auto N = speciesLabelToIndex.size();
-  std::vector<double> eventCounts(EVENT_TYPE_NUMBER * N, 0.0); 
-  for (const auto &subfile: filenames) {
+  std::vector<double> eventCounts(EVENT_TYPE_NUMBER * N, 0.0);
+  for (const auto &subfile : filenames) {
     std::ifstream is(subfile);
     std::string line;
     std::getline(is, line);
@@ -335,7 +331,7 @@ void Scenario::mergePerSpeciesEventCounts(const PLLRootedTree &speciesTree,
       }
     }
   }
-  unsigned int subfileCount = filenames.size(); 
+  unsigned int subfileCount = filenames.size();
   if (parallel) {
     if (normalize) {
       ParallelContext::sumUInt(subfileCount);
@@ -343,61 +339,50 @@ void Scenario::mergePerSpeciesEventCounts(const PLLRootedTree &speciesTree,
     ParallelContext::sumVectorDouble(eventCounts);
   }
   if (normalize) {
-    for (auto &count: eventCounts) {
+    for (auto &count : eventCounts) {
       count /= static_cast<double>(subfileCount);
     }
   }
   dumpSpeciesEventCountVector(os, eventCounts, speciesIndexToLabel);
 }
 
-void Scenario::saveReconciliation(const std::string &filename, ReconciliationFormat format, bool masterRankOnly)
-{
+void Scenario::saveReconciliation(const std::string &filename,
+                                  ReconciliationFormat format,
+                                  bool masterRankOnly) {
   ParallelOfstream os(filename, masterRankOnly);
   saveReconciliation(os, format);
 }
 
-void Scenario::saveReconciliation(ParallelOfstream &os, ReconciliationFormat format)
-{
+void Scenario::saveReconciliation(ParallelOfstream &os,
+                                  ReconciliationFormat format) {
   switch (format) {
   case ReconciliationFormat::NHX:
-    ReconciliationWriter::saveReconciliationNHX(_speciesTree, 
-        _geneRoot, 
-        _virtualRootIndex, 
-        _geneIdToEvents, 
-        os);
+    ReconciliationWriter::saveReconciliationNHX(
+        _speciesTree, _geneRoot, _virtualRootIndex, _geneIdToEvents, os);
     break;
   case ReconciliationFormat::ALE:
-    ReconciliationWriter::saveReconciliationALE(_speciesTree, 
-        _geneRoot, 
-        _virtualRootIndex, 
-        _geneIdToEvents, 
-        os);
+    ReconciliationWriter::saveReconciliationALE(
+        _speciesTree, _geneRoot, _virtualRootIndex, _geneIdToEvents, os);
     break;
   case ReconciliationFormat::RecPhyloXML:
-    ReconciliationWriter::saveReconciliationRecPhyloXML(_speciesTree, 
-        _virtualRootIndex, 
-        _geneIdToEvents, 
-        os);
+    ReconciliationWriter::saveReconciliationRecPhyloXML(
+        _speciesTree, _virtualRootIndex, _geneIdToEvents, os);
     break;
   case ReconciliationFormat::NewickEvents:
-    ReconciliationWriter::saveReconciliationNewickEvents( 
-        _geneRoot, 
-        _virtualRootIndex, 
-        _geneIdToEvents, 
-        os);
+    ReconciliationWriter::saveReconciliationNewickEvents(
+        _geneRoot, _virtualRootIndex, _geneIdToEvents, os);
     break;
   }
 }
-  
+
 void Scenario::countTransfers(const StringToUint &labelToId,
-      MatrixUint &count)
-{
+                              MatrixUint &count) {
   char *labelFrom = nullptr;
   char *labelTo = nullptr;
   unsigned int from = 0;
   unsigned int to = 0;
-  for (auto &event: _events) {
-    switch(event.type) {
+  for (auto &event : _events) {
+    switch (event.type) {
     case ReconciliationEventType::EVENT_T:
     case ReconciliationEventType::EVENT_TL:
       labelFrom = _speciesTree->nodes[event.speciesNode]->label;
@@ -419,16 +404,15 @@ void Scenario::countTransfers(const StringToUint &labelToId,
 }
 
 void Scenario::countOrigins(const StringToUint &labelToId,
-    std::vector<unsigned int> &fromS,
-    std::vector<unsigned int> &fromSButL,
-    MatrixUint &count)
-{
+                            std::vector<unsigned int> &fromS,
+                            std::vector<unsigned int> &fromSButL,
+                            MatrixUint &count) {
   // origins come from SL, S, T, and TL events
   countTransfers(labelToId, count);
   char *destLabel1 = nullptr;
   char *destLabel2 = nullptr;
-  for (auto &event: _events) {
-    switch(event.type) {
+  for (auto &event : _events) {
+    switch (event.type) {
     case ReconciliationEventType::EVENT_S:
       destLabel1 = _speciesTree->nodes[event.speciesNode]->left->label;
       destLabel2 = _speciesTree->nodes[event.speciesNode]->right->label;
@@ -436,8 +420,8 @@ void Scenario::countOrigins(const StringToUint &labelToId,
       fromS[labelToId.at(destLabel2)]++;
       break;
     case ReconciliationEventType::EVENT_SL:
-      destLabel1 = event.pllDestSpeciesNode->label; 
-      destLabel2 = event.pllLostSpeciesNode->label; 
+      destLabel1 = event.pllDestSpeciesNode->label;
+      destLabel2 = event.pllLostSpeciesNode->label;
       assert(destLabel1 != destLabel2);
       fromS[labelToId.at(destLabel1)]++;
       fromSButL[labelToId.at(destLabel2)]++;
@@ -453,25 +437,25 @@ void Scenario::countOrigins(const StringToUint &labelToId,
     }
   }
 }
-  
-void Scenario::saveTransfers(const std::string &filename, bool masterRankOnly)
-{
+
+void Scenario::saveTransfers(const std::string &filename, bool masterRankOnly) {
   ParallelOfstream os(filename, masterRankOnly);
-  for (auto &event: _events) {
-    if (event.type == ReconciliationEventType::EVENT_T || event.type == ReconciliationEventType::EVENT_TL) {
-      os << _speciesTree->nodes[event.speciesNode]->label << " " 
-        << _speciesTree->nodes[event.destSpeciesNode]->label << " " << 1  << std::endl;
+  for (auto &event : _events) {
+    if (event.type == ReconciliationEventType::EVENT_T ||
+        event.type == ReconciliationEventType::EVENT_TL) {
+      os << _speciesTree->nodes[event.speciesNode]->label << " "
+         << _speciesTree->nodes[event.destSpeciesNode]->label << " " << 1
+         << std::endl;
     }
   }
 }
- 
 
-double Scenario::countTransfer(const std::string &from, const std::string &to) 
-{
+double Scenario::countTransfer(const std::string &from, const std::string &to) {
   double res = 0.0;
-  for (auto &event: _events) {
-    if (event.type == ReconciliationEventType::EVENT_T || event.type == ReconciliationEventType::EVENT_TL) {
-      if (_speciesTree->nodes[event.speciesNode]->label == from && 
+  for (auto &event : _events) {
+    if (event.type == ReconciliationEventType::EVENT_T ||
+        event.type == ReconciliationEventType::EVENT_TL) {
+      if (_speciesTree->nodes[event.speciesNode]->label == from &&
           _speciesTree->nodes[event.destSpeciesNode]->label == to) {
         res += 1.0;
       }
@@ -480,25 +464,24 @@ double Scenario::countTransfer(const std::string &from, const std::string &to)
   return res;
 }
 
-  
-void Scenario::saveLargestOrthoGroup(std::string &filename, bool masterRankOnly) const
-{
+void Scenario::saveLargestOrthoGroup(std::string &filename,
+                                     bool masterRankOnly) const {
   ParallelOfstream os(filename, masterRankOnly);
   corax_unode_t virtualRoot;
   virtualRoot.next = _geneRoot;
   virtualRoot.node_index = _virtualRootIndex;
   virtualRoot.label = nullptr;
   virtualRoot.length = 0.0;
-  std::unique_ptr<OrthoGroup> orthoGroup(getLargestOrthoGroupRec(&virtualRoot, true));
-  for (auto value: *orthoGroup) {
+  std::unique_ptr<OrthoGroup> orthoGroup(
+      getLargestOrthoGroupRec(&virtualRoot, true));
+  for (auto value : *orthoGroup) {
     os << value << std::endl;
   }
   os << "-" << std::endl;
-
 }
 
-void Scenario::saveAllOrthoGroups(std::string &filename, bool masterRankOnly) const
-{
+void Scenario::saveAllOrthoGroups(std::string &filename,
+                                  bool masterRankOnly) const {
   ParallelOfstream os(filename, masterRankOnly);
   corax_unode_t virtualRoot;
   virtualRoot.next = _geneRoot;
@@ -509,41 +492,38 @@ void Scenario::saveAllOrthoGroups(std::string &filename, bool masterRankOnly) co
   OrthoGroups orthoGroups;
   getAllOrthoGroupRec(&virtualRoot, orthoGroups, currentOrthoGroup, true);
   orthoGroups.push_back(currentOrthoGroup);
-  for (auto orthoGroup: orthoGroups) {
-    for (auto value: *orthoGroup) {
+  for (auto orthoGroup : orthoGroups) {
+    for (auto value : *orthoGroup) {
       os << value << std::endl;
     }
     os << "-" << std::endl;
   }
-
 }
 
-
-
-void Scenario::saveTransferPairCountGlobal(PLLRootedTree &speciesTree,
-    std::vector< std::shared_ptr<Scenario> > &scenarios,
-    const std::string &filename)
-{
+void Scenario::saveTransferPairCountGlobal(
+    PLLRootedTree &speciesTree,
+    std::vector<std::shared_ptr<Scenario>> &scenarios,
+    const std::string &filename) {
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
   const unsigned int N = labelToId.size();
   const VectorUint zeros(N, 0);
   auto countMatrix = MatrixUint(N, zeros);
-  for (auto &scenario: scenarios) {
+  for (auto &scenario : scenarios) {
     scenario->countTransfers(labelToId, countMatrix);
   }
   std::vector<TransferPair> transferPairs;
   for (unsigned int i = 0; i < N; ++i) {
     for (unsigned int j = 0; j < N; ++j) {
       ParallelContext::sumUInt(countMatrix[i][j]);
-      if (countMatrix[i][j]) { 
+      if (countMatrix[i][j]) {
         TransferPair p(countMatrix[i][j], i, j);
         transferPairs.push_back(p);
       }
     }
   }
   unsigned int parentTransfers = 0;
-  for (auto speciesNode: speciesTree.getNodes()) {
+  for (auto speciesNode : speciesTree.getNodes()) {
     std::string fromLabel = speciesNode->label;
     auto from = labelToId.at(fromLabel);
     auto parent = speciesNode;
@@ -556,20 +536,16 @@ void Scenario::saveTransferPairCountGlobal(PLLRootedTree &speciesTree,
   }
   std::sort(transferPairs.rbegin(), transferPairs.rend());
   ParallelOfstream os(filename);
-  for (auto p: transferPairs) {
-    os << idToLabel[p.id1] 
-      << " " << idToLabel[p.id2] 
-      << " " << p.count 
-      << std::endl;
+  for (auto p : transferPairs) {
+    os << idToLabel[p.id1] << " " << idToLabel[p.id2] << " " << p.count
+       << std::endl;
   }
 }
 
-
-void Scenario::saveOriginsGlobal(PLLRootedTree &speciesTree,
-    std::vector< std::shared_ptr<Scenario> > &scenarios,
-    unsigned int samples,
-    const std::string &outputDir)
-{
+void Scenario::saveOriginsGlobal(
+    PLLRootedTree &speciesTree,
+    std::vector<std::shared_ptr<Scenario>> &scenarios, unsigned int samples,
+    const std::string &outputDir) {
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
   const unsigned int N = labelToId.size();
@@ -577,7 +553,7 @@ void Scenario::saveOriginsGlobal(PLLRootedTree &speciesTree,
   auto countMatrix = MatrixUint(N, zeros);
   std::vector<unsigned int> fromS(N, 0);
   std::vector<unsigned int> fromSButL(N, 0);
-  for (auto &scenario: scenarios) {
+  for (auto &scenario : scenarios) {
     scenario->countOrigins(labelToId, fromS, fromSButL, countMatrix);
   }
   // iterate over all dest species, and compute their origins
@@ -591,27 +567,26 @@ void Scenario::saveOriginsGlobal(PLLRootedTree &speciesTree,
     // iterate over all origins
     for (unsigned int i = 0; i < N; ++i) {
       ParallelContext::sumUInt(countMatrix[i][j]);
-      if (countMatrix[i][j]) { 
+      if (countMatrix[i][j]) {
         TransferPair p(countMatrix[i][j], i, j);
         transferPairs.push_back(p);
       }
     }
     std::sort(transferPairs.rbegin(), transferPairs.rend());
     ParallelOfstream os(output);
-    os << "vertical: " << double(fromS[j] + fromSButL[j]) / double(samples) << std::endl;
-    for (auto p: transferPairs) {
-      os << idToLabel[p.id1] 
-        << ", " << double(p.count) / double(samples)
-        << std::endl;
+    os << "vertical: " << double(fromS[j] + fromSButL[j]) / double(samples)
+       << std::endl;
+    for (auto p : transferPairs) {
+      os << idToLabel[p.id1] << ", " << double(p.count) / double(samples)
+         << std::endl;
     }
   }
 }
 
-
-OrthoGroup *Scenario::getLargestOrthoGroupRec(corax_unode_t *geneNode, bool isVirtualRoot) const
-{
+OrthoGroup *Scenario::getLargestOrthoGroupRec(corax_unode_t *geneNode,
+                                              bool isVirtualRoot) const {
   auto &events = _geneIdToEvents[geneNode->node_index];
-  for (auto &event: events) {
+  for (auto &event : events) {
     if (event.type == ReconciliationEventType::EVENT_TL) {
       return new OrthoGroup();
     }
@@ -633,7 +608,7 @@ OrthoGroup *Scenario::getLargestOrthoGroupRec(corax_unode_t *geneNode, bool isVi
     switch (event.type) {
     case ReconciliationEventType::EVENT_S:
       // keep both groups
-      for (auto &v: *leftOrthoGroup) {
+      for (auto &v : *leftOrthoGroup) {
         rightOrthoGroup->insert(v);
       }
       delete leftOrthoGroup;
@@ -642,7 +617,7 @@ OrthoGroup *Scenario::getLargestOrthoGroupRec(corax_unode_t *geneNode, bool isVi
       // only keep the non transfered gene
       if (event.rightGeneIndex == left->node_index) {
         delete leftOrthoGroup;
-        return  rightOrthoGroup;
+        return rightOrthoGroup;
       } else if (event.rightGeneIndex == right->node_index) {
         delete rightOrthoGroup;
         return leftOrthoGroup;
@@ -675,21 +650,18 @@ OrthoGroup *Scenario::getLargestOrthoGroupRec(corax_unode_t *geneNode, bool isVi
   }
 }
 
-static void appendOrtho(OrthoGroupPtr &orthoGroups, 
-    const OrthoGroupPtr &orthoGroupsToAppend)
-{
-  orthoGroups->insert(orthoGroupsToAppend->begin(),
-      orthoGroupsToAppend->end());
+static void appendOrtho(OrthoGroupPtr &orthoGroups,
+                        const OrthoGroupPtr &orthoGroupsToAppend) {
+  orthoGroups->insert(orthoGroupsToAppend->begin(), orthoGroupsToAppend->end());
 }
 
 void Scenario::getAllOrthoGroupRec(corax_unode_t *geneNode,
-      OrthoGroups &orthoGroups,
-      OrthoGroupPtr &currentOrthoGroup,
-      bool isVirtualRoot) const
-{
+                                   OrthoGroups &orthoGroups,
+                                   OrthoGroupPtr &currentOrthoGroup,
+                                   bool isVirtualRoot) const {
   auto &events = _geneIdToEvents[geneNode->node_index];
   bool underTL = false;
-  for (auto &event: events) {
+  for (auto &event : events) {
     if (event.type == ReconciliationEventType::EVENT_TL) {
       underTL = true;
     }
@@ -747,7 +719,7 @@ void Scenario::getAllOrthoGroupRec(corax_unode_t *geneNode,
         std::swap(leftOrthoGroup, rightOrthoGroup);
       }
       orthoGroups.push_back(rightOrthoGroup);
-      appendOrtho(currentOrthoGroup, leftOrthoGroup); 
+      appendOrtho(currentOrthoGroup, leftOrthoGroup);
       break;
     }
   }
@@ -758,39 +730,35 @@ void Scenario::getAllOrthoGroupRec(corax_unode_t *geneNode,
   }
 }
 
-
-void Scenario::initBlackList(unsigned int genesNumber, unsigned int speciesNumber)
-{
-  std::vector<int>  blackListAux(speciesNumber, false);
+void Scenario::initBlackList(unsigned int genesNumber,
+                             unsigned int speciesNumber) {
+  std::vector<int> blackListAux(speciesNumber, false);
   _blacklist = std::make_unique<ScenarioBlackList>(genesNumber, blackListAux);
-  
 }
 
-void Scenario::blackList(unsigned int geneNode, unsigned int speciesNode)
-{
-  if (_blacklist && _blacklist->size() > geneNode) { // not true for virtual nodes
+void Scenario::blackList(unsigned int geneNode, unsigned int speciesNode) {
+  if (_blacklist &&
+      _blacklist->size() > geneNode) { // not true for virtual nodes
     (*_blacklist)[geneNode][speciesNode] = true;
   }
 }
-bool Scenario::isBlacklisted(unsigned int geneNode, unsigned int speciesNode)
-{
-  if (_blacklist && _blacklist->size() > geneNode) { // not true for virtual nodes
+bool Scenario::isBlacklisted(unsigned int geneNode, unsigned int speciesNode) {
+  if (_blacklist &&
+      _blacklist->size() > geneNode) { // not true for virtual nodes
     return (*_blacklist)[geneNode][speciesNode];
   }
   return false;
 }
 
-void Scenario::resetBlackList()
-{
-  for (auto &aux: *_blacklist) {
+void Scenario::resetBlackList() {
+  for (auto &aux : *_blacklist) {
     for (unsigned int i = 0; i < aux.size(); ++i) {
       aux[i] = false;
     }
   }
 }
 
-static corax_unode_t *createNode(unsigned int index)
-{
+static corax_unode_t *createNode(unsigned int index) {
   auto node = new corax_unode_t();
   node->next = nullptr;
   node->back = nullptr;
@@ -798,33 +766,28 @@ static corax_unode_t *createNode(unsigned int index)
   node->label = nullptr;
   node->node_index = index;
   return node;
-} 
+}
 
-static void backLink(corax_unode_t *n1, corax_unode_t *n2)
-{
+static void backLink(corax_unode_t *n1, corax_unode_t *n2) {
   n1->back = n2;
   n2->back = n1;
 }
 
-static void nextLink(corax_unode_t *n1, corax_unode_t *n2, corax_unode_t *n3)
-{
+static void nextLink(corax_unode_t *n1, corax_unode_t *n2, corax_unode_t *n3) {
   n1->next = n2;
   n2->next = n3;
   n3->next = n1;
 }
 
-corax_unode_t *Scenario::generateVirtualGeneRoot()
-{
+corax_unode_t *Scenario::generateVirtualGeneRoot() {
   auto node1 = createNode(0);
   _geneNodeBuffer.push_back(node1);
   return node1;
 }
 
-
-void Scenario::generateGeneChildren(corax_unode_t *geneNode, 
-    corax_unode_t *&leftGeneNode,
-    corax_unode_t *&rightGeneNode)
-{
+void Scenario::generateGeneChildren(corax_unode_t *geneNode,
+                                    corax_unode_t *&leftGeneNode,
+                                    corax_unode_t *&rightGeneNode) {
   if (_geneNodeBuffer.size() == 1) {
     // we are at the root
     leftGeneNode = _geneNodeBuffer.back();
@@ -843,7 +806,3 @@ void Scenario::generateGeneChildren(corax_unode_t *geneNode,
   backLink(next2, rightGeneNode);
   _geneNodeBuffer.push_back(rightGeneNode);
 }
-
-
-
-

@@ -3,19 +3,14 @@
 
 namespace IO {
 
-bool isBlanck(const std::string &s) 
-{
-  return s.empty() 
-    || std::all_of(s.begin(), 
-        s.end(), 
-        [](char c){return std::isspace(c);});
+bool isBlanck(const std::string &s) {
+  return s.empty() || std::all_of(s.begin(), s.end(),
+                                  [](char c) { return std::isspace(c); });
 }
 
-template<typename T, typename P>
-T remove_if(T beg, T end, P pred)
-{
+template <typename T, typename P> T remove_if(T beg, T end, P pred) {
   T dest = beg;
-  for (T itr = beg;itr != end; ++itr)
+  for (T itr = beg; itr != end; ++itr)
     if (!pred(*itr))
       *(dest++) = *itr;
   return dest;
@@ -26,7 +21,4 @@ void removeSpaces(std::string &str) {
   str.erase(end_pos, str.end());
 }
 
-
-
-}
-
+} // namespace IO

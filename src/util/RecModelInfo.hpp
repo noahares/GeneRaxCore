@@ -1,8 +1,8 @@
 #pragma once
 
-#include <util/enums.hpp>
-#include <maths/Parameters.hpp>
 #include <IO/ArgumentsHelper.hpp>
+#include <maths/Parameters.hpp>
+#include <util/enums.hpp>
 
 struct RecModelInfo {
   // reconciliation model (UndatedDTL, UndatedDL, etc)
@@ -17,7 +17,7 @@ struct RecModelInfo {
   // at which ancestral species do we consider that originations
   // are possible, and with which probability
   OriginationStrategy originationStrategy;
-  
+
   // if set to true,  for each family, we prune from the species
   // tree the taxa that are not covered in this family
   bool pruneSpeciesTree;
@@ -27,9 +27,9 @@ struct RecModelInfo {
   // if the reconciliaiton model accounts for polytomies, branches
   // with a lenghts <= branchLengthThreshold are be contracted
   double branchLengthThreshold;
- 
+
   TransferConstaint transferConstraint;
-  
+
   // disable duplications
   bool noDup;
 
@@ -37,68 +37,41 @@ struct RecModelInfo {
   bool noTL;
 
   std::string fractionMissingFile;
- 
+
   // use less memory (but likelihood evaluation might be slower)
   // some models do not implement this function
   bool memorySavings;
 
-  RecModelInfo():
-    model(RecModel::UndatedDTL),
-    recOpt(RecOpt::Gradient),
-    perFamilyRates(true),
-    gammaCategories(1),
-    originationStrategy(OriginationStrategy::ROOT),
-    pruneSpeciesTree(true),
-    rootedGeneTree(true),
-    forceGeneTreeRoot(false),
-    madRooting(false),
-    branchLengthThreshold(-1.0),
-    transferConstraint(TransferConstaint::PARENTS),
-    noDup(false),
-    noTL(false),
-    memorySavings(false)
-  {
+  RecModelInfo()
+      : model(RecModel::UndatedDTL), recOpt(RecOpt::Gradient),
+        perFamilyRates(true), gammaCategories(1),
+        originationStrategy(OriginationStrategy::ROOT), pruneSpeciesTree(true),
+        rootedGeneTree(true), forceGeneTreeRoot(false), madRooting(false),
+        branchLengthThreshold(-1.0),
+        transferConstraint(TransferConstaint::PARENTS), noDup(false),
+        noTL(false), memorySavings(false) {}
+
+  RecModelInfo(RecModel model, RecOpt recOpt, bool perFamilyRates,
+               unsigned int gammaCategories,
+               OriginationStrategy originationStrategy, bool pruneSpeciesTree,
+               bool rootedGeneTree, bool forceGeneTreeRoot, bool madRooting,
+               double branchLengthThreshold,
+               TransferConstaint transferConstraint, bool noDup, bool noTL,
+               const std::string &fractionMissingFile, bool memorySavings)
+      : model(model), recOpt(recOpt), perFamilyRates(perFamilyRates),
+        gammaCategories(gammaCategories),
+        originationStrategy(originationStrategy),
+        pruneSpeciesTree(pruneSpeciesTree), rootedGeneTree(rootedGeneTree),
+        forceGeneTreeRoot(forceGeneTreeRoot), madRooting(madRooting),
+        branchLengthThreshold(branchLengthThreshold),
+        transferConstraint(transferConstraint), noDup(noDup), noTL(noTL),
+        fractionMissingFile(fractionMissingFile), memorySavings(memorySavings) {
 
   }
 
-  RecModelInfo(RecModel model,
-      RecOpt recOpt,
-      bool perFamilyRates,
-      unsigned int gammaCategories,
-      OriginationStrategy originationStrategy,
-      bool pruneSpeciesTree,
-      bool rootedGeneTree,
-      bool forceGeneTreeRoot,
-      bool madRooting,
-      double branchLengthThreshold,
-      TransferConstaint transferConstraint,
-      bool noDup,
-      bool noTL,
-      const std::string &fractionMissingFile,
-      bool memorySavings):
-    model(model),
-    recOpt(recOpt),
-    perFamilyRates(perFamilyRates),
-    gammaCategories(gammaCategories),
-    originationStrategy(originationStrategy),
-    pruneSpeciesTree(pruneSpeciesTree),
-    rootedGeneTree(rootedGeneTree),
-    forceGeneTreeRoot(forceGeneTreeRoot),
-    madRooting(madRooting),
-    branchLengthThreshold(branchLengthThreshold),
-    transferConstraint(transferConstraint),
-    noDup(noDup),
-    noTL(noTL),
-    fractionMissingFile(fractionMissingFile),
-    memorySavings(memorySavings)
-  {
-
-  }
-
-  void readFromArgv(char** argv, int &i)
-  {
-    model = RecModel(atoi(argv[i++]));  
-    recOpt = RecOpt(atoi(argv[i++]));  
+  void readFromArgv(char **argv, int &i) {
+    model = RecModel(atoi(argv[i++]));
+    recOpt = RecOpt(atoi(argv[i++]));
     perFamilyRates = bool(atoi(argv[i++]));
     gammaCategories = atoi(argv[i++]);
     originationStrategy = Enums::strToOrigination(argv[i++]);
@@ -118,8 +91,7 @@ struct RecModelInfo {
     memorySavings = bool(atoi(argv[i++]));
   }
 
-  std::vector<std::string> getArgv() const
-  {
+  std::vector<std::string> getArgv() const {
     std::vector<std::string> argv;
     argv.push_back(std::to_string(static_cast<int>(model)));
     argv.push_back(std::to_string(static_cast<int>(recOpt)));
@@ -130,7 +102,8 @@ struct RecModelInfo {
     argv.push_back(std::to_string(static_cast<int>(rootedGeneTree)));
     argv.push_back(std::to_string(static_cast<int>(forceGeneTreeRoot)));
     argv.push_back(std::to_string(static_cast<int>(madRooting)));
-    argv.push_back(ArgumentsHelper::transferConstraintToStr(transferConstraint));
+    argv.push_back(
+        ArgumentsHelper::transferConstraintToStr(transferConstraint));
     argv.push_back(std::to_string(static_cast<int>(noDup)));
     argv.push_back(std::to_string(static_cast<int>(noTL)));
     argv.push_back(std::to_string(branchLengthThreshold));
@@ -143,14 +116,11 @@ struct RecModelInfo {
     return argv;
   }
 
-  static int getArgc() 
-  {
-    return 15;
-  }
+  static int getArgc() { return 15; }
 
   std::vector<char> getParamTypes() const {
     std::vector<char> res;
-    for (auto str: Enums::parameterNames(model)) {
+    for (auto str : Enums::parameterNames(model)) {
       assert(str.size() == 1);
       res.push_back(str[0]);
     }
@@ -161,11 +131,12 @@ struct RecModelInfo {
   }
 
   unsigned int modelFreeParameters() const {
-    return Enums::freeParameters(model) + (originationStrategy == OriginationStrategy::OPTIMIZE ? 1 : 0);
+    return Enums::freeParameters(model) +
+           (originationStrategy == OriginationStrategy::OPTIMIZE ? 1 : 0);
   }
- 
+
   /*
-   *  Return global parameters with the appropriate 
+   *  Return global parameters with the appropriate
    *  number of values (all set to 0.1)
    */
   Parameters getDefaultGlobalParameters() const {

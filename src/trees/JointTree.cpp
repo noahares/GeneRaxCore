@@ -1,12 +1,11 @@
 #include "JointTree.hpp"
-#include <search/Moves.hpp>
-#include <parallelization/ParallelContext.hpp>
-#include <optimizers/PerFamilyDTLOptimizer.hpp>
 #include <IO/LibpllParsers.hpp>
 #include <chrono>
-#include <limits>
 #include <functional>
-
+#include <limits>
+#include <optimizers/PerFamilyDTLOptimizer.hpp>
+#include <parallelization/ParallelContext.hpp>
+#include <search/Moves.hpp>
 
 static size_t leafHash(corax_unode_t *leaf) {
   assert(leaf);
@@ -16,23 +15,22 @@ static size_t leafHash(corax_unode_t *leaf) {
 
 static size_t getTreeHashRec(corax_unode_t *node, size_t i) {
   assert(node);
-  if (i == 0) 
+  if (i == 0)
     i = 1;
   if (!node->next) {
     return leafHash(node);
   }
   auto hash1 = getTreeHashRec(node->next->back, i + 1);
   auto hash2 = getTreeHashRec(node->next->next->back, i + 1);
-  //Logger::info << "(" << hash1 << "," << hash2 << ") ";
+  // Logger::info << "(" << hash1 << "," << hash2 << ") ";
   std::hash<size_t> hash_fn;
   auto m = std::min(hash1, hash2);
   auto M = std::max(hash1, hash2);
   return hash_fn(m * i + M);
-
 }
 
-static corax_unode_t *findMinimumHashLeafRec(corax_unode_t * root, size_t &hashValue)
-{
+static corax_unode_t *findMinimumHashLeafRec(corax_unode_t *root,
+                                             size_t &hashValue) {
   assert(root);
   if (!root->next) {
     hashValue = leafHash(root);
@@ -52,8 +50,7 @@ static corax_unode_t *findMinimumHashLeafRec(corax_unode_t * root, size_t &hashV
   }
 }
 
-static corax_unode_t *findMinimumHashLeaf(corax_unode_t * root) 
-{
+static corax_unode_t *findMinimumHashLeaf(corax_unode_t *root) {
   assert(root);
   auto n1 = root;
   auto n2 = root->back;
@@ -68,29 +65,28 @@ static corax_unode_t *findMinimumHashLeaf(corax_unode_t * root)
   }
 }
 
-void JointTree::printAllNodes(std::ostream &os)
-{
+void JointTree::printAllNodes(std::ostream &os) {
   auto treeinfo = getTreeInfo();
   for (unsigned int i = 0; i < treeinfo->subnode_count; ++i) {
     auto node = treeinfo->subnodes[i];
     os << "node:" << node->node_index << " back:" << node->back->node_index;
     if (node->next) {
-      os << " left:" << node->next->node_index << " right:" << node->next->next->node_index  << std::endl;
+      os << " left:" << node->next->node_index
+         << " right:" << node->next->next->node_index << std::endl;
     } else {
       os << " label:" << node->label << std::endl;
     }
   }
 }
-    
-size_t JointTree::getUnrootedTreeHash()
-{
+
+size_t JointTree::getUnrootedTreeHash() {
   auto minHashLeaf = findMinimumHashLeaf(getTreeInfo()->root);
-  auto res = getTreeHashRec(minHashLeaf, 0) + getTreeHashRec(minHashLeaf->back, 0);
+  auto res =
+      getTreeHashRec(minHashLeaf, 0) + getTreeHashRec(minHashLeaf->back, 0);
   return res % 100000;
 }
 
-static void printLibpllNode(corax_unode_s *node, Logger &os, bool isRoot)
-{
+static void printLibpllNode(corax_unode_s *node, Logger &os, bool isRoot) {
   if (node->next) {
     os << "(";
     printLibpllNode(node->next->back, os, false);
@@ -103,7 +99,7 @@ static void printLibpllNode(corax_unode_s *node, Logger &os, bool isRoot)
   os << ":" << (isRoot ? node->length / 2.0 : node->length);
 }
 
-static void printLibpllTreeRooted(corax_unode_t *root, Logger &os){
+static void printLibpllTreeRooted(corax_unode_t *root, Logger &os) {
   os << "(";
   printLibpllNode(root, os, true);
   os << ",";
@@ -111,75 +107,54 @@ static void printLibpllTreeRooted(corax_unode_t *root, Logger &os){
   os << ");" << std::endl;
 }
 
-JointTree::JointTree(const std::string &newickString,
-    const std::string &alignmentFilename,
-    const std::string &speciestree_file,
-    const std::string &geneSpeciesMapfile,
-    const std::string &substitutionModel,
-    const RecModelInfo &recModelInfo,
-    RecOpt reconciliationOpt,
-    bool madRooting,
-    double supportThreshold,
-    double recWeight,
-    bool safeMode,
-    bool optimizeDTLRates,
-    const Parameters &ratesVector,
-    const std::string &checkpointPath):
-  _checkpoint(checkpointPath),
-  _libpllEvaluation(
-      (_checkpoint.checkpointExists ? _checkpoint.geneTreeNewickStr : newickString), 
-      false, 
-      alignmentFilename, 
-      (_checkpoint.checkpointExists ? _checkpoint.substModelStr : substitutionModel)),
-  _speciesTree(speciestree_file, true),
-  _optimizeDTLRates(optimizeDTLRates),
-  _safeMode(safeMode),
-  _enableReconciliation(true),
-  _enableLibpll(true),
-  _recOpt(reconciliationOpt),
-  _recWeight(recWeight),
-  _supportThreshold(supportThreshold),
-  _madRooting(madRooting)
-{
+JointTree::JointTree(
+    const std::string &newickString, const std::string &alignmentFilename,
+    const std::string &speciestree_file, const std::string &geneSpeciesMapfile,
+    const std::string &substitutionModel, const RecModelInfo &recModelInfo,
+    RecOpt reconciliationOpt, bool madRooting, double supportThreshold,
+    double recWeight, bool safeMode, bool optimizeDTLRates,
+    const Parameters &ratesVector, const std::string &checkpointPath)
+    : _checkpoint(checkpointPath),
+      _libpllEvaluation(
+          (_checkpoint.checkpointExists ? _checkpoint.geneTreeNewickStr
+                                        : newickString),
+          false, alignmentFilename,
+          (_checkpoint.checkpointExists ? _checkpoint.substModelStr
+                                        : substitutionModel)),
+      _speciesTree(speciestree_file, true), _optimizeDTLRates(optimizeDTLRates),
+      _safeMode(safeMode), _enableReconciliation(true), _enableLibpll(true),
+      _recOpt(reconciliationOpt), _recWeight(recWeight),
+      _supportThreshold(supportThreshold), _madRooting(madRooting) {
   if (_checkpoint.checkpointExists) {
-    Logger::info <<"using model " << _checkpoint.substModelStr << std::endl;
+    Logger::info << "using model " << _checkpoint.substModelStr << std::endl;
   }
   _geneSpeciesMap.fill(geneSpeciesMapfile, newickString);
   if (recModelInfo.forceGeneTreeRoot) {
     _enforcedRootedGeneTree = newickString;
   }
-  reconciliationEvaluation_ = std::make_shared<ReconciliationEvaluation>(_speciesTree,  
-      getGeneTree(),
-      _geneSpeciesMap, 
-      recModelInfo,
-      _enforcedRootedGeneTree
-      );
+  reconciliationEvaluation_ = std::make_shared<ReconciliationEvaluation>(
+      _speciesTree, getGeneTree(), _geneSpeciesMap, recModelInfo,
+      _enforcedRootedGeneTree);
   if (_checkpoint.checkpointExists) {
     setRates(_checkpoint.ratesVector);
   } else {
     setRates(ratesVector);
   }
   Logger::info << _ratesVector << std::endl;
-
 }
 
-JointTree::~JointTree()
-{
-}
-
+JointTree::~JointTree() {}
 
 void JointTree::printLibpllTree() const {
   printLibpllTreeRooted(_libpllEvaluation.getTreeInfo()->root, Logger::info);
 }
-
-
 
 void JointTree::optimizeParameters(bool felsenstein, bool reconciliation) {
   if (felsenstein && _enableLibpll) {
     _libpllEvaluation.optimizeAllParameters();
   }
   if (reconciliation && _enableReconciliation && _optimizeDTLRates) {
-    if (reconciliationEvaluation_->implementsTransfers()) {  
+    if (reconciliationEvaluation_->implementsTransfers()) {
       PerFamilyDTLOptimizer::optimizeDTLRates(*this, _recOpt);
     } else {
       PerFamilyDTLOptimizer::optimizeDLRates(*this, _recOpt);
@@ -194,7 +169,7 @@ double JointTree::computeLibpllLoglk(bool incremental) {
   return _libpllEvaluation.computeLikelihood(incremental);
 }
 
-double JointTree::computeReconciliationLoglk () {
+double JointTree::computeReconciliationLoglk() {
   if (!_enableReconciliation) {
     return 1.0;
   }
@@ -215,11 +190,9 @@ void JointTree::printLoglk(bool libpll, bool rec, bool joint, Logger &os) {
   os << std::endl;
 }
 
-
 corax_unode_t *JointTree::getNode(unsigned int index) {
   return getTreeInfo()->subnodes[index];
 }
-
 
 void JointTree::applyMove(SPRMove &move) {
   _rollbacks.push(move.applyMove(*this));
@@ -236,7 +209,6 @@ void JointTree::reOptimizeMove(SPRMove &move) {
     move.reOptimizeMove(*this);
   }
 }
-
 
 void JointTree::rollbackLastMove() {
   assert(!_rollbacks.empty());
@@ -259,29 +231,23 @@ void JointTree::save(const std::string &fileName, bool append) {
   os << PLLUnrootedTree::getRootedNewickString(root) << std::endl;
 }
 
-corax_treeinfo_t * JointTree::getTreeInfo() {
+corax_treeinfo_t *JointTree::getTreeInfo() {
   return _libpllEvaluation.getTreeInfo();
 }
 
-
-void JointTree::invalidateCLV(corax_unode_s *node)
-{
+void JointTree::invalidateCLV(corax_unode_s *node) {
   reconciliationEvaluation_->invalidateCLV(node->node_index);
   _libpllEvaluation.invalidateCLV(node->node_index);
 }
 
-
-void JointTree::setRates(const Parameters &ratesVector)
-{
+void JointTree::setRates(const Parameters &ratesVector) {
   _ratesVector = ratesVector;
   if (_enableReconciliation) {
     reconciliationEvaluation_->setRates(ratesVector);
   }
 }
 
-
-void JointTree::printInfo() 
-{
+void JointTree::printInfo() {
   auto treeInfo = getTreeInfo();
   auto speciesLeaves = getSpeciesTree().getLeafNumber();
   auto geneLeaves = treeInfo->tip_count;
@@ -291,9 +257,8 @@ void JointTree::printInfo()
   Logger::info << "Sites: " << sites << std::endl;
   Logger::info << std::endl;
 }
-    
-bool JointTree::canSPRCrossBranch(const corax_unode_t *branch) const
-{
+
+bool JointTree::canSPRCrossBranch(const corax_unode_t *branch) const {
   if (_enforcedRootedGeneTree.size() == 0) {
     return true;
   }
@@ -302,14 +267,13 @@ bool JointTree::canSPRCrossBranch(const corax_unode_t *branch) const
   assert(branch);
   return branch != root && branch->back != root;
 }
-    
-void JointTree::saveCheckpoint()
-{
-  _libpllEvaluation.getModel().alpha(_libpllEvaluation.getTreeInfo()->alphas[0] );
+
+void JointTree::saveCheckpoint() {
+  _libpllEvaluation.getModel().alpha(
+      _libpllEvaluation.getTreeInfo()->alphas[0]);
   _checkpoint.substModelStr = _libpllEvaluation.getModelStr();
-  _checkpoint.geneTreeNewickStr = _libpllEvaluation.getGeneTree().getNewickString(); 
-  _checkpoint.ratesVector = _ratesVector; 
+  _checkpoint.geneTreeNewickStr =
+      _libpllEvaluation.getGeneTree().getNewickString();
+  _checkpoint.ratesVector = _ratesVector;
   _checkpoint.save(true);
-
 }
-

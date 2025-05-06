@@ -5,25 +5,19 @@
 #include <memory>
 #include <vector>
 
-
-
 class JointTree;
-
 
 class SavedBranch {
 public:
-  SavedBranch(corax_unode_s *branch): 
-    branch_(branch), 
-    length_(branch->length) 
-  {}
+  SavedBranch(corax_unode_s *branch)
+      : branch_(branch), length_(branch->length) {}
 
-  SavedBranch(corax_unode_t *branch, double length):
-    branch_(branch),
-    length_(length)
-  {}
+  SavedBranch(corax_unode_t *branch, double length)
+      : branch_(branch), length_(length) {}
   void restore();
-  corax_unode_t *getNode() const {return branch_;}
-  double getLength() const {return length_;}
+  corax_unode_t *getNode() const { return branch_; }
+  double getLength() const { return length_; }
+
 private:
   corax_unode_t *branch_;
   double length_;
@@ -32,20 +26,11 @@ private:
 class SPRRollback {
 public:
   virtual ~SPRRollback() {}
-  SPRRollback(JointTree &tree, 
-      corax_tree_rollback_t &rollback,
-      const std::vector<SavedBranch> &branches,
-      corax_unode_t *root):
-    tree_(tree),
-    rollback_(rollback),
-    branches_(branches),
-    root_(root)
-  {}
-  
-  void saveBranch(const SavedBranch &branch)
-  {
-    branches_.push_back(branch);
-  }
+  SPRRollback(JointTree &tree, corax_tree_rollback_t &rollback,
+              const std::vector<SavedBranch> &branches, corax_unode_t *root)
+      : tree_(tree), rollback_(rollback), branches_(branches), root_(root) {}
+
+  void saveBranch(const SavedBranch &branch) { branches_.push_back(branch); }
 
   virtual void applyRollback();
 
@@ -55,4 +40,3 @@ private:
   std::vector<SavedBranch> branches_;
   corax_unode_t *root_;
 };
-

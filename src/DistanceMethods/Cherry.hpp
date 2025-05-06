@@ -1,12 +1,9 @@
 #pragma once
 
-#include <vector>
 #include <IO/Families.hpp>
-#include <trees/PLLRootedTree.hpp>
 #include <memory>
-
-
-
+#include <trees/PLLRootedTree.hpp>
+#include <vector>
 
 class Cherry {
 public:
@@ -15,6 +12,6 @@ public:
   /**
    *
    */
-  static std::unique_ptr<PLLRootedTree> geneTreeCherry(const Families &families);
+  static std::unique_ptr<PLLRootedTree>
+  geneTreeCherry(const Families &families);
 };
-

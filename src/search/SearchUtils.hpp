@@ -1,22 +1,21 @@
 #pragma once
 
-#include <search/Moves.hpp>
 #include <maths/AverageStream.hpp>
 #include <memory>
+#include <search/Moves.hpp>
 
 #include <unordered_map>
 
 class JointTree;
 
-
 /**
- *  Store information about the previously tested move likelihoods 
+ *  Store information about the previously tested move likelihoods
  *  Provide a stopping criteria for the SPR search, to stop before
  *  we reach the maximum SPR radius if the current likelihood is too
  *  low
  */
 struct DiggStopper {
-  DiggStopper(): worseDiffR1(0.0), streamR1(50), stream(50), ok(0), ko(0)  {}
+  DiggStopper() : worseDiffR1(0.0), streamR1(50), stream(50), ok(0), ko(0) {}
   double worseDiffR1;
   AverageStream streamR1;
   AverageStream stream;
@@ -35,9 +34,9 @@ struct DiggStopper {
   }
 
   bool doStop(double diff, unsigned int) {
-    //return false;
+    // return false;
     bool res = stream.isSignificant() && (diff < streamR1.getAverage());
-    //bool res = stream.isSignificant() && (diff < worseDiffR1 / 2.0);
+    // bool res = stream.isSignificant() && (diff < worseDiffR1 / 2.0);
     if (res) {
       ko += 1;
     } else {
@@ -46,7 +45,6 @@ struct DiggStopper {
     return res;
   }
 };
-
 
 class SearchUtils {
 public:
@@ -62,17 +60,14 @@ public:
    *
    *  Parallelization: this function is local to one rank
    */
-  static void testMove(JointTree &jointTree,
-    SPRMove &move,
-    double &newLoglk,
-    bool blo,
-    std::unordered_map<unsigned int, double> *treeHashScore = nullptr
-    );
+  static void
+  testMove(JointTree &jointTree, SPRMove &move, double &newLoglk, bool blo,
+           std::unordered_map<unsigned int, double> *treeHashScore = nullptr);
 
   /**
    *
    *  Find the best SPR move for a given prune index under a given radius
-   *  
+   *
    *  @param jointTree The current tree
    *  @param treeHashScore A buffer storing likelihoods to avoid
    *     computing the likelihood of the same tree twice
@@ -85,25 +80,19 @@ public:
    *    move is found to search further
    *  @param bestLL the best likelihood (should be initialized
    *    by the caller)
-   *  @param bestLLAmongPrune the best likelihood among all 
-   *    tested moves (can be worse than the initial 
+   *  @param bestLLAmongPrune the best likelihood among all
+   *    tested moves (can be worse than the initial
    *    tree likelihood). Initial value will be ignored
    *  @param blo Should we apply branch length opt
-   *  @param bestMove Best move (even if it has a lower 
+   *  @param bestMove Best move (even if it has a lower
    *    likelihood than the initial tree)
    *
    *  Parallelization: this function is local to one rank
    */
-  static bool diggBestMoveFromPrune(JointTree &jointTree,
-    std::unordered_map<unsigned int, double> &treeHashScores,
-    DiggStopper &stopper,
-    unsigned int pruneIndex,
-    unsigned int maxRadius,
-    unsigned int additionalRadius,
-    double &bestLL,
-    double &bestLLAmongPrune,
-    bool blo,
-    SPRMove &bestMove);
-
+  static bool diggBestMoveFromPrune(
+      JointTree &jointTree,
+      std::unordered_map<unsigned int, double> &treeHashScores,
+      DiggStopper &stopper, unsigned int pruneIndex, unsigned int maxRadius,
+      unsigned int additionalRadius, double &bestLL, double &bestLLAmongPrune,
+      bool blo, SPRMove &bestMove);
 };
-

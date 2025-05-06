@@ -1,41 +1,38 @@
 #pragma once
 
-#include <likelihoods/reconciliation_models/GTBaseReconciliationModel.hpp>
-#include <likelihoods/LibpllEvaluation.hpp>
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
 #include <algorithm>
-#include <util/Scenario.hpp>
 #include <cmath>
-
-
-
+#include <likelihoods/LibpllEvaluation.hpp>
+#include <likelihoods/reconciliation_models/GTBaseReconciliationModel.hpp>
+#include <util/Scenario.hpp>
 
 /**
  * TOOD DOCUMENTATION: check what this model does, and where it is used
  */
 template <class REAL>
-class SimpleDSModel: public GTBaseReconciliationModel<REAL> {
+class SimpleDSModel : public GTBaseReconciliationModel<REAL> {
 public:
-  SimpleDSModel(PLLRootedTree &speciesTree, 
-      const GeneSpeciesMapping &geneSpeciesMappingp, 
-      const RecModelInfo &recModelInfo): 
-    GTBaseReconciliationModel<REAL>(speciesTree, 
-        geneSpeciesMappingp, 
-        recModelInfo) {}
-  
-  
+  SimpleDSModel(PLLRootedTree &speciesTree,
+                const GeneSpeciesMapping &geneSpeciesMappingp,
+                const RecModelInfo &recModelInfo)
+      : GTBaseReconciliationModel<REAL>(speciesTree, geneSpeciesMappingp,
+                                        recModelInfo) {}
+
   SimpleDSModel(const SimpleDSModel &) = delete;
-  SimpleDSModel & operator = (const SimpleDSModel &) = delete;
+  SimpleDSModel &operator=(const SimpleDSModel &) = delete;
   SimpleDSModel(SimpleDSModel &&) = delete;
-  SimpleDSModel & operator = (SimpleDSModel &&) = delete;
+  SimpleDSModel &operator=(SimpleDSModel &&) = delete;
   virtual ~SimpleDSModel();
-  
+
   // overloaded from parent
   virtual void setRates(const RatesVector &rates);
+
 protected:
   // overload from parent
-  virtual void setInitialGeneTree(PLLUnrootedTree &tree, corax_unode_t *forcedGeneRoot);
+  virtual void setInitialGeneTree(PLLUnrootedTree &tree,
+                                  corax_unode_t *forcedGeneRoot);
   // overload from parent
   virtual void updateCLV(corax_unode_t *geneNode);
   // overload from parent
@@ -45,43 +42,42 @@ protected:
   }
 
   // overload from parent
-  virtual REAL getLikelihoodFactor() const {return REAL(1.0);}
+  virtual REAL getLikelihoodFactor() const { return REAL(1.0); }
   // overload from parent
-  virtual void recomputeSpeciesProbabilities(){};
+  virtual void recomputeSpeciesProbabilities() {};
   // overload from parent
   virtual void computeGeneRootLikelihood(corax_unode_t *virtualRoot);
   // overlead from parent
-  virtual void computeProbability(corax_unode_t *geneNode, corax_rnode_t *speciesNode, 
-      REAL &proba,
-      bool isVirtualRoot = false,
-      Scenario *scenario = nullptr,
-      Scenario::Event *event = nullptr,
-      bool stochastic = false);
+  virtual void computeProbability(corax_unode_t *geneNode,
+                                  corax_rnode_t *speciesNode, REAL &proba,
+                                  bool isVirtualRoot = false,
+                                  Scenario *scenario = nullptr,
+                                  Scenario::Event *event = nullptr,
+                                  bool stochastic = false);
+
 private:
   double _PS; // Speciation probability
   double _PD; // Duplication probability
-  
+
   struct DSCLV {
     REAL proba;
     std::set<unsigned int> clade;
     unsigned int genesCount;
-    DSCLV():proba(REAL()), genesCount(0) {}
+    DSCLV() : proba(REAL()), genesCount(0) {}
   };
   std::vector<DSCLV> _dsclvs;
 };
 
-
 template <class REAL>
-void SimpleDSModel<REAL>::setInitialGeneTree(PLLUnrootedTree &tree, corax_unode_t *forcedGeneRoot)
-{
+void SimpleDSModel<REAL>::setInitialGeneTree(PLLUnrootedTree &tree,
+                                             corax_unode_t *forcedGeneRoot) {
   GTBaseReconciliationModel<REAL>::setInitialGeneTree(tree, forcedGeneRoot);
   assert(this->_maxGeneId);
   _dsclvs = std::vector<DSCLV>(2 * (this->_maxGeneId + 1));
 }
 
 template <class REAL>
-void SimpleDSModel<REAL>::setRates(const RatesVector &rates)
-{
+void SimpleDSModel<REAL>::setRates(const RatesVector &rates) {
   assert(rates.size() == 1);
   auto &dupRates = rates[0];
   _PD = dupRates[0];
@@ -93,29 +89,23 @@ void SimpleDSModel<REAL>::setRates(const RatesVector &rates)
   this->invalidateAllCLVs();
 }
 
+template <class REAL> SimpleDSModel<REAL>::~SimpleDSModel() {}
 
 template <class REAL>
-SimpleDSModel<REAL>::~SimpleDSModel() { }
-
-template <class REAL>
-void SimpleDSModel<REAL>::updateCLV(corax_unode_t *geneNode)
-{
+void SimpleDSModel<REAL>::updateCLV(corax_unode_t *geneNode) {
   assert(geneNode);
-  computeProbability(geneNode, 
-      nullptr, 
-      _dsclvs[geneNode->node_index].proba);
+  computeProbability(geneNode, nullptr, _dsclvs[geneNode->node_index].proba);
 }
 
 template <class REAL>
-static REAL dividePowerTwo(REAL v, unsigned int powerTwo)
-{
+static REAL dividePowerTwo(REAL v, unsigned int powerTwo) {
   /*
   v *= pow(2.0, -double(powerTwo));
   return v;
   */
   const unsigned int MAX_EXPO_TWO = 16;
   const double MAX_POWER_TWO = pow(2.0, -double(MAX_EXPO_TWO));
-  
+
   while (powerTwo > MAX_EXPO_TWO) {
     v *= MAX_POWER_TWO;
     scale<REAL>(v);
@@ -127,14 +117,11 @@ static REAL dividePowerTwo(REAL v, unsigned int powerTwo)
 }
 
 template <class REAL>
-void SimpleDSModel<REAL>::computeProbability(corax_unode_t *geneNode, 
-    corax_rnode_t *, 
-      REAL &proba,
-      bool isVirtualRoot,
-      Scenario *,
-      Scenario::Event *event,
-      bool)
-  
+void SimpleDSModel<REAL>::computeProbability(corax_unode_t *geneNode,
+                                             corax_rnode_t *, REAL &proba,
+                                             bool isVirtualRoot, Scenario *,
+                                             Scenario::Event *event, bool)
+
 {
   assert(!event); // we cannot reconcile with this model
   auto gid = geneNode->node_index;
@@ -148,8 +135,8 @@ void SimpleDSModel<REAL>::computeProbability(corax_unode_t *geneNode,
     _dsclvs[gid].genesCount = 1;
     return;
   }
-  corax_unode_t *leftGeneNode = 0;     
-  corax_unode_t *rightGeneNode = 0;     
+  corax_unode_t *leftGeneNode = 0;
+  corax_unode_t *rightGeneNode = 0;
   leftGeneNode = this->getLeft(geneNode, isVirtualRoot);
   rightGeneNode = this->getRight(geneNode, isVirtualRoot);
   auto v = leftGeneNode->node_index;
@@ -181,22 +168,19 @@ void SimpleDSModel<REAL>::computeProbability(corax_unode_t *geneNode,
       proba = dividePowerTwo(proba, diff);
     }
   }
-    //proba /= pow(2.0, _dsclvs[gid].genesCount - 1) - pow(2.0, clade.size() - 1);
+  // proba /= pow(2.0, _dsclvs[gid].genesCount - 1) - pow(2.0, clade.size() -
+  // 1);
 }
-  
+
 template <class REAL>
-REAL SimpleDSModel<REAL>::getGeneRootLikelihood(corax_unode_t *root) const
-{
+REAL SimpleDSModel<REAL>::getGeneRootLikelihood(corax_unode_t *root) const {
   auto u = root->node_index + this->_maxGeneId + 1;
   return _dsclvs[u].proba;
 }
 
 template <class REAL>
-void SimpleDSModel<REAL>::computeGeneRootLikelihood(corax_unode_t *virtualRoot)
-{
+void SimpleDSModel<REAL>::computeGeneRootLikelihood(
+    corax_unode_t *virtualRoot) {
   auto u = virtualRoot->node_index;
   computeProbability(virtualRoot, nullptr, _dsclvs[u].proba, true);
 }
-
-
-

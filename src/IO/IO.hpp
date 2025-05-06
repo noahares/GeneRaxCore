@@ -7,4 +7,4 @@ namespace IO {
 bool isBlanck(const std::string &s);
 void removeSpaces(std::string &str);
 
-}
+} // namespace IO

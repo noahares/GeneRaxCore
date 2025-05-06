@@ -4,16 +4,16 @@
 
 const unsigned int INVALID_NODE_ID = static_cast<unsigned int>(-1);
 
-SpeciesSplits::SpeciesSplits(const std::unordered_set<std::string> &speciesLabels,
-    bool acceptTrivialClade):
-  _acceptTrivialClade(acceptTrivialClade),
-  _speciesNumber(speciesLabels.size())
-{
+SpeciesSplits::SpeciesSplits(
+    const std::unordered_set<std::string> &speciesLabels,
+    bool acceptTrivialClade)
+    : _acceptTrivialClade(acceptTrivialClade),
+      _speciesNumber(speciesLabels.size()) {
   std::set<std::string> orderedLabels;
-  for (auto &label: speciesLabels) {
+  for (auto &label : speciesLabels) {
     orderedLabels.insert(label);
   }
-  for (auto &label: orderedLabels) {
+  for (auto &label : orderedLabels) {
     unsigned int spid = _labelToSpid.size();
     _labelToSpid.insert({label, spid});
     _spidToLabel.push_back(label);
@@ -24,12 +24,11 @@ SpeciesSplits::SpeciesSplits(const std::unordered_set<std::string> &speciesLabel
     _cladeToCid.insert({clade, spid});
   }
 }
-  
+
 void SpeciesSplits::_treatNodeSplit(unsigned int nodeId,
-    unsigned int leftNodeId,
-    unsigned int rightNodeId, 
-    std::vector<CID> &geneNodeToCid)
-{
+                                    unsigned int leftNodeId,
+                                    unsigned int rightNodeId,
+                                    std::vector<CID> &geneNodeToCid) {
   auto leftCid = geneNodeToCid[leftNodeId];
   auto rightCid = geneNodeToCid[rightNodeId];
   auto &leftClade = _cidToClade[leftCid];
@@ -57,13 +56,11 @@ void SpeciesSplits::_treatNodeSplit(unsigned int nodeId,
   }
 }
 
-
 void SpeciesSplits::addGeneTree(PLLUnrootedTree &geneTree,
-    const GeneSpeciesMapping &mapping)
-{
+                                const GeneSpeciesMapping &mapping) {
   auto postOrderGeneNodes = geneTree.getPostOrderNodes();
   std::vector<CID> geneNodeToCid(postOrderGeneNodes.size());
-  for (auto node: postOrderGeneNodes) {
+  for (auto node : postOrderGeneNodes) {
     if (!node->next) {
       // for leaves, spid == cid
       auto species = mapping.getSpecies(node->label);
@@ -72,52 +69,42 @@ void SpeciesSplits::addGeneTree(PLLUnrootedTree &geneTree,
     } else {
       auto leftNodeId = node->next->back->node_index;
       auto rightNodeId = node->next->next->back->node_index;
-      _treatNodeSplit(node->node_index,
-          leftNodeId, 
-          rightNodeId,
-          geneNodeToCid);
+      _treatNodeSplit(node->node_index, leftNodeId, rightNodeId, geneNodeToCid);
     }
   }
-  for (auto branch: geneTree.getBranches()) {
+  for (auto branch : geneTree.getBranches()) {
     if (branch->next && branch->back->next) { // for all internal branches
-      _treatNodeSplit(INVALID_NODE_ID,
-          branch->node_index,
-          branch->back->node_index,
-          geneNodeToCid);
+      _treatNodeSplit(INVALID_NODE_ID, branch->node_index,
+                      branch->back->node_index, geneNodeToCid);
     }
   }
 }
 
-
-void SpeciesSplits::computeVector()
-{
+void SpeciesSplits::computeVector() {
   _splitCountVector.clear();
-  for (auto &split: _splitCountsMap) {
+  for (auto &split : _splitCountsMap) {
     _splitCountVector.push_back({split.first, split.second});
   }
 }
-  
+
 void SpeciesSplits::addGeneTree(const std::string &newickFile,
-      const GeneSpeciesMapping &mapping)
-{
+                                const GeneSpeciesMapping &mapping) {
   PLLUnrootedTree geneTree(newickFile);
   addGeneTree(geneTree, mapping);
 }
-  
-unsigned int SpeciesSplits::nonDistinctSplitsNumber() const
-{
+
+unsigned int SpeciesSplits::nonDistinctSplitsNumber() const {
   unsigned int res = 0;
-  for (auto splitCount: getSplitCounts()) {
+  for (auto splitCount : getSplitCounts()) {
     res += splitCount.second;
   }
   return res;
 }
 
-void SpeciesSplits::_addSplit(Split &split)
-{
+void SpeciesSplits::_addSplit(Split &split) {
   // Add non-trivial splits
   if (!_acceptTrivialClade) {
-    if (_cidToSpeciesNumber[split.first] < 2 || 
+    if (_cidToSpeciesNumber[split.first] < 2 ||
         _cidToSpeciesNumber[split.second] < 2) {
       return;
     }
@@ -132,4 +119,3 @@ void SpeciesSplits::_addSplit(Split &split)
     _splitCountsMap.insert({split, 1});
   }
 }
-  

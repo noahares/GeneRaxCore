@@ -1,10 +1,8 @@
 #pragma once
 
+#include <IO/Logger.hpp>
 #include <string>
 #include <util/enums.hpp>
-#include <IO/Logger.hpp>
-
-
 
 /**
  * Static methods for helping argument parsing
@@ -13,9 +11,8 @@ class ArgumentsHelper {
 public:
   ArgumentsHelper() = delete;
 
-  static std::string strategyToStr(GeneSearchStrategy s)
-  {
-    switch(s) {
+  static std::string strategyToStr(GeneSearchStrategy s) {
+    switch (s) {
     case GeneSearchStrategy::SPR:
       return "SPR";
     case GeneSearchStrategy::EVAL:
@@ -26,25 +23,23 @@ public:
     exit(41);
   }
 
-  static GeneSearchStrategy strToStrategy(const std::string &str) 
-  {
+  static GeneSearchStrategy strToStrategy(const std::string &str) {
     if (str == "SPR") {
       return GeneSearchStrategy::SPR;
-    }  else if (str == "EVAL") {
+    } else if (str == "EVAL") {
       return GeneSearchStrategy::EVAL;
-    }  else if (str == "SKIP") {
+    } else if (str == "SKIP") {
       return GeneSearchStrategy::SKIP;
-    }  else if (str == "RECONCILE") {
+    } else if (str == "RECONCILE") {
       return GeneSearchStrategy::EVAL;
     } else {
       Logger::info << "Invalid strategy " << str << std::endl;
       exit(41);
     }
   }
-  
-  static std::string speciesStrategyToStr(SpeciesSearchStrategy s)
-  {
-    switch(s) {
+
+  static std::string speciesStrategyToStr(SpeciesSearchStrategy s) {
+    switch (s) {
     case SpeciesSearchStrategy::SPR:
       return "SPR";
     case SpeciesSearchStrategy::TRANSFERS:
@@ -61,29 +56,28 @@ public:
     exit(41);
   }
 
-  static SpeciesSearchStrategy strToSpeciesSearchStrategy(const std::string &str) 
-  {
+  static SpeciesSearchStrategy
+  strToSpeciesSearchStrategy(const std::string &str) {
     if (str == "SPR") {
       return SpeciesSearchStrategy::SPR;
-    }  else if (str == "TRANSFERS") {
+    } else if (str == "TRANSFERS") {
       return SpeciesSearchStrategy::TRANSFERS;
-    }  else if (str == "HYBRID") {
+    } else if (str == "HYBRID") {
       return SpeciesSearchStrategy::HYBRID;
-    }  else if (str == "REROOT") {
+    } else if (str == "REROOT") {
       return SpeciesSearchStrategy::REROOT;
-    }  else if (str == "EVAL") {
+    } else if (str == "EVAL") {
       return SpeciesSearchStrategy::EVAL;
-    }  else if (str == "SKIP") {
+    } else if (str == "SKIP") {
       return SpeciesSearchStrategy::SKIP;
     } else {
       Logger::info << "Invalid species strategy " << str << std::endl;
       exit(41);
     }
   }
- 
-  static std::string recModelToStr(RecModel recModel)
-  {
-    switch(recModel) {
+
+  static std::string recModelToStr(RecModel recModel) {
+    switch (recModel) {
     case RecModel::ParsimonyD:
       return "ParsimonyD";
     case RecModel::UndatedDL:
@@ -96,17 +90,12 @@ public:
     exit(41);
   }
 
-  static bool isValidRecModel(const std::string &str)
-  {
-    return (str == "UndatedDL") || 
-      (str == "UndatedDTL") || 
-      (str == "SimpleDS") || 
-      (str == "ParsimonyD")
-      ;
+  static bool isValidRecModel(const std::string &str) {
+    return (str == "UndatedDL") || (str == "UndatedDTL") ||
+           (str == "SimpleDS") || (str == "ParsimonyD");
   }
 
-  static RecModel strToRecModel(const std::string &str)
-  {
+  static RecModel strToRecModel(const std::string &str) {
     if (str == "UndatedDL") {
       return RecModel::UndatedDL;
     } else if (str == "ParsimonyD") {
@@ -122,7 +111,7 @@ public:
   }
 
   static std::string transferConstraintToStr(TransferConstaint tc) {
-    switch(tc) {
+    switch (tc) {
     case TransferConstaint::NONE:
       return "NONE";
     case TransferConstaint::PARENTS:
@@ -138,7 +127,7 @@ public:
       return TransferConstaint::NONE;
     } else if (str == "PARENTS") {
       return TransferConstaint::PARENTS;
-    } else if(str == "RELDATED") {
+    } else if (str == "RELDATED") {
       return TransferConstaint::RELDATED;
     } else {
       Logger::info << "Invalid transfer constraint " << str << std::endl;
@@ -148,7 +137,7 @@ public:
   }
 
   static std::string recOptToStr(RecOpt recOpt) {
-    switch(recOpt) {
+    switch (recOpt) {
     case RecOpt::Grid:
       return "GRID";
     case RecOpt::Simplex:
@@ -179,7 +168,8 @@ public:
     } else if (str == "NONE") {
       return RecOpt::None;
     } else {
-      Logger::info << "Invalid reconciliation optimization method " << str << std::endl;
+      Logger::info << "Invalid reconciliation optimization method " << str
+                   << std::endl;
       exit(41);
     }
   }
@@ -192,7 +182,9 @@ public:
     } else if (str == "MAD") {
       return CCPRooting::MAD;
     } else {
-      Logger::info << "Invalid rooting mode for conditional clade probabilities: " << str << std::endl;
+      Logger::info
+          << "Invalid rooting mode for conditional clade probabilities: " << str
+          << std::endl;
       exit(41);
     }
   }

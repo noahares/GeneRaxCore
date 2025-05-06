@@ -1,11 +1,10 @@
 #pragma once
 
-#include <corax/corax.h>
 #include <IO/LibpllParsers.hpp>
+#include <corax/corax.h>
 
 extern int is_separator[];
 extern int to_trim[];
-
 
 enum ParsingErrorType {
   PET_NOERROR = 0,
@@ -26,12 +25,12 @@ enum ParsingErrorType {
 /**
  *  Get a short name describing the parsing error
  */
-const char* get_parsing_error_name(ParsingErrorType type);
+const char *get_parsing_error_name(ParsingErrorType type);
 
 /**
  * Get a short description of the parsing error
  */
-const char* get_parsing_error_diagnostic(ParsingErrorType type);
+const char *get_parsing_error_diagnostic(ParsingErrorType type);
 
 /*
  *  Parsing error information
@@ -46,7 +45,6 @@ struct ParsingError {
   unsigned int offset;
 };
 
-
 int is_numeric(char *s, double *d);
 
 /**
@@ -55,9 +53,8 @@ int is_numeric(char *s, double *d);
  */
 void skip_spaces(char **buffer);
 
-
 /**
- *  Return the size of the next token to read 
+ *  Return the size of the next token to read
  *  (number of characters before the next separator
  *  after the current character)
  */
@@ -95,15 +92,10 @@ struct Token {
  *  and increment the buffer pointer to the next pointer
  *  The token should then be destroyed with destroy_token
  */
-unsigned int read_token(char **buffer, 
-    Token *token);
+unsigned int read_token(char **buffer, Token *token);
 
 /**
  *  Deallocate the elements of token created
  *  with read_token
  */
 void destroy_token(Token *token);
-
-
-
-

@@ -1,91 +1,68 @@
 #include "Astrid.hpp"
 #include <DistanceMethods/MiniNJ.hpp>
-#include <trees/PLLUnrootedTree.hpp>
 #include <IO/Logger.hpp>
-#include <parallelization/PerCoreGeneTrees.hpp>
 #include <limits>
+#include <parallelization/PerCoreGeneTrees.hpp>
+#include <trees/PLLUnrootedTree.hpp>
 
 using DistanceVectorMatrix = std::vector<DistanceMatrix>;
 
-static DistanceMatrix getNullMatrix(unsigned int N,
-    double value = 0.0)
-{
+static DistanceMatrix getNullMatrix(unsigned int N, double value = 0.0) {
   std::vector<double> nullDistances(N, value);
-  return DistanceMatrix(N, nullDistances); 
+  return DistanceMatrix(N, nullDistances);
 }
-static DistanceMatrix getMatrix(unsigned int N,
-    unsigned int M,
-    double value)
-{
+static DistanceMatrix getMatrix(unsigned int N, unsigned int M, double value) {
   std::vector<double> nullDistances(M, value);
-  return DistanceMatrix(N, nullDistances); 
+  return DistanceMatrix(N, nullDistances);
 }
 
-
-static void fillDistancesRec(corax_unode_t *currentNode, 
-    const std::vector<unsigned int> &nodeIndexToSpid,
-    double currentDistance,
-    std::vector<double> &distances,
-    std::vector<bool> *belongsToPruned)
-{
+static void fillDistancesRec(corax_unode_t *currentNode,
+                             const std::vector<unsigned int> &nodeIndexToSpid,
+                             double currentDistance,
+                             std::vector<double> &distances,
+                             std::vector<bool> *belongsToPruned) {
   if (!belongsToPruned || (*belongsToPruned)[currentNode->node_index]) {
     currentDistance += 1.0;
   }
   if (!currentNode->next) {
     // leaf
     if (!belongsToPruned || (*belongsToPruned)[currentNode->node_index]) {
-      distances[nodeIndexToSpid[currentNode->node_index]] 
-        = currentDistance;
+      distances[nodeIndexToSpid[currentNode->node_index]] = currentDistance;
     }
     return;
   }
-  fillDistancesRec(currentNode->next->back, 
-      nodeIndexToSpid,
-      currentDistance, 
-      distances,
-      belongsToPruned);
-  fillDistancesRec(currentNode->next->next->back, 
-      nodeIndexToSpid,
-      currentDistance, 
-      distances,
-      belongsToPruned);
+  fillDistancesRec(currentNode->next->back, nodeIndexToSpid, currentDistance,
+                   distances, belongsToPruned);
+  fillDistancesRec(currentNode->next->next->back, nodeIndexToSpid,
+                   currentDistance, distances, belongsToPruned);
 }
 
 static void fillSpeciesDistances(const PLLUnrootedTree &speciesTree,
-    const StringToUint &speciesStringToSpeciesId,
-    DistanceMatrix &speciesDistanceMatrix,
-    std::vector<bool> *belongsToPruned = nullptr)
-{
+                                 const StringToUint &speciesStringToSpeciesId,
+                                 DistanceMatrix &speciesDistanceMatrix,
+                                 std::vector<bool> *belongsToPruned = nullptr) {
   std::vector<unsigned int> nodeIndexToSpid(speciesTree.getLeafNumber());
-  for (auto leaf: speciesTree.getLeaves()) {
-    nodeIndexToSpid[leaf->node_index] = speciesStringToSpeciesId.at(leaf->label);
+  for (auto leaf : speciesTree.getLeaves()) {
+    nodeIndexToSpid[leaf->node_index] =
+        speciesStringToSpeciesId.at(leaf->label);
   }
-  for (auto leaf: speciesTree.getLeaves()) {
+  for (auto leaf : speciesTree.getLeaves()) {
     if (belongsToPruned && !(*belongsToPruned)[leaf->node_index]) {
       continue;
     }
     std::string label = leaf->label;
     auto id = speciesStringToSpeciesId.at(label);
-    fillDistancesRec(leaf->back,
-        nodeIndexToSpid,
-        0.0,
-        speciesDistanceMatrix[id],
-        belongsToPruned);
+    fillDistancesRec(leaf->back, nodeIndexToSpid, 0.0,
+                     speciesDistanceMatrix[id], belongsToPruned);
   }
 }
 
-
-
-
-
-Astrid::Astrid(const PLLUnrootedTree &speciesTree,
-    const Families &families,
-    double minbl)
-{
+Astrid::Astrid(const PLLUnrootedTree &speciesTree, const Families &families,
+               double minbl) {
   bool minMode = true;
   bool reweight = false;
   bool ustar = false;
-  for (auto leaf: speciesTree.getLeaves()) {
+  for (auto leaf : speciesTree.getLeaves()) {
     std::string label(leaf->label);
     _speciesStringToSpeciesId.insert({label, _speciesIdToSpeciesString.size()});
     _speciesIdToSpeciesString.push_back(label);
@@ -94,24 +71,16 @@ Astrid::Astrid(const PLLUnrootedTree &speciesTree,
     _pows.push_back(std::pow(0.5, i));
   }
   _geneDistanceMatrices.resize(1);
-  MiniNJ::computeDistanceMatrix(families,
-    minMode, 
-    reweight,
-    ustar,
-    minbl,
-    _geneDistanceMatrices[0],
-    _speciesIdToSpeciesString,
-    _speciesStringToSpeciesId);
+  MiniNJ::computeDistanceMatrix(
+      families, minMode, reweight, ustar, minbl, _geneDistanceMatrices[0],
+      _speciesIdToSpeciesString, _speciesStringToSpeciesId);
 }
 
-
-double Astrid::computeBME(const PLLUnrootedTree &speciesTree)
-{
+double Astrid::computeBME(const PLLUnrootedTree &speciesTree) {
   unsigned int N = _speciesIdToSpeciesString.size();
   DistanceMatrix speciesDistanceMatrix = getNullMatrix(N);
-  fillSpeciesDistances(speciesTree, 
-      _speciesStringToSpeciesId,
-      speciesDistanceMatrix);
+  fillSpeciesDistances(speciesTree, _speciesStringToSpeciesId,
+                       speciesDistanceMatrix);
   double res = 0.0;
   for (unsigned int i = 0; i < N; ++i) {
     for (unsigned int j = 0; j < i; ++j) {
@@ -123,16 +92,16 @@ double Astrid::computeBME(const PLLUnrootedTree &speciesTree)
   return res;
 }
 
-void Astrid::_computeSubBMEs(const PLLUnrootedTree &speciesTree)
-{
+void Astrid::_computeSubBMEs(const PLLUnrootedTree &speciesTree) {
   auto subtrees1 = speciesTree.getReverseDepthNodes();
   auto nodesNumber = subtrees1.size();
-  _subBMEs = DistanceVectorMatrix(nodesNumber, 
+  _subBMEs = DistanceVectorMatrix(
+      nodesNumber,
       getMatrix(nodesNumber, 1, std::numeric_limits<double>::infinity()));
-  for (auto n1: subtrees1) {
+  for (auto n1 : subtrees1) {
     auto subtrees2 = speciesTree.getPostOrderNodesFrom(n1->back);
     auto i1 = n1->node_index;
-    for (auto n2: subtrees2) {
+    for (auto n2 : subtrees2) {
       auto i2 = n2->node_index;
       if (!n1->next && !n2->next) { // both leaves
         // edge case
@@ -140,21 +109,17 @@ void Astrid::_computeSubBMEs(const PLLUnrootedTree &speciesTree)
       } else if (n1->next && !n2->next) { // n2 is a leaf
         // we already computed the symetric
         _subBMEs[i1][i2][0] = _subBMEs[i2][i1][0];
-      } else  { // n2 is not a leaf
+      } else { // n2 is not a leaf
         auto left2 = n2->next->back->node_index;
         auto right2 = n2->next->next->back->node_index;
-        _subBMEs[i1][i2][0] = 0.5 * (_subBMEs[i1][left2][0] + _subBMEs[i1][right2][0]);
+        _subBMEs[i1][i2][0] =
+            0.5 * (_subBMEs[i1][left2][0] + _subBMEs[i1][right2][0]);
       }
     }
   }
-
 }
 
-
-
-static corax_unode_t *getOtherNext(corax_unode_t *n1, 
-    corax_unode_t *n2)
-{
+static corax_unode_t *getOtherNext(corax_unode_t *n1, corax_unode_t *n2) {
   if (n1->next == n2) {
     return n2->next;
   } else {
@@ -162,22 +127,17 @@ static corax_unode_t *getOtherNext(corax_unode_t *n1,
   }
 }
 
-// test regrafting  Wp between Vs and Vsplus1 after 
+// test regrafting  Wp between Vs and Vsplus1 after
 // having regrafted Wp between Vsminus and Vs
 // and recursively test further SPR mvoes
-static void getBestSPRRec(unsigned int s,
-    corax_unode_t *W0, 
-    corax_unode_t *Wp, 
-    corax_unode_t *Wsminus1, 
-    corax_unode_t *Vsminus1, 
-    double delta_Vsminus2_Wp, // previous deltaAB
-    corax_unode_t *Vs, 
-    double Lsminus1, // L_s-1
-    corax_unode_t *&bestRegraftNode,
-    double &bestLs,
-    const std::vector<DistanceMatrix> &subBMEs)
-{
-  corax_unode_t *Ws = getOtherNext(Vs, Vsminus1->back)->back; 
+static void getBestSPRRec(unsigned int s, corax_unode_t *W0, corax_unode_t *Wp,
+                          corax_unode_t *Wsminus1, corax_unode_t *Vsminus1,
+                          double delta_Vsminus2_Wp, // previous deltaAB
+                          corax_unode_t *Vs,
+                          double Lsminus1, // L_s-1
+                          corax_unode_t *&bestRegraftNode, double &bestLs,
+                          const std::vector<DistanceMatrix> &subBMEs) {
+  corax_unode_t *Ws = getOtherNext(Vs, Vsminus1->back)->back;
   // compute L_s
   // we compute LS for an NNI to ((A,B),(C,D)) by swapping B and C
   // where:
@@ -196,8 +156,8 @@ static void getBestSPRRec(unsigned int s,
     deltaAB = subBMEs[W0->node_index][Wp->node_index][0];
     deltaAC = subBMEs[W0->node_index][Ws->node_index][0];
   } else {
-    deltaAB = 0.5 * (delta_Vsminus2_Wp + 
-      subBMEs[Wsminus1->node_index][Wp->node_index][0]);
+    deltaAB = 0.5 * (delta_Vsminus2_Wp +
+                     subBMEs[Wsminus1->node_index][Wp->node_index][0]);
     deltaAC = subBMEs[Vsminus1->node_index][Ws->node_index][0];
     deltaAC -= pow(0.5, s) * subBMEs[Wp->node_index][Ws->node_index][0];
     deltaAC += pow(0.5, s) * subBMEs[W0->node_index][Ws->node_index][0];
@@ -210,20 +170,16 @@ static void getBestSPRRec(unsigned int s,
   }
   // recursive call
   if (Vs->back->next) {
-    getBestSPRRec(s+1, W0, Wp, Ws, Vs, deltaAB, Vs->back->next, 
-        Ls, bestRegraftNode, bestLs, subBMEs);
-    getBestSPRRec(s+1, W0, Wp, Ws, Vs, deltaAB, Vs->back->next->next, 
-        Ls, bestRegraftNode, bestLs, subBMEs);
+    getBestSPRRec(s + 1, W0, Wp, Ws, Vs, deltaAB, Vs->back->next, Ls,
+                  bestRegraftNode, bestLs, subBMEs);
+    getBestSPRRec(s + 1, W0, Wp, Ws, Vs, deltaAB, Vs->back->next->next, Ls,
+                  bestRegraftNode, bestLs, subBMEs);
   }
 }
 
-
-
-void Astrid::getBestSPR(PLLUnrootedTree &speciesTree,
-      unsigned int,
-      std::vector<SPRMove> &bestMoves)
-{
-  for (auto pruneNode: speciesTree.getPostOrderNodes()) {
+void Astrid::getBestSPR(PLLUnrootedTree &speciesTree, unsigned int,
+                        std::vector<SPRMove> &bestMoves) {
+  for (auto pruneNode : speciesTree.getPostOrderNodes()) {
     double bestDiff = 0.0;
     unsigned int bestS = 1;
     corax_unode_t *bestRegraftNode = nullptr;
@@ -234,12 +190,9 @@ void Astrid::getBestSPR(PLLUnrootedTree &speciesTree,
   std::sort(bestMoves.begin(), bestMoves.end());
 }
 
-
 bool Astrid::getBestSPRFromPrune(corax_unode_t *prunedNode,
-      corax_unode_t *&bestRegraftNode,
-      double &bestDiff,
-      unsigned int &)
-{
+                                 corax_unode_t *&bestRegraftNode,
+                                 double &bestDiff, unsigned int &) {
   bool foundBetter = false;
   double oldBestDiff = bestDiff;
   auto Wp = prunedNode;
@@ -249,7 +202,7 @@ bool Astrid::getBestSPRFromPrune(corax_unode_t *prunedNode,
   std::vector<corax_unode_t *> V0s;
   V0s.push_back(Wp->back->next->back);
   V0s.push_back(Wp->back->next->next->back);
-  for (auto V0: V0s) {
+  for (auto V0 : V0s) {
     auto V = getOtherNext(Wp->back, V0->back);
     if (!V->back->next) {
       continue;
@@ -257,13 +210,13 @@ bool Astrid::getBestSPRFromPrune(corax_unode_t *prunedNode,
     std::vector<corax_unode_t *> V1s;
     V1s.push_back(V->back->next);
     V1s.push_back(V->back->next->next);
-    for (auto V1: V1s) {
+    for (auto V1 : V1s) {
       unsigned int s = 1;
       corax_unode_t *W0 = V0;
       corax_unode_t *Wsminus1 = W0;
       double deltaAB = 0.0; // not used at first iteration
-      getBestSPRRec(s, W0, Wp,  Wsminus1, V, deltaAB,
-          V1, 0.0, bestRegraftNode, bestDiff, _subBMEs);
+      getBestSPRRec(s, W0, Wp, Wsminus1, V, deltaAB, V1, 0.0, bestRegraftNode,
+                    bestDiff, _subBMEs);
       if (bestDiff > oldBestDiff) {
         foundBetter = true;
       }
@@ -271,4 +224,3 @@ bool Astrid::getBestSPRFromPrune(corax_unode_t *prunedNode,
   }
   return foundBetter;
 }
-

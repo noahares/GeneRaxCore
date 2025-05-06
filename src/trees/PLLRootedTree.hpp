@@ -1,49 +1,44 @@
 #pragma once
 
-#include <corax/corax.h>
 #include <IO/LibpllParsers.hpp>
-#include <string>
+#include <corax/corax.h>
 #include <memory>
-#include <vector>
 #include <set>
+#include <string>
 #include <unordered_set>
 #include <util/CArrayRange.hpp>
 #include <util/enums.hpp>
 #include <util/types.hpp>
+#include <vector>
 
-
-typedef struct corax_rnode_s
-{
-  char * label;
+typedef struct corax_rnode_s {
+  char *label;
   double length;
   unsigned int node_index;
   unsigned int clv_index;
   int scaler_index;
   unsigned int pmatrix_index;
-  struct corax_rnode_s * left;
-  struct corax_rnode_s * right;
-  struct corax_rnode_s * parent;
+  struct corax_rnode_s *left;
+  struct corax_rnode_s *right;
+  struct corax_rnode_s *parent;
 
-  void * data;
+  void *data;
 } corax_rnode_t;
 
-typedef struct corax_rtree_s
-{
+typedef struct corax_rtree_s {
   unsigned int tip_count;
   unsigned int inner_count;
   unsigned int edge_count;
 
-  corax_rnode_t ** nodes;
+  corax_rnode_t **nodes;
 
-  corax_rnode_t * root;
+  corax_rnode_t *root;
 
 } corax_rtree_t;
 
-void corax_rtree_destroy(corax_rtree_t * tree,
-                                  void (*cb_destroy)(void *));
+void corax_rtree_destroy(corax_rtree_t *tree, void (*cb_destroy)(void *));
 
-
-corax_utree_t * corax_rtree_unroot(corax_rtree_t * tree);
+corax_utree_t *corax_rtree_unroot(corax_rtree_t *tree);
 
 /**
  *  C++ wrapper around the libpll corax_rtree_t structure
@@ -52,7 +47,7 @@ corax_utree_t * corax_rtree_unroot(corax_rtree_t * tree);
 class PLLRootedTree {
 public:
   /**
-   * Construct from a string that is either a path 
+   * Construct from a string that is either a path
    * to a newick file or a newick string
    */
   PLLRootedTree(const std::string &str, bool isFile = true);
@@ -62,29 +57,30 @@ public:
    */
   PLLRootedTree(const std::unordered_set<std::string> &labels);
 
-  static std::unique_ptr<PLLRootedTree> buildFromStrOrFile(const std::string &strOrFile);
+  static std::unique_ptr<PLLRootedTree>
+  buildFromStrOrFile(const std::string &strOrFile);
 
   /**
    *  Construct a rooted tree from outgroup->back
    */
-  static std::unique_ptr<PLLRootedTree> buildFromOutgroup(corax_unode_t *outgroup);  
-  static std::string getRootedNewickFromOutgroup(corax_unode_t *outgroup);  
-  
+  static std::unique_ptr<PLLRootedTree>
+  buildFromOutgroup(corax_unode_t *outgroup);
+  static std::string getRootedNewickFromOutgroup(corax_unode_t *outgroup);
+
   /**
    * Forbid copy
    */
   PLLRootedTree(const PLLRootedTree &) = delete;
-  PLLRootedTree & operator = (const PLLRootedTree &) = delete;
+  PLLRootedTree &operator=(const PLLRootedTree &) = delete;
   PLLRootedTree(PLLRootedTree &&) = delete;
-  PLLRootedTree & operator = (PLLRootedTree &&) = delete;
-
+  PLLRootedTree &operator=(PLLRootedTree &&) = delete;
 
   /*
    * Tree dimension
    */
   unsigned int getNodeNumber() const;
   unsigned int getLeafNumber() const;
-  unsigned int getInnerNodeNumber() const; 
+  unsigned int getInnerNodeNumber() const;
 
   /*
    * Node access
@@ -94,37 +90,33 @@ public:
   corax_rnode_t *getNode(unsigned int node_index) const;
   corax_rnode_t *getParent(unsigned int node_index) const;
   corax_rnode_t *getNeighbor(unsigned int node_index) const;
- 
 
   /**
    *  Tree comparison
    */
-  static bool areIsomorphic(const PLLRootedTree &t1,
-    const PLLRootedTree &t2);
+  static bool areIsomorphic(const PLLRootedTree &t1, const PLLRootedTree &t2);
 
-  bool operator ==(const PLLRootedTree &other) const
-  {
+  bool operator==(const PLLRootedTree &other) const {
     return areIsomorphic(*this, other);
   }
-  
 
   /**
    * labels
    */
   std::unordered_set<std::string> getLabels(bool leavesOnly) const;
-  
+
   static void getLeafLabelsUnder(corax_rnode_t *node,
-      std::unordered_set<std::string> &labels);
+                                 std::unordered_set<std::string> &labels);
 
   /**
-   *  Get a mapping from label to integer 
+   *  Get a mapping from label to integer
    */
   StringToUintMap getLabelToIntMap();
 
   /*
    * Save the tree in newick format in filename
    */
-  void save(const std::string &fileName) const; 
+  void save(const std::string &fileName) const;
 
   std::string getNewickString() const;
 
@@ -141,7 +133,8 @@ public:
   /**
    *  Rename internal nodes having invalidated, missing or duplicated names
    */
-  void ensureUniqueLabels(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate = nullptr);
+  void ensureUniqueLabels(
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate = nullptr);
 
   /**
    *  Change the label of the node indexed with nodeIndex
@@ -151,25 +144,24 @@ public:
   /**
    *  Direct access to the libpll structure
    */
-  corax_rtree_t *getRawPtr() {return _tree.get();}
-  const corax_rtree_t *getRawPtr() const {return _tree.get();}
-  
-  CArrayRange<corax_rnode_t*> getLeaves() const;
-  CArrayRange<corax_rnode_t*> getInnerNodes() const;
-  CArrayRange<corax_rnode_t*> getNodes() const;
-  std::vector<corax_rnode_t*> getPostOrderNodes() const;
+  corax_rtree_t *getRawPtr() { return _tree.get(); }
+  const corax_rtree_t *getRawPtr() const { return _tree.get(); }
+
+  CArrayRange<corax_rnode_t *> getLeaves() const;
+  CArrayRange<corax_rnode_t *> getInnerNodes() const;
+  CArrayRange<corax_rnode_t *> getNodes() const;
+  std::vector<corax_rnode_t *> getPostOrderNodes() const;
 
   /**
    *  Open unlabelledNewickFile as a rooted tree and ensure that
    *  all its nodes have a unique label. Stores the result into
    *  labelledNewickFile (can be equal to unlabelledNewickFile)
    */
-  static void labelRootedTree(const std::string &unlabelledNewickFile, 
-      const std::string &labelledNewickFile);
+  static void labelRootedTree(const std::string &unlabelledNewickFile,
+                              const std::string &labelledNewickFile);
   static void setSon(corax_rnode_t *parent, corax_rnode_t *newSon, bool left);
-  
-  friend std::ostream& operator<<(std::ostream& os, const PLLRootedTree &tree)
-  {
+
+  friend std::ostream &operator<<(std::ostream &os, const PLLRootedTree &tree) {
     char *newick = corax_rtree_export_newick(tree.getRawPtr()->root, 0);
     std::string str(newick);
     os << str;
@@ -190,16 +182,16 @@ public:
    */
   bool areParents(corax_rnode_t *n1, corax_rnode_t *n2);
 
-  void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
-  
-  
+  void onSpeciesTreeChange(
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
+
   std::vector<bool> &getParentsCache(corax_rnode_t *n1);
   std::vector<bool> &getAncestorssCache(corax_rnode_t *n1);
-  
+
   void buildLCACache();
 
   /**
-   *  Compute and return a mapping between labels and 
+   *  Compute and return a mapping between labels and
    *  unique IDs, such that the mapping does
    *  not depend on the internal indices (to be sure
    *  that the IDs are the same for different processes
@@ -212,9 +204,10 @@ public:
    *  Build a consensus tree from a list of strings representing
    *  either a newick file or a newick string.
    */
-  static std::string buildConsensusTree(const std::vector<std::string> &strOrFiles, 
-      double threshold = 0.51);
-  
+  static std::string
+  buildConsensusTree(const std::vector<std::string> &strOrFiles,
+                     double threshold = 0.51);
+
   /**
    *  Return a mapping from the nodes IDs of this tree
    *  and the input tree. Both trees must have the same
@@ -222,31 +215,28 @@ public:
    */
   std::vector<unsigned int> getNodeIndexMapping(PLLRootedTree &otherTree);
 
-  std::unordered_map<std::string, corax_rnode_t *> getLabelToNode(bool leafOnly);
+  std::unordered_map<std::string, corax_rnode_t *>
+  getLabelToNode(bool leafOnly);
 
   bool areNodeIndicesParallelConsistent() const;
 
   std::vector<corax_rnode_t *> getOrderedSpeciations() const;
+
 private:
-  std::unique_ptr<corax_rtree_t, void(*)(corax_rtree_t*)> _tree;
-  
+  std::unique_ptr<corax_rtree_t, void (*)(corax_rtree_t *)> _tree;
+
   struct LCACache {
     // vectors are indexed with rnodes indices
     // lcas[n1][n2] == lca(n1, n2) in the tree
     // parents[n1][n2] is true if n2 is an ancestor
     //   of n1 or n1 an ancestor of n2
     // ancestors[n1][n2] is true if n2 is ancestor of n1
-    std::vector<std::vector<corax_rnode_t *> > lcas;
-    std::vector<std::vector<bool> > parents;
-    std::vector<std::vector<bool> > ancestors;
+    std::vector<std::vector<corax_rnode_t *>> lcas;
+    std::vector<std::vector<bool>> parents;
+    std::vector<std::vector<bool>> ancestors;
   };
   std::unique_ptr<LCACache> _lcaCache;
-  
-  
-  static corax_rtree_t *buildRandomTree(const std::unordered_set<std::string> &leafLabels);
+
+  static corax_rtree_t *
+  buildRandomTree(const std::unordered_set<std::string> &leafLabels);
 };
-
-
-
-
-

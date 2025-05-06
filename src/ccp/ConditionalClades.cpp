@@ -1,20 +1,20 @@
-  
+
 #include "ConditionalClades.hpp"
-#include <trees/PLLUnrootedTree.hpp>
 #include <IO/Logger.hpp>
 #include <cassert>
 #include <fstream>
 #include <iostream>
-#include <trees/PLLRootedTree.hpp>
 #include <sstream>
+#include <trees/PLLRootedTree.hpp>
+#include <trees/PLLUnrootedTree.hpp>
 
 struct TreeWraper {
   std::shared_ptr<PLLUnrootedTree> tree;
   corax_unode_t *root;
   size_t hash;
   double ll;
-  TreeWraper(const std::string newickStr,
-      bool rooted):root(nullptr), ll(0.0) {
+  TreeWraper(const std::string newickStr, bool rooted)
+      : root(nullptr), ll(0.0) {
     tree = std::make_shared<PLLUnrootedTree>(newickStr, false);
     if (rooted) {
       PLLRootedTree rootedTree(newickStr, false);
@@ -25,44 +25,30 @@ struct TreeWraper {
     }
   }
 
-  bool operator ==(const TreeWraper &other) const
-  {
-    return root == other.root && 
-      PLLUnrootedTree::areIsomorphic(*tree, *(other.tree));
+  bool operator==(const TreeWraper &other) const {
+    return root == other.root &&
+           PLLUnrootedTree::areIsomorphic(*tree, *(other.tree));
   }
 };
 
-namespace std
-{
-  template<>
-    struct hash<TreeWraper>
-    {
-      size_t
-        operator()(const TreeWraper& tree) const
-        {
-          return tree.hash;
-        }
-    };
-}
+namespace std {
+template <> struct hash<TreeWraper> {
+  size_t operator()(const TreeWraper &tree) const { return tree.hash; }
+};
+} // namespace std
 
 using WeightedTrees = std::unordered_map<TreeWraper, unsigned int>;
 
-
-
 static CCPClade getComplementary(const CCPClade &clade,
-    const CCPClade &subclade)
-{
+                                 const CCPClade &subclade) {
   CCPClade complementary(subclade);
   complementary.negate();
   complementary &= clade;
   return complementary;
 }
 
-static void addClade(CID cid,
-    CladeCounts &cladeCounts,
-    double count,
-    bool useLikelihoods)
-{
+static void addClade(CID cid, CladeCounts &cladeCounts, double count,
+                     bool useLikelihoods) {
   assert(count);
   auto cladeCountsIt = cladeCounts.find(cid);
   if (cladeCountsIt == cladeCounts.end()) {
@@ -76,19 +62,14 @@ static void addClade(CID cid,
   }
 }
 
-static void addSubclade(CID cid,
-    CID subcladeCID,
-    SubcladeCounts &subcladeCounts,
-    double count,
-    double bl,
-    bool useLikelihoods)
-{
+static void addSubclade(CID cid, CID subcladeCID,
+                        SubcladeCounts &subcladeCounts, double count, double bl,
+                        bool useLikelihoods) {
   addClade(subcladeCID, subcladeCounts[cid], count, useLikelihoods);
 }
-   
-void printClade(const CCPClade &clade, 
-    const std::vector<std::string> &idToLeaf)
-{
+
+void printClade(const CCPClade &clade,
+                const std::vector<std::string> &idToLeaf) {
   std::cerr << "{";
   bool first = true;
   for (unsigned int i = 0; i < clade.size(); ++i) {
@@ -103,15 +84,11 @@ void printClade(const CCPClade &clade,
   std::cerr << "}";
 }
 
-
 static bool readTrees(const std::string &inputFile,
-    const std::string &likelihoodFile,
-    bool rooted,
-    WeightedTrees &weightedTrees,
-    unsigned int &inputTrees,
-    unsigned int &uniqueInputTrees,
-    unsigned int sampleFrequency)
-{
+                      const std::string &likelihoodFile, bool rooted,
+                      WeightedTrees &weightedTrees, unsigned int &inputTrees,
+                      unsigned int &uniqueInputTrees,
+                      unsigned int sampleFrequency) {
   std::ifstream infile(inputFile);
   std::string line;
   bool useLikelihoods = likelihoodFile.size() != 0;
@@ -132,12 +109,13 @@ static bool readTrees(const std::string &inputFile,
     }
     assert(likelihoods.size() == lines.size());
   }
-  
+
   unsigned int llIndex = 0;
-  for (auto line: lines) {
+  for (auto line : lines) {
     TreeWraper wraper(line, rooted);
     if (!wraper.tree->hasUniqueLeafLabels()) {
-      Logger::error << "Error, the trees in " << inputFile << " have duplicated leaf labels" << std::endl;
+      Logger::error << "Error, the trees in " << inputFile
+                    << " have duplicated leaf labels" << std::endl;
       return false;
     }
     if (useLikelihoods) {
@@ -152,7 +130,7 @@ static bool readTrees(const std::string &inputFile,
           weightedTrees.erase(it);
           weightedTrees.insert({wraper, 1});
         }
-      } else{
+      } else {
         it->second++;
       }
     }
@@ -162,17 +140,15 @@ static bool readTrees(const std::string &inputFile,
   return true;
 }
 
-// extract all clades and map them to clade IDs, which 
+// extract all clades and map them to clade IDs, which
 // are sorted (child clades appear before the parent clades)
 // for each weighted tree, also stores its node in post order
-static void extractClades(const WeightedTrees &weightedTrees,
-    const std::unordered_map<std::string, unsigned int> &leafToId,
-    CladeToCID &cladeToCID,
-    CIDToClade &cidToClade,
-    CIDToLeaf &cidToLeaf,
-    std::vector<std::vector<corax_unode_t*> > &postOrderNodes
-    )
-{
+static void
+extractClades(const WeightedTrees &weightedTrees,
+              const std::unordered_map<std::string, unsigned int> &leafToId,
+              CladeToCID &cladeToCID, CIDToClade &cidToClade,
+              CIDToLeaf &cidToLeaf,
+              std::vector<std::vector<corax_unode_t *>> &postOrderNodes) {
   auto &anyTree = *(weightedTrees.begin()->first.tree);
   CCPClade emptyClade(anyTree.getLeafNumber(), false);
   CCPClade fullClade(anyTree.getLeafNumber(), true);
@@ -183,20 +159,20 @@ static void extractClades(const WeightedTrees &weightedTrees,
   // add the root clade (containing all taxa)
   orderedClades.insert(fullClade);
   // iterate over all trees of the tree distribution
-  for (auto pair: weightedTrees) {
+  for (auto pair : weightedTrees) {
     auto virtualRoot = pair.first.root;
     auto &tree = *(pair.first.tree);
-    std::vector<CCPClade> nodeIndexToClade(tree.getDirectedNodeNumber(), 
-        emptyClade);
+    std::vector<CCPClade> nodeIndexToClade(tree.getDirectedNodeNumber(),
+                                           emptyClade);
     if (virtualRoot) {
       postOrderNodes.emplace_back(tree.getPostOrderNodesRooted(virtualRoot));
     } else {
       postOrderNodes.emplace_back(tree.getPostOrderNodes());
     }
     // traverse all directed nodes of the current tree, and compute
-    // the corresponding clade. Store them into nodeIndexToClade to 
+    // the corresponding clade. Store them into nodeIndexToClade to
     // reuse the child subclades in the post order traversal
-    for (auto node: postOrderNodes.back()) {
+    for (auto node : postOrderNodes.back()) {
       auto nodeIndex = node->node_index;
       auto &clade = nodeIndexToClade[nodeIndex];
       if (!node->next) { // leaf
@@ -214,7 +190,7 @@ static void extractClades(const WeightedTrees &weightedTrees,
   cladeToCID.clear();
   // fill cidToClade and cladeToCID
   // The order is important because we want to make sure that a parent
-  // clade always comes after its child clades in the CID ordering 
+  // clade always comes after its child clades in the CID ordering
   for (auto it = orderedClades.begin(); it != orderedClades.end(); ++it) {
     auto &clade = *it;
     unsigned int CID = cidToClade.size();
@@ -222,20 +198,16 @@ static void extractClades(const WeightedTrees &weightedTrees,
     cladeToCID[clade] = CID;
   }
   // so far we have only added the non-trivial clades. Now we add
-  // the trivial clades 
-  for (auto pair: leafToId) {
+  // the trivial clades
+  for (auto pair : leafToId) {
     CCPClade clade(leafNumber, false);
     clade.set(pair.second);
     cidToLeaf[cladeToCID[clade]] = pair.first;
   }
 }
 
-
-static void addBL(unsigned int cid,
-    unsigned int childCid, 
-    double bl,
-    SubcladeBLs &subcladeBLs)
-{
+static void addBL(unsigned int cid, unsigned int childCid, double bl,
+                  SubcladeBLs &subcladeBLs) {
   auto &m = subcladeBLs[cid];
   if (m.find(childCid) == m.end()) {
     m.insert({childCid, std::vector<double>()});
@@ -247,30 +219,29 @@ static void addBL(unsigned int cid,
 // subcladeCOunts (for each clade, the number of times each subclade
 // occures)
 // if CIDToDeviation is not null, fill it with the map deviations
-static void fillCladeCounts(const WeightedTrees &weightedTrees,
-    const CladeToCID &cladeToCID,
+static void fillCladeCounts(
+    const WeightedTrees &weightedTrees, const CladeToCID &cladeToCID,
     const std::unordered_map<std::string, unsigned int> &leafToId,
-    const std::vector<std::vector<corax_unode_t*> > &postOrderNodes,
-    SubcladeCounts &subcladeCounts,
-    SubcladeBLs &subcladeBLs,
+    const std::vector<std::vector<corax_unode_t *>> &postOrderNodes,
+    SubcladeCounts &subcladeCounts, SubcladeBLs &subcladeBLs,
     bool useLikelihoods,
-    std::unordered_map<unsigned int, double> *CIDToDeviation = nullptr)
-{
+    std::unordered_map<unsigned int, double> *CIDToDeviation = nullptr) {
   auto &anyTree = *(weightedTrees.begin()->first.tree);
   auto emptyClade = CCPClade(anyTree.getLeafNumber(), false);
   auto fullClade = CCPClade(anyTree.getLeafNumber(), true);
   auto fullCladeCID = cladeToCID.at(fullClade);
-  std::vector<CCPClade> nodeIndexToClade(anyTree.getDirectedNodeNumber(), emptyClade); 
+  std::vector<CCPClade> nodeIndexToClade(anyTree.getDirectedNodeNumber(),
+                                         emptyClade);
   std::vector<CID> nodeIndexToCID(anyTree.getDirectedNodeNumber());
   // root clade
   unsigned int weightedTreeIndex = 0;
-  for (auto pair: weightedTrees) {
+  for (auto pair : weightedTrees) {
     std::vector<double> deviations;
     if (CIDToDeviation) {
       deviations = pair.first.tree->getMADRelativeDeviations();
     }
     double frequency = useLikelihoods ? pair.first.ll : pair.second;
-    for (auto node: postOrderNodes.at(weightedTreeIndex)) {
+    for (auto node : postOrderNodes.at(weightedTreeIndex)) {
       auto nodeIndex = node->node_index;
       auto &clade = nodeIndexToClade.at(nodeIndex);
       CID cid;
@@ -288,15 +259,19 @@ static void fillCladeCounts(const WeightedTrees &weightedTrees,
         auto rightCID = nodeIndexToCID[rightNode->node_index];
         clade = leftClade | rightClade;
         cid = cladeToCID.at(clade);
-        addSubclade(cid, leftCID, subcladeCounts, frequency, leftNode->length, useLikelihoods);
+        addSubclade(cid, leftCID, subcladeCounts, frequency, leftNode->length,
+                    useLikelihoods);
         addBL(cid, leftCID, leftNode->length, subcladeBLs);
-        addSubclade(cid, rightCID, subcladeCounts, frequency, rightNode->length, useLikelihoods);
+        addSubclade(cid, rightCID, subcladeCounts, frequency, rightNode->length,
+                    useLikelihoods);
         addBL(cid, rightCID, rightNode->length, subcladeBLs);
       }
 
       nodeIndexToCID[node->node_index] = cid;
-      if (pair.first.root == nullptr || node == pair.first.root || node->back == pair.first.root) {
-        addSubclade(fullCladeCID, cid, subcladeCounts, frequency, node->length, useLikelihoods);
+      if (pair.first.root == nullptr || node == pair.first.root ||
+          node->back == pair.first.root) {
+        addSubclade(fullCladeCID, cid, subcladeCounts, frequency, node->length,
+                    useLikelihoods);
         addBL(fullCladeCID, cid, node->length, subcladeBLs);
       }
       if (CIDToDeviation) {
@@ -305,26 +280,19 @@ static void fillCladeCounts(const WeightedTrees &weightedTrees,
     }
     weightedTreeIndex++;
   }
-
 }
 
-
-
-
 ConditionalClades::ConditionalClades(const std::string &inputFile,
-    const std::string &likelihoods,
-      CCPRooting ccpRooting,
-      unsigned int sampleFrequency):
-  _inputTrees(0),
-  _uniqueInputTrees(0),
-  _ccpRooting(ccpRooting),
-  _isValid(true)
-{
+                                     const std::string &likelihoods,
+                                     CCPRooting ccpRooting,
+                                     unsigned int sampleFrequency)
+    : _inputTrees(0), _uniqueInputTrees(0), _ccpRooting(ccpRooting),
+      _isValid(true) {
   std::ifstream is(inputFile);
   if (is.peek() == '#') {
     try {
       buildFromALEFormat(inputFile, ccpRooting);
-      //printContent();
+      // printContent();
       return;
     } catch (...) {
       // maybe that wasn't the ALE format after all!
@@ -334,14 +302,10 @@ ConditionalClades::ConditionalClades(const std::string &inputFile,
   buildFromGeneTrees(inputFile, likelihoods, ccpRooting, sampleFrequency);
 }
 
-static CID getCIDFromALE(size_t readCID)
-{
-  return readCID - 1; 
-}
- 
-void ConditionalClades::buildFromALEFormat(const std::string &inputFile, 
-        CCPRooting ccpRooting)
-{
+static CID getCIDFromALE(size_t readCID) { return readCID - 1; }
+
+void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
+                                           CCPRooting ccpRooting) {
   assert(ccpRooting == CCPRooting::UNIFORM);
   std::ifstream is(inputFile);
   std::string line;
@@ -353,12 +317,12 @@ void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
   auto N = tree.getLeafNumber();
   // read comment "#observations"
   std::getline(is, line);
-  is >> _inputTrees; 
+  is >> _inputTrees;
   std::getline(is, line);
   // read comment "#Bip counts"
   std::getline(is, line);
   // read the bip counts
-  std::unordered_map<size_t, double> bipCounts; 
+  std::unordered_map<size_t, double> bipCounts;
   size_t cladeNumber = 0;
   while (is.peek() != '#') {
     size_t id;
@@ -375,7 +339,7 @@ void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
   cladeNumber++; // for the clade with all taxa
   // read comment "#Bip _bls"
   std::getline(is, line);
-  // skip the bls for now 
+  // skip the bls for now
   while (is.peek() != '#') {
     std::getline(is, line);
   }
@@ -401,7 +365,7 @@ void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
   cladeNumberCheck++;
   assert(cladeNumber == cladeNumberCheck);
   std::getline(is, line);
-  
+
   // read comment "#leaf-id"
   std::getline(is, line);
   _idToLeaf.resize(N);
@@ -447,7 +411,7 @@ void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
   }
   // now fill the root clade
   CCPClade fullClade(N, true);
-  size_t fullCID = cladeNumber -1;
+  size_t fullCID = cladeNumber - 1;
   _CIDToClade[fullCID] = fullClade;
   _cladeToCID.insert({fullClade, fullCID});
   for (unsigned int cid = 0; cid < _CIDToClade.size() - 1; ++cid) {
@@ -456,21 +420,22 @@ void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
     auto clade = _CIDToClade[cid];
     if (!clade[0]) {
       // do not add both a split and its complementary
-    //  continue;
+      //  continue;
     }
     auto compClade = ~clade;
     split.left = cid;
     split.right = _cladeToCID[compClade];
     assert(bipCounts[cid] == bipCounts[split.right]);
-    split.frequency = double(bipCounts[cid]) / double(_inputTrees * 2 * (2 * N - 3));
+    split.frequency =
+        double(bipCounts[cid]) / double(_inputTrees * 2 * (2 * N - 3));
     _allCladeSplits[split.parent].push_back(split);
   }
-  for (auto &splits: _allCladeSplits) {
+  for (auto &splits : _allCladeSplits) {
     if (!splits.size()) {
       continue;
     }
     double sum = 0.0;
-    for (auto &split: splits) {
+    for (auto &split : splits) {
       sum += split.frequency;
     }
     assert(fabs(sum - 1.0) < 0.0000001);
@@ -479,89 +444,71 @@ void ConditionalClades::buildFromALEFormat(const std::string &inputFile,
 }
 
 void ConditionalClades::buildFromGeneTrees(const std::string &inputFile,
-    const std::string &likelihoods,
-    CCPRooting ccpRooting,
-    unsigned int sampleFrequency)
-{
+                                           const std::string &likelihoods,
+                                           CCPRooting ccpRooting,
+                                           unsigned int sampleFrequency) {
   std::unordered_map<std::string, unsigned int> leafToId;
   CCPClade emptyClade;
   CCPClade fullClade;
   WeightedTrees weightedTrees;
-  _isValid &= readTrees(inputFile,
-      likelihoods,
-      (ccpRooting == CCPRooting::ROOTED),
-      weightedTrees, 
-      _inputTrees, 
-      _uniqueInputTrees,
-      sampleFrequency); 
+  _isValid &=
+      readTrees(inputFile, likelihoods, (ccpRooting == CCPRooting::ROOTED),
+                weightedTrees, _inputTrees, _uniqueInputTrees, sampleFrequency);
   if (!isValid()) {
     return;
   }
   auto &anyTree = *(weightedTrees.begin()->first.tree);
-  for (auto leaf: anyTree.getLabels()) {
+  for (auto leaf : anyTree.getLabels()) {
     leafToId.insert({leaf, leafToId.size()});
     _idToLeaf.push_back(leaf);
   }
   emptyClade = CCPClade(anyTree.getLeafNumber(), false);
   fullClade = CCPClade(anyTree.getLeafNumber(), true);
-  
-  std::vector<std::vector<corax_unode_t*> > postOrderNodes;
-  // first pass to get all clades and assign them a CID
-  extractClades(weightedTrees, 
-      leafToId,
-      _cladeToCID,
-      _CIDToClade,
-      _CIDToLeaf,
-      postOrderNodes
-      );
 
+  std::vector<std::vector<corax_unode_t *>> postOrderNodes;
+  // first pass to get all clades and assign them a CID
+  extractClades(weightedTrees, leafToId, _cladeToCID, _CIDToClade, _CIDToLeaf,
+                postOrderNodes);
 
   SubcladeCounts subcladeCounts(_CIDToClade.size());
-  std::unique_ptr<std::unordered_map<unsigned int, double> >
-    CIDToDeviation;
+  std::unique_ptr<std::unordered_map<unsigned int, double>> CIDToDeviation;
   if (madRooting()) {
-    CIDToDeviation = 
-      std::make_unique<std::unordered_map<unsigned int, double> >();
-    }
+    CIDToDeviation =
+        std::make_unique<std::unordered_map<unsigned int, double>>();
+  }
   // second pass to count the number of occurence of each clade,
   // and for each clade, the number of occurences of its subclades
   bool useLikelihoods = likelihoods.size();
   SubcladeBLs subcladeBLs(_CIDToClade.size());
-  fillCladeCounts(weightedTrees,
-      _cladeToCID,
-      leafToId,
-      postOrderNodes,
-      subcladeCounts,
-      subcladeBLs,
-      useLikelihoods,
-      CIDToDeviation.get());
+  fillCladeCounts(weightedTrees, _cladeToCID, leafToId, postOrderNodes,
+                  subcladeCounts, subcladeBLs, useLikelihoods,
+                  CIDToDeviation.get());
   _fillCCP(subcladeCounts, subcladeBLs, useLikelihoods, CIDToDeviation.get());
 }
- 
 
 void normalizeFrequencies(CladeSplits &splits, bool logScale) {
-  
+
   if (logScale) {
     // rescale to loglikelihoods to likelihoods
     double max = -std::numeric_limits<double>::max();
-    for (const auto &split: splits) {
+    for (const auto &split : splits) {
       max = std::max(max, split.frequency);
     }
-    for (auto &split: splits) {
+    for (auto &split : splits) {
       split.frequency = std::max(0.000001, exp(split.frequency - max));
-      //Logger::info << split.frequency << " ";
+      // Logger::info << split.frequency << " ";
     }
-    //Logger::info << std::endl;
-  } 
+    // Logger::info << std::endl;
+  }
   double sum = 0.0;
-  for (const auto &split: splits) {
+  for (const auto &split : splits) {
     sum += split.frequency;
   }
-  for (auto &split: splits) {
+  for (auto &split : splits) {
     split.frequency /= sum;
   }
 }
- 
+
 double average(const std::vector<double> &values) {
   assert(values.size());
   double sum = std::accumulate(values.begin(), values.end(), 0.0);
@@ -569,15 +516,14 @@ double average(const std::vector<double> &values) {
   return sum / size;
 }
 
-void ConditionalClades::_fillCCP(SubcladeCounts &subcladeCounts,
-    SubcladeBLs &subcladeBLs, 
+void ConditionalClades::_fillCCP(
+    SubcladeCounts &subcladeCounts, SubcladeBLs &subcladeBLs,
     bool useLikelihoods,
-    std::unordered_map<unsigned int, double> *CIDToDeviation)
-{
+    std::unordered_map<unsigned int, double> *CIDToDeviation) {
   _allCladeSplits.clear();
   auto cladesNumber = _CIDToClade.size();
   _allCladeSplits.resize(cladesNumber);
-  auto rootCID = cladesNumber -  1;
+  auto rootCID = cladesNumber - 1;
   CCPClade fullClade(_CIDToClade[0].size(), true);
   assert(rootCID = _cladeToCID[fullClade]);
   for (unsigned int cid = 0; cid < cladesNumber; ++cid) {
@@ -585,7 +531,7 @@ void ConditionalClades::_fillCCP(SubcladeCounts &subcladeCounts,
     auto &cladeSplits = _allCladeSplits[cid];
     if (subcladeCounts[cid].size()) {
       // internal clade
-      for (auto &subcladeCount: subcladeCounts[cid]) {
+      for (auto &subcladeCount : subcladeCounts[cid]) {
         auto CIDLeft = subcladeCount.first;
         auto cladeLeft = _CIDToClade[CIDLeft];
         auto cladeRight = getComplementary(clade, cladeLeft);
@@ -599,7 +545,7 @@ void ConditionalClades::_fillCCP(SubcladeCounts &subcladeCounts,
         split.right = CIDRight;
         split.blLeft = average(subcladeBLs[cid][CIDLeft]);
         split.blRight = average(subcladeBLs[cid][CIDRight]);
-        double frequency = double(subcladeCount.second); 
+        double frequency = double(subcladeCount.second);
         if (CIDToDeviation && split.parent == rootCID) {
           double deviation = (*CIDToDeviation)[split.left] + 1.0;
           frequency /= (deviation * deviation);
@@ -612,8 +558,7 @@ void ConditionalClades::_fillCCP(SubcladeCounts &subcladeCounts,
   }
 }
 
-void ConditionalClades::printContent() const
-{
+void ConditionalClades::printContent() const {
 
   for (unsigned int CID = 0; CID < _allCladeSplits.size(); ++CID) {
     auto &clade = _CIDToClade[CID];
@@ -622,7 +567,7 @@ void ConditionalClades::printContent() const
     printClade(clade, _idToLeaf);
     std::cerr << std::endl;
     double sumFrequencies = 0.0;
-    for (auto &cladeSplit: cladeSplits) {
+    for (auto &cladeSplit : cladeSplits) {
       std::cerr << "  ";
       printClade(_CIDToClade[cladeSplit.left], _idToLeaf);
       std::cerr << "|";
@@ -632,102 +577,84 @@ void ConditionalClades::printContent() const
     }
   }
 }
-  
-bool ConditionalClades::isLeaf(CID cid) const
-{
+
+bool ConditionalClades::isLeaf(CID cid) const {
   return getCladeSplits(cid).size() == 0;
 }
-  
-std::string ConditionalClades::getLeafLabel(CID cid) const
-{
+
+std::string ConditionalClades::getLeafLabel(CID cid) const {
   assert(isLeaf(cid));
   return _CIDToLeaf.at(cid);
 }
-  
-unsigned int ConditionalClades::getRootsNumber() const
-{
-  return _allCladeSplits.back().size() / 2; 
+
+unsigned int ConditionalClades::getRootsNumber() const {
+  return _allCladeSplits.back().size() / 2;
 }
 
-static void serializeUInt(unsigned int v,
-    std::ostream &os)
-{
-  os.write(reinterpret_cast<char *>(&v),sizeof(unsigned int));
+static void serializeUInt(unsigned int v, std::ostream &os) {
+  os.write(reinterpret_cast<char *>(&v), sizeof(unsigned int));
 }
 
-static unsigned int unserializeUInt(std::istream &is)
-{
+static unsigned int unserializeUInt(std::istream &is) {
   unsigned int res;
-  is.read(reinterpret_cast<char *>(&res),sizeof(unsigned int));
+  is.read(reinterpret_cast<char *>(&res), sizeof(unsigned int));
   return res;
 }
 
-static void serializeDouble( double v,
-    std::ostream &os)
-{
-  os.write(reinterpret_cast<char *>(&v),sizeof(double));
+static void serializeDouble(double v, std::ostream &os) {
+  os.write(reinterpret_cast<char *>(&v), sizeof(double));
 }
 
-static double unserializeDouble(std::istream &is)
-{
+static double unserializeDouble(std::istream &is) {
   double res;
-  is.read(reinterpret_cast<char *>(&res),sizeof(double));
+  is.read(reinterpret_cast<char *>(&res), sizeof(double));
   return res;
 }
 
-static void serializeString(const std::string &str,
-    std::ostream &os)
-{
+static void serializeString(const std::string &str, std::ostream &os) {
   unsigned int size = str.size();
   serializeUInt(str.size(), os);
-  os.write(str.c_str(), size*sizeof(char) );
+  os.write(str.c_str(), size * sizeof(char));
 }
 
-static std::string unserializeString(std::istream &is)
-{
+static std::string unserializeString(std::istream &is) {
   unsigned int size = unserializeUInt(is);
   std::vector<char> temp(size);
   is.read(reinterpret_cast<char *>(&temp[0]), size * sizeof(char));
-  return std::string (temp.begin(),temp.end());
+  return std::string(temp.begin(), temp.end());
 }
 
-static void serializeCCPClade(const CCPClade &clade,
-    std::ostream &os)
-{
+static void serializeCCPClade(const CCPClade &clade, std::ostream &os) {
   unsigned int size = clade.size();
   serializeUInt(size, os);
   auto &data = clade.getInternalBuffer();
   unsigned int dataSize = data.size();
   serializeUInt(dataSize, os);
   os.write(reinterpret_cast<const char *>(&data[0]),
-      data.size() * sizeof(genesis::utils::Bitvector::IntType));
+           data.size() * sizeof(genesis::utils::Bitvector::IntType));
 }
 
-static CCPClade unserializeCCPClade(std::istream &is)
-{
+static CCPClade unserializeCCPClade(std::istream &is) {
   auto size = unserializeUInt(is);
   CCPClade res(size);
   auto &data = res.getInternalBuffer();
   auto dataSize = unserializeUInt(is);
   data.resize(dataSize);
-  is.read(reinterpret_cast<char *>(&data[0]), 
-      data.size() * sizeof(genesis::utils::Bitvector::IntType));
+  is.read(reinterpret_cast<char *>(&data[0]),
+          data.size() * sizeof(genesis::utils::Bitvector::IntType));
   return res;
 }
 
-static void serializeCladeSplit(const CladeSplit &split,
-    std::ostream &os)
-{
-  serializeUInt(split.parent, os); 
-  serializeUInt(split.left, os); 
-  serializeUInt(split.right, os); 
-  serializeDouble(split.blLeft, os); 
-  serializeDouble(split.blRight, os); 
-  serializeDouble(split.frequency, os); 
+static void serializeCladeSplit(const CladeSplit &split, std::ostream &os) {
+  serializeUInt(split.parent, os);
+  serializeUInt(split.left, os);
+  serializeUInt(split.right, os);
+  serializeDouble(split.blLeft, os);
+  serializeDouble(split.blRight, os);
+  serializeDouble(split.frequency, os);
 }
 
-static CladeSplit unserializeCladeSplit(std::ifstream &is)
-{
+static CladeSplit unserializeCladeSplit(std::ifstream &is) {
   CladeSplit res;
   res.parent = unserializeUInt(is);
   res.left = unserializeUInt(is);
@@ -738,45 +665,43 @@ static CladeSplit unserializeCladeSplit(std::ifstream &is)
   return res;
 }
 
-void ConditionalClades::serialize(const std::string &outputFile)
-{
+void ConditionalClades::serialize(const std::string &outputFile) {
   std::ofstream os(outputFile, std::ios::binary);
   serializeUInt(_inputTrees, os);
   serializeUInt(_uniqueInputTrees, os);
   // _idToLeaf
   serializeUInt(_idToLeaf.size(), os);
-  for (const auto &str: _idToLeaf) {
+  for (const auto &str : _idToLeaf) {
     serializeString(str, os);
   }
   // _CIDToLeaf
   serializeUInt(_CIDToLeaf.size(), os);
-  for (auto it: _CIDToLeaf) {
+  for (auto it : _CIDToLeaf) {
     serializeUInt(it.first, os);
     serializeString(it.second, os);
   }
   // _cladeToCID
   serializeUInt(_cladeToCID.size(), os);
-  for (auto it: _cladeToCID) {
+  for (auto it : _cladeToCID) {
     serializeCCPClade(it.first, os);
     serializeUInt(it.second, os);
   }
   // _CIDToClade
   serializeUInt(_CIDToClade.size(), os);
-  for (auto &clade: _CIDToClade) {
+  for (auto &clade : _CIDToClade) {
     serializeCCPClade(clade, os);
   }
   // _allCladeSplits
   serializeUInt(_allCladeSplits.size(), os);
-  for (auto &cladeSplits: _allCladeSplits) {
+  for (auto &cladeSplits : _allCladeSplits) {
     serializeUInt(cladeSplits.size(), os);
-    for (auto &cladeSplit: cladeSplits) {
-      serializeCladeSplit(cladeSplit, os); 
+    for (auto &cladeSplit : cladeSplits) {
+      serializeCladeSplit(cladeSplit, os);
     }
   }
 }
 
-void ConditionalClades::unserialize(const std::string &inputFile)
-{
+void ConditionalClades::unserialize(const std::string &inputFile) {
   std::ifstream is(inputFile, std::ios::binary);
   _inputTrees = unserializeUInt(is);
   _uniqueInputTrees = unserializeUInt(is);
@@ -816,26 +741,25 @@ void ConditionalClades::unserialize(const std::string &inputFile)
       cladeSplits[j] = unserializeCladeSplit(is);
     }
   }
-  //printContent();
+  // printContent();
 }
 
-void ConditionalClades::printStats() const
-{
-  std::cerr << "Leaves " << _CIDToLeaf.size() << " clades: " << _cladeToCID.size() <<  " unique trees " << _uniqueInputTrees << std::endl;
-
+void ConditionalClades::printStats() const {
+  std::cerr << "Leaves " << _CIDToLeaf.size()
+            << " clades: " << _cladeToCID.size() << " unique trees "
+            << _uniqueInputTrees << std::endl;
 }
 
-void ConditionalClades::reorderClades(const std::vector<CID> &mappings)
-{
+void ConditionalClades::reorderClades(const std::vector<CID> &mappings) {
   auto cladeNumber = mappings.size();
   // remap _CIDToLeaf
   CIDToLeaf newCIDToLeaf(cladeNumber);
-  for (const auto &pair: _CIDToLeaf) {
+  for (const auto &pair : _CIDToLeaf) {
     newCIDToLeaf[mappings[pair.first]] = pair.second;
   }
   _CIDToLeaf = newCIDToLeaf;
   // remap _CIDToClade
-  for (const auto &pair: _cladeToCID) {
+  for (const auto &pair : _cladeToCID) {
     _CIDToClade[mappings[pair.second]] = pair.first;
   }
   // remap _cladeToCID
@@ -847,7 +771,7 @@ void ConditionalClades::reorderClades(const std::vector<CID> &mappings)
   for (unsigned int oldCid = 0; oldCid < cladeNumber; ++oldCid) {
     auto newCid = mappings[oldCid];
     const auto &cladeSplits = _allCladeSplits[oldCid];
-    for (const auto &split: cladeSplits) {
+    for (const auto &split : cladeSplits) {
       CladeSplit newSplit;
       newSplit.parent = mappings[split.parent];
       newSplit.left = mappings[split.left];

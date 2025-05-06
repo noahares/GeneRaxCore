@@ -1,14 +1,14 @@
 #include <optimizers/PerFamilyDTLOptimizer.hpp>
 
-#include <parallelization/ParallelContext.hpp>
-#include <trees/JointTree.hpp>
-#include <parallelization/PerCoreGeneTrees.hpp>
 #include <IO/Logger.hpp>
-#include <limits>
 #include <algorithm>
-#include <iostream>
 #include <cmath>
+#include <iostream>
+#include <limits>
 #include <optimizers/DTLOptimizer.hpp>
+#include <parallelization/ParallelContext.hpp>
+#include <parallelization/PerCoreGeneTrees.hpp>
+#include <trees/JointTree.hpp>
 
 static bool isValidLikelihood(double ll) {
   return std::isnormal(ll) && ll < -0.0000001;
@@ -23,13 +23,11 @@ static void updateLL(Parameters &rates, JointTree &jointTree) {
   }
 }
 
-void PerFamilyDTLOptimizer::findBestRatesDL(JointTree &jointTree,
-    double minDup, double maxDup,
-    double minLoss, double maxLoss, unsigned int steps,
-    double &bestDup,
-    double &bestLoss,
-    double &bestLL) 
-{
+void PerFamilyDTLOptimizer::findBestRatesDL(JointTree &jointTree, double minDup,
+                                            double maxDup, double minLoss,
+                                            double maxLoss, unsigned int steps,
+                                            double &bestDup, double &bestLoss,
+                                            double &bestLL) {
   bestLL = std::numeric_limits<double>::lowest();
   auto totalSteps = steps * steps;
   auto begin = ParallelContext::getBegin(totalSteps);
@@ -46,7 +44,7 @@ void PerFamilyDTLOptimizer::findBestRatesDL(JointTree &jointTree,
     if (!isValidLikelihood(newLL)) {
       continue;
     }
-    if (newLL > bestLL) { 
+    if (newLL > bestLL) {
       bestDup = rates[0];
       bestLoss = rates[1];
       bestLL = newLL;
@@ -59,16 +57,10 @@ void PerFamilyDTLOptimizer::findBestRatesDL(JointTree &jointTree,
   jointTree.setRates(Parameters(bestDup, bestLoss));
 }
 
-void PerFamilyDTLOptimizer::findBestRatesDTL(JointTree &jointTree,
-    double minDup, double maxDup,
-    double minLoss, double maxLoss, 
-    double minTrans, double maxTrans, 
-    unsigned int steps,
-    double &bestDup,
-    double &bestLoss,
-    double &bestTrans,
-    double &bestLL) 
-{
+void PerFamilyDTLOptimizer::findBestRatesDTL(
+    JointTree &jointTree, double minDup, double maxDup, double minLoss,
+    double maxLoss, double minTrans, double maxTrans, unsigned int steps,
+    double &bestDup, double &bestLoss, double &bestTrans, double &bestLL) {
   bestLL = std::numeric_limits<double>::lowest();
   unsigned int totalSteps = steps * steps * steps;
   auto begin = ParallelContext::getBegin(totalSteps);
@@ -87,7 +79,7 @@ void PerFamilyDTLOptimizer::findBestRatesDTL(JointTree &jointTree,
     if (!isValidLikelihood(newLL)) {
       continue;
     }
-    if (newLL > bestLL) { 
+    if (newLL > bestLL) {
       bestDup = rates[0];
       bestLoss = rates[1];
       bestTrans = rates[2];
@@ -102,9 +94,9 @@ void PerFamilyDTLOptimizer::findBestRatesDTL(JointTree &jointTree,
   jointTree.setRates(Parameters(bestDup, bestLoss, bestTrans));
 }
 
-
-void PerFamilyDTLOptimizer::optimizeDTLRates(JointTree &jointTree, RecOpt method) {
-  switch(method) {
+void PerFamilyDTLOptimizer::optimizeDTLRates(JointTree &jointTree,
+                                             RecOpt method) {
+  switch (method) {
   case RecOpt::Grid:
     optimizeDTLRatesWindow(jointTree);
     break;
@@ -121,8 +113,9 @@ void PerFamilyDTLOptimizer::optimizeDTLRates(JointTree &jointTree, RecOpt method
   }
 }
 
-void PerFamilyDTLOptimizer::optimizeDLRates(JointTree &jointTree, RecOpt method) {
-  switch(method) {
+void PerFamilyDTLOptimizer::optimizeDLRates(JointTree &jointTree,
+                                            RecOpt method) {
+  switch (method) {
   case RecOpt::Grid:
     optimizeDLRatesWindow(jointTree);
     break;
@@ -139,10 +132,9 @@ void PerFamilyDTLOptimizer::optimizeDLRates(JointTree &jointTree, RecOpt method)
   }
 }
 
-
 void PerFamilyDTLOptimizer::optimizeDLRatesWindow(JointTree &jointTree) {
   Logger::timed << "Start optimizing DL rates" << std::endl;
-  
+
   double bestLL = std::numeric_limits<double>::lowest();
   double newLL = 0;
   double bestDup = 0.0;
@@ -155,21 +147,23 @@ void PerFamilyDTLOptimizer::optimizeDLRatesWindow(JointTree &jointTree) {
   double epsilon = 0.001;
   do {
     bestLL = newLL;
-    findBestRatesDL(jointTree, minDup, maxDup, minLoss, maxLoss, steps, bestDup, bestLoss, newLL);
+    findBestRatesDL(jointTree, minDup, maxDup, minLoss, maxLoss, steps, bestDup,
+                    bestLoss, newLL);
     double offsetDup = (maxDup - minDup) / steps;
-    double offsetLoss =(maxLoss - minLoss) / steps;
+    double offsetLoss = (maxLoss - minLoss) / steps;
     minDup = std::max(0.0, bestDup - offsetDup);
     maxDup = bestDup + offsetDup;
     minLoss = std::max(0.0, bestLoss - offsetLoss);
     maxLoss = bestLoss + offsetLoss;
   } while (fabs(newLL - bestLL) > epsilon);
-  Logger::info << " best rates: " << bestDup << " " << bestLoss <<  " " << newLL << std::endl;
-  if  (!isValidLikelihood(newLL)) {
+  Logger::info << " best rates: " << bestDup << " " << bestLoss << " " << newLL
+               << std::endl;
+  if (!isValidLikelihood(newLL)) {
     Logger::error << "Invalid likelihood " << newLL << std::endl;
     ParallelContext::abort(10);
   }
 }
-    
+
 void PerFamilyDTLOptimizer::optimizeDTLRatesWindow(JointTree &jointTree) {
   Logger::timed << "Start optimizing DTL rates" << std::endl;
   double bestLL = std::numeric_limits<double>::lowest();
@@ -187,7 +181,8 @@ void PerFamilyDTLOptimizer::optimizeDTLRatesWindow(JointTree &jointTree) {
   double epsilon = 0.01;
   do {
     bestLL = newLL;
-    findBestRatesDTL(jointTree, minDup, maxDup, minLoss, maxLoss, minTrans, maxTrans, steps, bestDup, bestLoss, bestTrans, newLL);
+    findBestRatesDTL(jointTree, minDup, maxDup, minLoss, maxLoss, minTrans,
+                     maxTrans, steps, bestDup, bestLoss, bestTrans, newLL);
     double offsetDup = (maxDup - minDup) / steps;
     double offsetLoss = (maxLoss - minLoss) / steps;
     double offsetTrans = (maxTrans - minTrans) / steps;
@@ -198,24 +193,24 @@ void PerFamilyDTLOptimizer::optimizeDTLRatesWindow(JointTree &jointTree) {
     minTrans = std::max(0.0, bestTrans - offsetTrans);
     maxTrans = bestTrans + offsetTrans;
   } while (fabs(newLL - bestLL) > epsilon);
-  if  (!isValidLikelihood(newLL)) {
+  if (!isValidLikelihood(newLL)) {
     Logger::error << "Invalid likelihood " << newLL << std::endl;
     ParallelContext::abort(10);
   }
 }
 
-
-
 /*
  *  Find the point between  r1 and r2. Parallelized over the iterations
  */
-Parameters findBestPoint(Parameters r1, Parameters r2, unsigned int iterations, JointTree &jointTree) 
-{
+Parameters findBestPoint(Parameters r1, Parameters r2, unsigned int iterations,
+                         JointTree &jointTree) {
   Parameters best = r1;
   best.setScore(-100000000000);
   unsigned int bestI = 0;
-  for (auto i = ParallelContext::getRank(); i < iterations; i += ParallelContext::getSize()) {
-    Parameters current = r1 + ((r2 - r1) * (double(i) / double(iterations - 1)));
+  for (auto i = ParallelContext::getRank(); i < iterations;
+       i += ParallelContext::getSize()) {
+    Parameters current =
+        r1 + ((r2 - r1) * (double(i) / double(iterations - 1)));
     updateLL(current, jointTree);
     if (current < best) {
       best = current;
@@ -235,10 +230,8 @@ Parameters findBestPoint(Parameters r1, Parameters r2, unsigned int iterations, 
   return best;
 }
 
-
-
-void PerFamilyDTLOptimizer::optimizeRateSimplex(JointTree &jointTree, bool transfers)
-{
+void PerFamilyDTLOptimizer::optimizeRateSimplex(JointTree &jointTree,
+                                                bool transfers) {
   Logger::timed << "Starting DTL rates optimization" << std::endl;
   std::vector<Parameters> rates;
   if (transfers) {
@@ -251,7 +244,7 @@ void PerFamilyDTLOptimizer::optimizeRateSimplex(JointTree &jointTree, bool trans
     rates.push_back(Parameters(1.0, 0.01));
     rates.push_back(Parameters(0.01, 1.0));
   }
-  for (auto &r: rates) {
+  for (auto &r : rates) {
     updateLL(r, jointTree);
   }
   Parameters worstRate;
@@ -266,32 +259,32 @@ void PerFamilyDTLOptimizer::optimizeRateSimplex(JointTree &jointTree, bool trans
     }
     x0 = x0 / double(rates.size() - 1);
     // reflexion, exansion and contraction at the same time
-    Parameters x1 = x0 - (x0 - rates.back()) * 0.5;  
-    Parameters x2 = x0 + (x0 - rates.back()) * 1.5;  
+    Parameters x1 = x0 - (x0 - rates.back()) * 0.5;
+    Parameters x2 = x0 + (x0 - rates.back()) * 1.5;
     unsigned int iterations = 8;
     Parameters xr = findBestPoint(x1, x2, iterations, jointTree);
-    if (xr < rates[rates.size() - 1] ) {
+    if (xr < rates[rates.size() - 1]) {
       rates.back() = xr;
     }
     currentIt++;
   }
   sort(rates.begin(), rates.end());
   updateLL(rates[0], jointTree);
-  Logger::timed << "Simplex converged after " << currentIt << " iterations" << std::endl;
+  Logger::timed << "Simplex converged after " << currentIt << " iterations"
+                << std::endl;
   Logger::timed << rates[0] << std::endl;
 }
 
-  
-void PerFamilyDTLOptimizer::optimizeDTLRatesGradient(JointTree &jointTree)
-{
+void PerFamilyDTLOptimizer::optimizeDTLRatesGradient(JointTree &jointTree) {
   Evaluations evaluations;
   evaluations.push_back(jointTree.getReconciliationEvaluationPtr());
   OptimizationSettings settings;
-  settings.lineSearchMinImprovement = std::max(0.1, fabs(jointTree.computeReconciliationLoglk()) / 1000.0);
+  settings.lineSearchMinImprovement =
+      std::max(0.1, fabs(jointTree.computeReconciliationLoglk()) / 1000.0);
   settings.epsilon = 0.00000001;
   settings.minAlpha = 0.00000001;
-  Parameters rates = DTLOptimizer::optimizeParameters(evaluations, jointTree.getRatesVector(), settings);
+  Parameters rates = DTLOptimizer::optimizeParameters(
+      evaluations, jointTree.getRatesVector(), settings);
   Logger::info << "Per family rates: " << rates << std::endl;
   jointTree.setRates(rates);
 }
-

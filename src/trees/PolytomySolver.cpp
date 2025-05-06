@@ -1,12 +1,10 @@
 #include "PolytomySolver.hpp"
+#include <limits>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/PLLUnrootedTree.hpp>
-#include <limits>
 
 const double BL_THRESHOLD = 0.000001;
 
-
-  
 struct Entry {
   unsigned int m1;
   unsigned int m2;
@@ -16,20 +14,15 @@ struct Entry {
   unsigned int losses;
   unsigned int ac; // ancestral copies
   std::vector<std::string> subtrees;
-  Entry():
-    m1(std::numeric_limits<unsigned int>::max()),
-    m2(std::numeric_limits<unsigned int>::max()),
-    ym(std::numeric_limits<unsigned int>::max()),
-    nbs(0),
-    dups(0),
-    losses(0),
-    ac(0)
-  {}
+  Entry()
+      : m1(std::numeric_limits<unsigned int>::max()),
+        m2(std::numeric_limits<unsigned int>::max()),
+        ym(std::numeric_limits<unsigned int>::max()), nbs(0), dups(0),
+        losses(0), ac(0) {}
 
-  unsigned int getMinCost(unsigned int k)
-  {
+  unsigned int getMinCost(unsigned int k) {
     if (k < m1) {
-      return ym  + m1 - k;
+      return ym + m1 - k;
     } else if (k > m2) {
       return ym + k - m2;
     } else {
@@ -38,17 +31,9 @@ struct Entry {
   }
 };
 
-
-static void computeCup(unsigned int l1,
-    unsigned int l2,
-    unsigned int yl,
-    unsigned int r1,
-    unsigned int r2,
-    unsigned int yr,
-    unsigned int &m1,
-    unsigned int &m2,
-    unsigned int &ym)
-{
+static void computeCup(unsigned int l1, unsigned int l2, unsigned int yl,
+                       unsigned int r1, unsigned int r2, unsigned int yr,
+                       unsigned int &m1, unsigned int &m2, unsigned int &ym) {
   m1 = 99999;
   if (l1 < r1) {
     if (l2 < r1) {
@@ -69,7 +54,7 @@ static void computeCup(unsigned int l1,
       m1 = r1;
       m2 = r2;
       return;
-    } 
+    }
   } else if (r1 <= l1 && l1 <= r2) {
     if (l1 <= r2) {
       // case 4
@@ -92,45 +77,41 @@ static void computeCup(unsigned int l1,
   }
 }
 
-void computeDupLoss(corax_rnode_t *node,
-    std::vector<Entry> &entries,
-    unsigned int k)
-{
+void computeDupLoss(corax_rnode_t *node, std::vector<Entry> &entries,
+                    unsigned int k) {
   auto &c = entries[node->node_index];
   if (!node->left) {
     // LEAF
     if (k >= c.nbs) {
       c.losses = k - c.nbs;
     } else {
-      c.dups = c.nbs -k;
+      c.dups = c.nbs - k;
     }
   } else {
     // INTERNAL NODE
     auto cl = entries[node->left->node_index];
     auto cr = entries[node->right->node_index];
-    
-    if (k > c.nbs && 
-        c.getMinCost(k) == 
-        (cl.getMinCost(k-c.nbs) + cr.getMinCost(k-c.nbs))) {
+
+    if (k > c.nbs && c.getMinCost(k) == (cl.getMinCost(k - c.nbs) +
+                                         cr.getMinCost(k - c.nbs))) {
       // case 1
-      computeDupLoss(node->left, entries, k - c.nbs); 
-      computeDupLoss(node->right, entries, k - c.nbs); 
+      computeDupLoss(node->left, entries, k - c.nbs);
+      computeDupLoss(node->right, entries, k - c.nbs);
     } else if (k < c.m1) {
-      c.dups = c.m1 -k;
-      computeDupLoss(node->left, entries, c.m1 - c.nbs); 
-      computeDupLoss(node->right, entries, c.m1 - c.nbs); 
+      c.dups = c.m1 - k;
+      computeDupLoss(node->left, entries, c.m1 - c.nbs);
+      computeDupLoss(node->right, entries, c.m1 - c.nbs);
     } else if (k > c.m2) {
       c.losses = k - c.m2;
-      computeDupLoss(node->left, entries, c.m2 - c.nbs); 
-      computeDupLoss(node->right, entries, c.m2 - c.nbs); 
+      computeDupLoss(node->left, entries, c.m2 - c.nbs);
+      computeDupLoss(node->right, entries, c.m2 - c.nbs);
     }
   }
 }
 
 static void computeAncestralCopies(corax_rnode_t *node,
-    std::vector<Entry> &entries,
-    unsigned int parentsCopies)
-{
+                                   std::vector<Entry> &entries,
+                                   unsigned int parentsCopies) {
   auto &c = entries[node->node_index];
   c.ac = parentsCopies + c.dups - c.losses;
   if (node->left) {
@@ -139,32 +120,29 @@ static void computeAncestralCopies(corax_rnode_t *node,
   }
 }
 
-std::string joinNodes(const std::string &n1, const std::string &n2) 
-{
+std::string joinNodes(const std::string &n1, const std::string &n2) {
   if (!n1.size()) {
     return n2;
   } else if (!n2.size()) {
-      return n1;   
+    return n1;
   } else {
     return "(" + n1 + "," + n2 + ")";
   }
 }
 
 void PolytomySolver::solveSimpleInterface(
-      PLLRootedTree &speciesTree,
-      std::map<std::string, unsigned int> &speciesLabelsToSolve
-      )
-{
-  unsigned int speciesNumber = speciesTree.getNodeNumber(); 
+    PLLRootedTree &speciesTree,
+    std::map<std::string, unsigned int> &speciesLabelsToSolve) {
+  unsigned int speciesNumber = speciesTree.getNodeNumber();
   std::vector<Entry> cells(speciesNumber);
-  for (auto node: speciesTree.getPostOrderNodes()) {
+  for (auto node : speciesTree.getPostOrderNodes()) {
     auto spid = node->node_index;
     auto &c = cells[spid];
     std::string label = node->label;
     auto &m1 = c.m1;
     auto &m2 = c.m2;
     auto &ym = c.ym;
-    
+
     if (speciesLabelsToSolve.find(label) != speciesLabelsToSolve.end()) {
       c.nbs = speciesLabelsToSolve[label];
     }
@@ -180,20 +158,18 @@ void PolytomySolver::solveSimpleInterface(
     } else {
       auto &cl = cells[node->left->node_index];
       auto &cr = cells[node->right->node_index];
-      computeCup(
-          cl.m1, cl.m2, cl.ym,
-          cr.m1, cr.m2, cr.ym,
-          m1, m2, ym);
+      computeCup(cl.m1, cl.m2, cl.ym, cr.m1, cr.m2, cr.ym, m1, m2, ym);
       m1 += c.nbs;
       m2 += c.nbs;
-      //assert (m1 > c.nbs); 
-      //assert (m2 > c.nbs); 
+      // assert (m1 > c.nbs);
+      // assert (m2 > c.nbs);
     }
-    //std::cout << label << "\t" << m1 << "\t" << m2 << "\t" << ym << std::endl;
+    // std::cout << label << "\t" << m1 << "\t" << m2 << "\t" << ym <<
+    // std::endl;
   }
   computeDupLoss(speciesTree.getRoot(), cells, 1);
   computeAncestralCopies(speciesTree.getRoot(), cells, 1);
-  for (auto node: speciesTree.getPostOrderNodes()) {
+  for (auto node : speciesTree.getPostOrderNodes()) {
     auto spid = node->node_index;
     auto &c = cells[spid];
     if (!node->left) {
@@ -201,7 +177,7 @@ void PolytomySolver::solveSimpleInterface(
       std::string label(node->label);
       c.subtrees = std::vector<std::string>(c.nbs - c.dups, label);
       for (unsigned int i = 0; i < c.dups; ++i) {
-        auto &t = c.subtrees[i%c.subtrees.size()];
+        auto &t = c.subtrees[i % c.subtrees.size()];
         t = joinNodes(t, label);
       }
     } else {
@@ -241,12 +217,8 @@ void PolytomySolver::solveSimpleInterface(
   auto root = speciesTree.getRoot();
   auto &rootCell = cells[root->node_index];
   std::cout << root->label << " ";
-  for (auto &s: rootCell.subtrees) {
+  for (auto &s : rootCell.subtrees) {
     std::cout << s << " ";
   }
   std::cout << std::endl;
-
-
-
 }
-

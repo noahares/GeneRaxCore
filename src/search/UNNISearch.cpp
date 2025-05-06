@@ -1,10 +1,8 @@
-#include "UNNISearch.hpp"  
+#include "UNNISearch.hpp"
 
 #include <IO/Logger.hpp>
 
-static void uswap(corax_unode_t *A,
-    corax_unode_t *B) 
-{
+static void uswap(corax_unode_t *A, corax_unode_t *B) {
   auto temp = A->back;
   A->back = B->back;
   B->back = temp;
@@ -12,28 +10,22 @@ static void uswap(corax_unode_t *A,
   B->back->back = B;
 }
 
-void UNNIMove::apply()
-{
-  uswap(getB(), getC());
-}
+void UNNIMove::apply() { uswap(getB(), getC()); }
 
-
-double UNNISearch::runRound()
-{
+double UNNISearch::runRound() {
   double bestScore = _evaluator.eval(_tree);
   Logger::timed << "Starting NNI round, score=" << bestScore << std::endl;
   UNNIMove bestMove(nullptr, false);
   std::vector<bool> bools;
   bools.push_back(true);
   bools.push_back(false);
-  for (auto edge: _tree.getBranchesDeterministic()) {
+  for (auto edge : _tree.getBranchesDeterministic()) {
     if (!edge->next or !edge->back->next) {
       continue;
     }
-    for (bool left: bools) {
+    for (bool left : bools) {
       UNNIMove move(edge, left);
-      double newScore = _evaluator.evalNNI(_tree, 
-          move);
+      double newScore = _evaluator.evalNNI(_tree, move);
       if (newScore > bestScore) {
         bestScore = newScore;
         bestMove = move;
@@ -47,8 +39,7 @@ double UNNISearch::runRound()
   return bestScore;
 }
 
-double UNNISearch::search()
-{
+double UNNISearch::search() {
   double bestScore = _evaluator.eval(_tree);
   double epsilon = 0.0;
   do {
@@ -58,5 +49,3 @@ double UNNISearch::search()
   } while (epsilon > 0.000000001);
   return bestScore;
 }
-
-

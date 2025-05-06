@@ -1,44 +1,39 @@
 #include "RootedSpeciesSplitScore.hpp"
-#include <ccp/RootedSpeciesSplitScore.hpp>
 #include <IO/Logger.hpp>
+#include <ccp/RootedSpeciesSplitScore.hpp>
 #include <parallelization/ParallelContext.hpp>
 
 static const SPID INVALID_SPID = static_cast<unsigned int>(-1);
 static const unsigned int INVALID_NODE_INDEX = static_cast<unsigned int>(-1);
 
 RootedSpeciesSplitScore::RootedSpeciesSplitScore(PLLRootedTree &speciesTree,
-    const SpeciesSplits &splits):
-  _splits(splits),
-  _speciesTree(&speciesTree),
-  _spidToNodeIndex(_speciesTree->getNodeNumber()),
-  _nodeIndexToSpid(_speciesTree->getNodeNumber(), INVALID_SPID)
-  //_labelToSpid(splits.getLabelToSpid())
-{
-}
-  
-void RootedSpeciesSplitScore::updateSpeciesTree(PLLRootedTree &speciesTree)
-{
+                                                 const SpeciesSplits &splits)
+    : _splits(splits), _speciesTree(&speciesTree),
+      _spidToNodeIndex(_speciesTree->getNodeNumber()),
+      _nodeIndexToSpid(_speciesTree->getNodeNumber(), INVALID_SPID)
+//_labelToSpid(splits.getLabelToSpid())
+{}
+
+void RootedSpeciesSplitScore::updateSpeciesTree(PLLRootedTree &speciesTree) {
   _speciesTree = &speciesTree;
   _speciesTree->buildLCACache();
   // map internal branches to branch ids
   SPID maxSpid = 0;
-  for (auto node: _speciesTree->getLeaves()) {
+  for (auto node : _speciesTree->getLeaves()) {
     std::string label(node->label);
     auto spid = _splits.getLabelToSpid().at(label);
     _spidToNodeIndex[spid] = (node->node_index);
     _nodeIndexToSpid[node->node_index] = spid;
     maxSpid = std::max(spid, maxSpid);
   }
-  for (auto node: _speciesTree->getInnerNodes()) {
+  for (auto node : _speciesTree->getInnerNodes()) {
     maxSpid++;
     _spidToNodeIndex[maxSpid] = (node->node_index);
     _nodeIndexToSpid[node->node_index] = maxSpid;
   }
 }
 
-
-corax_rnode_t *RootedSpeciesSplitScore::getLCA(unsigned int cid)
-{
+corax_rnode_t *RootedSpeciesSplitScore::getLCA(unsigned int cid) {
   const auto &clade = _splits.getClade(cid);
   corax_rnode_t *lca = nullptr;
   for (unsigned int spid = 0; spid < clade.size(); ++spid) {
@@ -49,13 +44,11 @@ corax_rnode_t *RootedSpeciesSplitScore::getLCA(unsigned int cid)
         lca = _speciesTree->getLCA(lca->node_index, _spidToNodeIndex[spid]);
       }
     }
-  } 
+  }
   return lca;
 }
 
-
-double RootedSpeciesSplitScore::getScore()
-{
+double RootedSpeciesSplitScore::getScore() {
   // compute the score
   std::vector<double> score(_spidToNodeIndex.size(), 0.0);
   std::vector<double> denominator(_spidToNodeIndex.size(), 0.0);
@@ -72,7 +65,7 @@ double RootedSpeciesSplitScore::getScore()
     auto lcaSpid = _nodeIndexToSpid[lca->node_index];
     if (_speciesTree->areParents(lca1, lca2)) {
       // MISMATCH
-      denominator[lcaSpid] += count; 
+      denominator[lcaSpid] += count;
     } else {
       // MATCH
       score[lcaSpid] += count;

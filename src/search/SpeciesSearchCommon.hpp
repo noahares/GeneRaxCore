@@ -3,16 +3,15 @@
 #include <vector>
 
 #include <likelihoods/ReconciliationEvaluation.hpp>
-#include <util/types.hpp>
-#include <util/Scenario.hpp>
 #include <maths/AverageStream.hpp>
 #include <search/UFBoot.hpp>
 #include <trees/SpeciesTree.hpp>
+#include <util/Scenario.hpp>
+#include <util/types.hpp>
 
 class PerCorePotentialTransfers;
 using TreePerFamLL = std::pair<std::string, PerFamLL>;
 using TreePerFamLLVec = std::vector<TreePerFamLL>;
-
 
 /**
  *  Store results (likelihoods, bootstrap info) for each
@@ -20,15 +19,12 @@ using TreePerFamLLVec = std::vector<TreePerFamLL>;
  */
 class RootLikelihoods {
 public:
-
-  RootLikelihoods(unsigned int localFamilies)
-  {
+  RootLikelihoods(unsigned int localFamilies) {
     unsigned int samples = 1000;
     for (unsigned int i = 0; i < samples; ++i) {
       _bootstraps.push_back(RootBoot(localFamilies));
     }
   }
-                
 
   /*
    *  Reset all results
@@ -36,7 +32,7 @@ public:
   void reset() {
     _idToLL.clear();
     newickToId.clear();
-    for (auto &bs: _bootstraps) {
+    for (auto &bs : _bootstraps) {
       bs.reset();
     }
   }
@@ -45,29 +41,28 @@ public:
    *  Add the likelihood of a root position
    */
   void saveRootLikelihood(corax_rnode_t *root, double ll);
-  
-  void savePerFamilyLikelihoods(corax_rnode_t *root, 
-      const PerFamLL &likelihoods);
+
+  void savePerFamilyLikelihoods(corax_rnode_t *root,
+                                const PerFamLL &likelihoods);
 
   /**
-   *  Fill the labels of the tree with the corresponding root 
-   *  likelihoods 
+   *  Fill the labels of the tree with the corresponding root
+   *  likelihoods
    */
   void fillTree(PLLRootedTree &tree);
 
   /**
-   *  Fill the labels of the tree with the corresponding root 
-   *  likelihoods 
+   *  Fill the labels of the tree with the corresponding root
+   *  likelihoods
    */
   void fillTreeBootstraps(PLLRootedTree &tree);
 
   /**
    * Return true if no value was stored
-   */ 
-  bool isEmpty() const {return !_idToLL.size();}
+   */
+  bool isEmpty() const { return !_idToLL.size(); }
 
 private:
-
   bool hasSubtreeId(const corax_rnode_t *subtree) const;
   unsigned int getSubtreeId(const corax_rnode_t *subtree) const;
   unsigned int getRootId(const corax_rnode_t *root);
@@ -77,8 +72,6 @@ private:
   std::vector<RootBoot> _bootstraps;
 };
 
-
-
 /**
  *  Interface for classes that are used by the search
  *  algorithms to evaluate the reconciliation likelihood and
@@ -86,8 +79,7 @@ private:
  */
 class SpeciesTreeLikelihoodEvaluatorInterface {
 public:
-  virtual ~SpeciesTreeLikelihoodEvaluatorInterface()
-  {}
+  virtual ~SpeciesTreeLikelihoodEvaluatorInterface() {}
 
   /**
    *  Compute and return the likelihood
@@ -132,10 +124,11 @@ public:
    */
   virtual void popAndApplyRollback() = 0;
 
-  virtual void getTransferInformation(SpeciesTree &speciesTree,
-    TransferFrequencies &frequencies,
-    PerSpeciesEvents &perSpeciesEvents,
-    PerCorePotentialTransfers &potentialTransfers) = 0;
+  virtual void
+  getTransferInformation(SpeciesTree &speciesTree,
+                         TransferFrequencies &frequencies,
+                         PerSpeciesEvents &perSpeciesEvents,
+                         PerCorePotentialTransfers &potentialTransfers) = 0;
 
   /**
    *  Are we in prune species tree mode?
@@ -151,19 +144,16 @@ public:
   /**
    *  Should be called when the species tree is updated
    */
-  virtual void onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
-  {
+  virtual void onSpeciesTreeChange(
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
     (void)(nodesToInvalidate);
   }
 
   /**
    *  Should the optimization routines print verbose logs?
    */
-  virtual bool isVerbose() const {return false;}
-
+  virtual bool isVerbose() const { return false; }
 };
-
-
 
 /**
  *  Structure that describes the current state of the
@@ -172,24 +162,22 @@ public:
 struct SpeciesSearchState {
 public:
   SpeciesSearchState(SpeciesTree &speciesTree,
-      const std::string &pathToBestSpeciesTree,
-      unsigned int familyNumber): 
-    speciesTree(speciesTree),
-    pathToBestSpeciesTree(pathToBestSpeciesTree),
-    farFromPlausible(true),
-    khBoots(familyNumber, speciesTree.getTree().getNodeNumber(), 1000)
-    {
-      for (unsigned int i = 0; i < 1000; ++i) {
-        sprBoots.push_back(PerBranchBoot(familyNumber,
-              speciesTree.getTree().getNodeNumber()));
-      }
+                     const std::string &pathToBestSpeciesTree,
+                     unsigned int familyNumber)
+      : speciesTree(speciesTree), pathToBestSpeciesTree(pathToBestSpeciesTree),
+        farFromPlausible(true),
+        khBoots(familyNumber, speciesTree.getTree().getNodeNumber(), 1000) {
+    for (unsigned int i = 0; i < 1000; ++i) {
+      sprBoots.push_back(
+          PerBranchBoot(familyNumber, speciesTree.getTree().getNodeNumber()));
     }
-  
+  }
+
   /**
    *  Reference to the current species tree
    */
   SpeciesTree &speciesTree;
-  
+
   /**
    *  The search algorithm will save the current species tree
    *  at this location after each likelihood improvement
@@ -200,17 +188,17 @@ public:
    *  The likelihood of the best species tree
    */
   double bestLL;
-        
-   /**
+
+  /**
    *  Set to true when the tree is far from being plausible
    *  (in the early stage of the search after starting from
    *  a random tree for instance).
-   *  
+   *
    *  When set to true, the search strategy can choose to
    *  apply less thorough optimizations and to favor speed
    *  over small tree improvments.
    *
-   *  Both the search algorithm functions and their caller 
+   *  Both the search algorithm functions and their caller
    *  can update this variable.
    */
   bool farFromPlausible;
@@ -223,16 +211,15 @@ public:
    *  (see for instance SpeciesSearchCommon::testSPR)
    *  It is then used to decide if the approximated likelihood
    *  score is good enough to try estimating the exact score.
-   *  
-   *  This is only relevant when 
+   *
+   *  This is only relevant when
    *  SpeciesTreeLikelihoodEvaluatorInterface::providesFastLikelihoodImpl
    *  is set to true
    */
   AverageStream averageApproxError;
 
-
   std::vector<PerBranchBoot> sprBoots;
-  PerBranchKH khBoots;  
+  PerBranchKH khBoots;
 
   /**
    *  To call when a better tree is found
@@ -240,24 +227,24 @@ public:
   void betterTreeCallback(double ll, PerFamLL &perFamLL);
 
   /**
-   *  To call when the likelihood increases but the tree does not 
+   *  To call when the likelihood increases but the tree does not
    *  change (e.g after rates optimization)
    */
   void betterLikelihoodCallback(double ll, PerFamLL &perFamLL);
 
   void saveSpeciesTreeKH(const std::string &outputFile);
   void saveSpeciesTreeBP(const std::string &outputFile);
-  
+
   class Listener {
   public:
     /**
-     *  If the object is attached to a SpeciesSearchState, 
+     *  If the object is attached to a SpeciesSearchState,
      *  this callback will be called when a better tree is found
      */
     virtual void betterTreeCallback() = 0;
   };
 
-  void addListener(Listener *listener) {_listeners.push_back(listener);}
+  void addListener(Listener *listener) { _listeners.push_back(listener); }
 
 private:
   std::vector<Listener *> _listeners;
@@ -266,27 +253,24 @@ private:
 class SpeciesSearchCommon {
 public:
   /**
-   *  Test a SPR move. 
+   *  Test a SPR move.
    *  If it improves the likelihood, keep it and return true.
    *  Else, rollback it and return false.
    */
   static bool testSPR(SpeciesTree &speciesTree,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-    SpeciesSearchState &searchState,
-    unsigned int prune,
-    unsigned int regraft);
+                      SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+                      SpeciesSearchState &searchState, unsigned int prune,
+                      unsigned int regraft);
 
   /**
    *  Try SPR moves with a small radius around the species
-   *  node with id spid. If a move improves the likelihood, 
-   *  apply it, and recursively search further. Otherwise, 
+   *  node with id spid. If a move improves the likelihood,
+   *  apply it, and recursively search further. Otherwise,
    *  rollback the tested moves.
    *  Returns true if one better tree has been found
    */
-  static bool veryLocalSearch(SpeciesTree &speciesTree,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-    SpeciesSearchState &searchState,
-    unsigned int spid);
-  
+  static bool
+  veryLocalSearch(SpeciesTree &speciesTree,
+                  SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+                  SpeciesSearchState &searchState, unsigned int spid);
 };
-

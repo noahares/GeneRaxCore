@@ -1,25 +1,24 @@
 #pragma once
 
-#include <cassert>
-#include <random>
-#include <string>
-#include <sstream>
-#include <fstream>
-#include <IO/ParallelOfstream.hpp>
 #include <IO/Logger.hpp>
+#include <IO/ParallelOfstream.hpp>
+#include <cassert>
+#include <fstream>
+#include <random>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 
 struct DTLRates {
   double rates[3];
   double ll;
-  
-  DTLRates(double d = 0.0, double l = 0.0, double t = 0.0): ll(0.0) {
+
+  DTLRates(double d = 0.0, double l = 0.0, double t = 0.0) : ll(0.0) {
     rates[0] = d;
     rates[1] = l;
     rates[2] = t;
   }
-
 
   inline void ensureValidity() {
     rates[0] = std::max(0.0, rates[0]);
@@ -27,32 +26,31 @@ struct DTLRates {
     rates[2] = std::max(0.0, rates[2]);
   }
 
-  inline bool operator <(const DTLRates& v) const {
-    return ll > v.ll;
+  inline bool operator<(const DTLRates &v) const { return ll > v.ll; }
+
+  inline bool operator<=(const DTLRates &v) const { return ll >= v.ll; }
+
+  inline DTLRates operator+(const DTLRates &v) const {
+    return DTLRates(rates[0] + v.rates[0], rates[1] + v.rates[1],
+                    rates[2] + v.rates[2]);
   }
-  
-  inline bool operator <=(const DTLRates& v) const {
-    return ll >=  v.ll;
+
+  inline DTLRates operator-(const DTLRates &v) const {
+    return DTLRates(rates[0] - v.rates[0], rates[1] - v.rates[1],
+                    rates[2] - v.rates[2]);
   }
-  
-  inline DTLRates operator+(const DTLRates& v) const {
-    return DTLRates(rates[0] + v.rates[0], rates[1] + v.rates[1], rates[2] + v.rates[2]);
-  }
-  
-  inline DTLRates operator-(const DTLRates& v) const {
-    return DTLRates(rates[0] - v.rates[0], rates[1] - v.rates[1], rates[2] - v.rates[2]);
-  }
-  
+
   inline DTLRates operator*(double v) const {
     return DTLRates(v * rates[0], v * rates[1], v * rates[2]);
   }
-  
+
   inline DTLRates operator/(double v) const {
     return DTLRates(rates[0] / v, rates[1] / v, rates[2] / v);
   }
-  
-  friend std::ostream& operator<<(std::ostream& os, const DTLRates &v) {
-    os << "(" << v.rates[0] << ", " << v.rates[1] << ", " << v.rates[2] << ", " <<  v.ll  << ")";
+
+  friend std::ostream &operator<<(std::ostream &os, const DTLRates &v) {
+    os << "(" << v.rates[0] << ", " << v.rates[1] << ", " << v.rates[2] << ", "
+       << v.ll << ")";
     return os;
   }
 
@@ -70,10 +68,9 @@ struct DTLRates {
   }
 };
 
-static double randfrom(double min, double max, 
-    std::default_random_engine &gen)
-{
-  std::uniform_real_distribution<double> distribution(0.0,1.0);
+static double randfrom(double min, double max,
+                       std::default_random_engine &gen) {
+  std::uniform_real_distribution<double> distribution(0.0, 1.0);
   if (distribution(gen) < 0.5) {
     return min;
   } else {
@@ -83,102 +80,101 @@ static double randfrom(double min, double max,
 
 class DTLRatesVector {
 public:
-  DTLRatesVector(): _ll(0.0) {}
-  DTLRatesVector(unsigned int size): _rates(size), _ll(0.0) {}
-  DTLRatesVector(unsigned int size, const DTLRates &rate): _rates(size, rate), _ll(0.0) {}  
-  DTLRatesVector(const std::string &src): _ll(0.0) {load(src);} 
-  DTLRatesVector(const DTLRates &rates): _ll(0.0) {_rates.push_back(rates);}
+  DTLRatesVector() : _ll(0.0) {}
+  DTLRatesVector(unsigned int size) : _rates(size), _ll(0.0) {}
+  DTLRatesVector(unsigned int size, const DTLRates &rate)
+      : _rates(size, rate), _ll(0.0) {}
+  DTLRatesVector(const std::string &src) : _ll(0.0) { load(src); }
+  DTLRatesVector(const DTLRates &rates) : _ll(0.0) { _rates.push_back(rates); }
   void initRandom(double min, double max, std::default_random_engine &gen) {
-    for (auto &rate: _rates) {
-      rate = DTLRates(randfrom(min, max, gen), randfrom(min, max, gen), randfrom(min, max, gen));
+    for (auto &rate : _rates) {
+      rate = DTLRates(randfrom(min, max, gen), randfrom(min, max, gen),
+                      randfrom(min, max, gen));
     }
   }
-  
-  inline bool operator <(const DTLRatesVector& v) const {
-    return _ll > v._ll;
+
+  inline bool operator<(const DTLRatesVector &v) const { return _ll > v._ll; }
+
+  inline bool operator<=(const DTLRatesVector &v) const { return _ll >= v._ll; }
+
+  inline double getLL() const { return _ll; }
+
+  inline void setLL(double ll) { _ll = ll; }
+
+  inline unsigned int size() const {
+    return static_cast<unsigned int>(_rates.size());
   }
-  
-  inline bool operator <=(const DTLRatesVector& v) const {
-    return _ll >=  v._ll;
+
+  inline const DTLRates &getRates(unsigned int index) const {
+    return _rates[index];
   }
- 
-  inline double getLL() const {return _ll;}
-  
-  inline void setLL(double ll) { _ll = ll;}
 
-  inline unsigned int size() const {return static_cast<unsigned int>(_rates.size());}
+  inline DTLRates &getRates(unsigned int index) { return _rates[index]; }
 
-  inline const DTLRates &getRates(unsigned int index) const {return _rates[index];}
-  
-  inline DTLRates &getRates(unsigned int index) {return _rates[index];}
-
-  inline const std::vector<DTLRates> &getRatesVector() const {return _rates;}
-  inline std::vector<DTLRates> &getRatesVector() {return _rates;}
+  inline const std::vector<DTLRates> &getRatesVector() const { return _rates; }
+  inline std::vector<DTLRates> &getRatesVector() { return _rates; }
 
   inline void ensureValidity() {
-    for (auto &r: _rates) {
+    for (auto &r : _rates) {
       r.ensureValidity();
     }
   }
 
-  inline DTLRatesVector operator+(const DTLRatesVector& v) const {
+  inline DTLRatesVector operator+(const DTLRatesVector &v) const {
     assert(size() == v.size());
     DTLRatesVector res(size());
     for (unsigned int i = 0; i < size(); ++i) {
-      res.getRates(i) = getRates(i) + v.getRates(i); 
+      res.getRates(i) = getRates(i) + v.getRates(i);
     }
     return res;
   }
-  
-  inline DTLRatesVector operator-(const DTLRatesVector& v) const {
+
+  inline DTLRatesVector operator-(const DTLRatesVector &v) const {
     assert(size() == v.size());
     DTLRatesVector res(size());
     for (unsigned int i = 0; i < size(); ++i) {
-      res.getRates(i) = getRates(i) - v.getRates(i); 
+      res.getRates(i) = getRates(i) - v.getRates(i);
     }
     return res;
   }
-  
+
   inline DTLRatesVector operator*(double v) const {
     DTLRatesVector res(size());
     for (unsigned int i = 0; i < size(); ++i) {
-      res.getRates(i) = getRates(i) * v; 
+      res.getRates(i) = getRates(i) * v;
     }
     return res;
   }
-  
+
   inline DTLRatesVector operator/(double v) const {
     DTLRatesVector res(size());
     for (unsigned int i = 0; i < size(); ++i) {
-      res.getRates(i) = getRates(i) / v; 
+      res.getRates(i) = getRates(i) / v;
     }
     return res;
   }
- 
-  friend std::ostream& operator<<(std::ostream& os, const DTLRatesVector &v) {
+
+  friend std::ostream &operator<<(std::ostream &os, const DTLRatesVector &v) {
     os << "[";
-    for (auto &rates: v._rates) {
+    for (auto &rates : v._rates) {
       os << rates << " ";
     }
     os << "]";
     return os;
   }
 
-  void save(const std::string &dest) 
-  {
+  void save(const std::string &dest) {
     ParallelOfstream os(dest);
-    for (auto &r: _rates) {
+    for (auto &r : _rates) {
       os << r.rates[0] << " " << r.rates[1] << " " << r.rates[2] << std::endl;
     }
   }
 
-  void load(const std::string &src) 
-  {
+  void load(const std::string &src) {
     _rates.clear();
     std::ifstream is(src);
     std::string line;
-    while (std::getline(is, line))
-    {
+    while (std::getline(is, line)) {
       if (line.size() == 0) {
         break;
       }
@@ -188,7 +184,7 @@ public:
       _rates.push_back(DTLRates(a, b, c));
     }
   }
-  
+
   inline double distance(const DTLRatesVector &v) const {
     assert(v.size() == size());
     double res = 0.0;
@@ -197,9 +193,10 @@ public:
     }
     return sqrt(res) / double(size());
   }
-  
+
   void normalize(double norm = 1.0) {
-    double av = distance(DTLRatesVector(static_cast<unsigned int>(_rates.size())));
+    double av =
+        distance(DTLRatesVector(static_cast<unsigned int>(_rates.size())));
     *this = *this * (norm / av);
   }
 

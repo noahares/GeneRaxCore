@@ -1,32 +1,28 @@
 #pragma once
-#include <vector>
-#include <string>
 #include <IO/Families.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
+#include <string>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/PLLUnrootedTree.hpp>
 #include <util/types.hpp>
+#include <vector>
 
-// counts[spid][famid][gid] 
-using IntersectionCounts = 
-std::vector<std::vector<std::vector<unsigned int> > >;
+// counts[spid][famid][gid]
+using IntersectionCounts = std::vector<std::vector<std::vector<unsigned int>>>;
 
-using QuadriCounts = 
-std::vector<std::vector<UInt3> >;
-
+using QuadriCounts = std::vector<std::vector<UInt3>>;
 
 class ICCalculator {
 public:
   /**
-   *  @param referenceTreePath 
+   *  @param referenceTreePath
    *  @param families information about evaluation trees
-   *  @param eqpicRadius max size of the branch path to consider for eqpic computation
+   *  @param eqpicRadius max size of the branch path to consider for eqpic
+   * computation
    *  @param paralogy if set to true, only consider speciation-driven quartets
    */
-  ICCalculator(const std::string &referenceTreePath,
-      const Families &families,
-      int eqpicRadius,
-      bool paralogy);
+  ICCalculator(const std::string &referenceTreePath, const Families &families,
+               int eqpicRadius, bool paralogy);
 
   /*
    *  Export computed scores in newick format
@@ -42,16 +38,14 @@ public:
    *
    */
   void exportScores(const std::string &outputQPIC,
-      const std::string &outputEQPIC,
-      const std::string &outputSupport,
-      const std::string &outputSupportTriplets);
+                    const std::string &outputEQPIC,
+                    const std::string &outputSupport,
+                    const std::string &outputSupportTriplets);
 
-  static void computeScores(PLLRootedTree &tree,
-      const Families &families,
-      bool paralogy,
-      int eqpicRadius,
-      const std::string &tempPrefix,
-      std::vector<double> &idToSupport);
+  static void computeScores(PLLRootedTree &tree, const Families &families,
+                            bool paralogy, int eqpicRadius,
+                            const std::string &tempPrefix,
+                            std::vector<double> &idToSupport);
 
 private:
   // trees
@@ -64,7 +58,7 @@ private:
   unsigned int _taxaNumber;
   std::vector<unsigned int> _refNodeIndexToBranchIndex;
   unsigned int _maxBranchIndex;
- 
+
   // parameters
   bool _paralogy;
   int _eqpicRadius;
@@ -73,35 +67,33 @@ private:
   QuadriCounts _quadriCounts;
 
   // evaluation trees data
-  std::vector<std::unique_ptr<PLLUnrootedTree> > _evaluationTrees;
- 
+  std::vector<std::unique_ptr<PLLUnrootedTree>> _evaluationTrees;
+
   // debug
   std::vector<std::string> _spidToString;
 
-  std::vector<double> _qpic; 
-  std::vector<double> _eqpic; 
-  std::vector<double> _localSupport1; 
-  std::vector<double> _localSupport2; 
-  std::vector<double> _localSupport3; 
-  
+  std::vector<double> _qpic;
+  std::vector<double> _eqpic;
+  std::vector<double> _localSupport1;
+  std::vector<double> _localSupport2;
+  std::vector<double> _localSupport3;
+
   // _isPartitionInFamily[famid][spid]
-  std::vector<std::vector<bool> > _isPartitionInFamily;
+  std::vector<std::vector<bool>> _isPartitionInFamily;
 
   void _readTrees();
   void _computeIntersections();
   void _computeQuadriCounts();
 
-  unsigned int _getQuadripartitionCount(
-    unsigned int famid,
-    const std::array<unsigned int, 4> &refQuadriparition,
-    const std::array<unsigned int, 3> &evalTripartition);
+  unsigned int
+  _getQuadripartitionCount(unsigned int famid,
+                           const std::array<unsigned int, 4> &refQuadriparition,
+                           const std::array<unsigned int, 3> &evalTripartition);
   unsigned int _getQuadripartitionCountPro(
-    unsigned int famid,
-    const std::array<unsigned int, 4> &refQuadriparition,
-    const std::array<unsigned int, 3> &evalTripartition);
+      unsigned int famid, const std::array<unsigned int, 4> &refQuadriparition,
+      const std::array<unsigned int, 3> &evalTripartition);
   void _computeRefBranchIndices();
   std::string _getNewickWithThreeScores();
-  std::string _getNewickWithScore(std::vector<double> &branchScores, const std::string &scoreName);
-
-
+  std::string _getNewickWithScore(std::vector<double> &branchScores,
+                                  const std::string &scoreName);
 };

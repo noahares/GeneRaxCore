@@ -1,16 +1,13 @@
 #include "PolyTree.hpp"
 
-
 #include <iostream>
 
-static bool contractBranch(corax_unode_t *branch)
-{
+static bool contractBranch(corax_unode_t *branch) {
   return branch->length <= 0.000001 && branch->next;
 }
 
 static void fillChildrenRec(corax_unode_t *node,
-    std::vector<corax_unode_t*> &children)
-{
+                            std::vector<corax_unode_t *> &children) {
   auto left = node->next->back;
   auto right = node->next->next->back;
   assert(left);
@@ -25,14 +22,11 @@ static void fillChildrenRec(corax_unode_t *node,
   } else {
     fillChildrenRec(right, children);
   }
-
 }
 
-PolyTree::PolyTree(PLLUnrootedTree &tree):
-  _tree(tree),
-  _cells(tree.getDirectedNodeNumber())
-{
-  for (auto node: tree.getPostOrderNodes()) {
+PolyTree::PolyTree(PLLUnrootedTree &tree)
+    : _tree(tree), _cells(tree.getDirectedNodeNumber()) {
+  for (auto node : tree.getPostOrderNodes()) {
     auto gid = node->node_index;
     auto &cell = _cells[gid];
     cell.gid = gid;
@@ -42,10 +36,8 @@ PolyTree::PolyTree(PLLUnrootedTree &tree):
   }
 }
 
-
 static std::string buildStringRec(corax_unode_t *node,
-    const std::vector<PolyTree::Cell> &cells)
-{
+                                  const std::vector<PolyTree::Cell> &cells) {
   auto gid = node->node_index;
   std::string res;
   auto &cell = cells[gid];
@@ -67,14 +59,10 @@ static std::string buildStringRec(corax_unode_t *node,
   return res;
 }
 
-std::string PolyTree::getNewickString() const
-{
+std::string PolyTree::getNewickString() const {
   auto root = _tree.getNode(0);
-  auto res1 = buildStringRec(root, 
-      _cells);
-  auto res2 = buildStringRec(root->back,
-      _cells);
+  auto res1 = buildStringRec(root, _cells);
+  auto res2 = buildStringRec(root->back, _cells);
   auto res = "(" + res1 + "," + res2 + ");";
   return res;
 }
-

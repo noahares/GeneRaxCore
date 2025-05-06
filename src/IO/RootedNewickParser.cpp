@@ -4,10 +4,10 @@
  *  Structure holding the current context of the parsing
  */
 struct RTreeParser {
-  // Pointer to the start of the newick string 
-  char* input;
+  // Pointer to the start of the newick string
+  char *input;
   // Pointer to the current offset in the newick string
-  char* input_current;
+  char *input_current;
   // size of input
   unsigned int input_size;
   // buffer containing all nodes
@@ -26,12 +26,10 @@ struct RTreeParser {
   ParsingError *error;
 };
 
-
 /**
  *  Deallocate all information stored in p
  */
-void destroy_rtree_parser(struct RTreeParser *p)
-{
+void destroy_rtree_parser(struct RTreeParser *p) {
   for (unsigned int i = 0; i < p->nodes_number; ++i) {
     if (p->nodes[i]) {
       free(p->nodes[i]->label);
@@ -47,16 +45,12 @@ void destroy_rtree_parser(struct RTreeParser *p)
 /**
  *  Return true if the parsing failed
  */
-int has_errored(struct RTreeParser *p)
-{
-  return p->error->type != PET_NOERROR;
-}
+int has_errored(struct RTreeParser *p) { return p->error->type != PET_NOERROR; }
 
 /**
  *  Callback for parsing error
  */
-void set_error(struct RTreeParser *p, ParsingErrorType type)
-{
+void set_error(struct RTreeParser *p, ParsingErrorType type) {
   if (!has_errored(p)) {
     p->error->type = type;
     p->error->offset = p->input_current - p->input - 1;
@@ -66,11 +60,10 @@ void set_error(struct RTreeParser *p, ParsingErrorType type)
 /**
  *  Allocate a larger node buffer in p
  */
-void increase_nodes_capacity(RTreeParser *p)
-{
-  p->nodes_capacity *= 4;  
-  corax_rnode_t **new_buffer = (corax_rnode_t **)calloc(
-      p->nodes_capacity, sizeof(corax_rnode_t *));
+void increase_nodes_capacity(RTreeParser *p) {
+  p->nodes_capacity *= 4;
+  corax_rnode_t **new_buffer =
+      (corax_rnode_t **)calloc(p->nodes_capacity, sizeof(corax_rnode_t *));
   memcpy(new_buffer, p->nodes, (p->nodes_number) * sizeof(corax_rnode_t *));
   free(p->nodes);
   p->nodes = new_buffer;
@@ -79,8 +72,7 @@ void increase_nodes_capacity(RTreeParser *p)
 /**
  *  Create and initialize a new node in p
  */
-corax_rnode_t *rtree_parse_add_node(RTreeParser *p)
-{
+corax_rnode_t *rtree_parse_add_node(RTreeParser *p) {
   if (p->nodes_number >= p->nodes_capacity) {
     increase_nodes_capacity(p);
   }
@@ -111,15 +103,14 @@ corax_rnode_t *rtree_parse_add_node(RTreeParser *p)
     }
   }
   p->nodes_number++;
-  return node; 
+  return node;
 }
 
 /*
  *  Create a new node under the current node in p
  *  Called after a left parenthesis
  */
-void rtree_add_node_down(RTreeParser *p) 
-{
+void rtree_add_node_down(RTreeParser *p) {
   p->parent_node = p->current_node;
   p->current_node = rtree_parse_add_node(p);
 }
@@ -128,8 +119,7 @@ void rtree_add_node_down(RTreeParser *p)
  * Go up in the tree structure being built in p
  * Called after a right parenthesis.
  */
-void rtree_go_up(RTreeParser *p)
-{
+void rtree_go_up(RTreeParser *p) {
   if (!p->current_node->label && !p->current_node->left) {
     set_error(p, PET_EMPTY_NODE);
   }
@@ -144,18 +134,15 @@ void rtree_go_up(RTreeParser *p)
  *  Create a neighbor node
  *  Called after a comma
  */
-void rtree_add_node_neighbor(RTreeParser *p)
-{
+void rtree_add_node_neighbor(RTreeParser *p) {
   p->current_node = rtree_parse_add_node(p);
 }
 
-int is_branch_length_set(corax_rnode_t *node)
-{
+int is_branch_length_set(corax_rnode_t *node) {
   return node && node->length != INFINITY;
 }
 
-void rtree_add_label(RTreeParser *p, Token *token)
-{
+void rtree_add_label(RTreeParser *p, Token *token) {
   if (p->current_node->label) {
     set_error(p, PET_INVALID_LABEL);
     return;
@@ -167,10 +154,7 @@ void rtree_add_label(RTreeParser *p, Token *token)
   token->str = NULL;
 }
 
-
-
-void terminate_node_creation(corax_rnode_t *node)
-{
+void terminate_node_creation(corax_rnode_t *node) {
   if (!node) {
     return;
   }
@@ -179,18 +163,16 @@ void terminate_node_creation(corax_rnode_t *node)
   }
 }
 
-void parse(RTreeParser *p)
-{
+void parse(RTreeParser *p) {
   Token token;
   Token tokenBL;
   token.str = NULL;
   tokenBL.str = NULL;
   bool end = false;
   rtree_add_node_down(p); // add root
-   
-  while (!end && read_token(&p->input_current, &token)) 
-  {
-    switch(token.type) {
+
+  while (!end && read_token(&p->input_current, &token)) {
+    switch (token.type) {
     case TT_SEMICOLON:
       end = true;
       break;
@@ -216,7 +198,7 @@ void parse(RTreeParser *p)
         set_error(p, PET_INVALID_PARENTHESES);
       } else {
         terminate_node_creation(p->current_node);
-        rtree_go_up(p); 
+        rtree_go_up(p);
       }
       break;
     case TT_COMMA:
@@ -225,7 +207,7 @@ void parse(RTreeParser *p)
       break;
     case TT_STRING:
     case TT_DOUBLE:
-      rtree_add_label(p, &token); 
+      rtree_add_label(p, &token);
       break;
     }
     destroy_token(&token);
@@ -251,14 +233,13 @@ void parse(RTreeParser *p)
  *  Build the tree.
  *  The input newick string should have already been parsed
  */
-corax_rtree_t *build_rtree(RTreeParser *p)
-{
+corax_rtree_t *build_rtree(RTreeParser *p) {
   if (has_errored(p)) {
     return NULL;
   }
-  corax_rtree_t * tree = (corax_rtree_t *)malloc(sizeof(corax_rtree_t));
-  tree->nodes = (corax_rnode_t **)malloc(
-      (p->nodes_number)*sizeof(corax_rnode_t *));
+  corax_rtree_t *tree = (corax_rtree_t *)malloc(sizeof(corax_rtree_t));
+  tree->nodes =
+      (corax_rnode_t **)malloc((p->nodes_number) * sizeof(corax_rnode_t *));
   unsigned int tips_number = p->nodes_number / 2 + 1;
   unsigned int tips_index = 0;
   unsigned int internal_index = tips_number;
@@ -268,26 +249,19 @@ corax_rtree_t *build_rtree(RTreeParser *p)
     corax_rnode_t *node = p->nodes[i];
     p->nodes[i] = NULL; // avoid double free when destroying p
     if (!node->left) {
-      node->node_index 
-        = node->clv_index 
-        = node->pmatrix_index 
-        = tips_index++;
+      node->node_index = node->clv_index = node->pmatrix_index = tips_index++;
       node->scaler_index = CORAX_SCALE_BUFFER_NONE;
     } else {
       node->scaler_index = internal_index - tips_number;
-      node->node_index 
-        = node->clv_index 
-        = node->pmatrix_index 
-        = internal_index++;
+      node->node_index = node->clv_index = node->pmatrix_index =
+          internal_index++;
     }
     tree->nodes[node->node_index] = node;
   }
   tree->root = p->nodes[0];
   p->nodes[0] = NULL; // avoid double free when destroying p
   tree->root->scaler_index = internal_index - tips_number;
-  tree->root->node_index 
-        = tree->root->clv_index 
-        = internal_index++;
+  tree->root->node_index = tree->root->clv_index = internal_index++;
   tree->root->pmatrix_index = 0;
   tree->nodes[tree->root->node_index] = tree->root;
   assert(internal_index == p->nodes_number);
@@ -298,38 +272,31 @@ corax_rtree_t *build_rtree(RTreeParser *p)
   return tree;
 }
 
-corax_rtree_t * custom_rtree_parse_newick(const char *input,
-    bool is_file,
-    ParsingError *error)
-{
+corax_rtree_t *custom_rtree_parse_newick(const char *input, bool is_file,
+                                         ParsingError *error) {
   RTreeParser p;
   p.error = error;
   error->type = PET_NOERROR;
   // todo: use const correctly!!
   p.is_file = is_file;
   if (is_file) {
-    p.input = get_file_content(input); 
+    p.input = get_file_content(input);
     if (p.input == NULL) {
       set_error(&p, PET_FILE_DOES_NOT_EXISTS);
       return NULL;
     }
   } else {
-    p.input = (char*)input;
+    p.input = (char *)input;
   }
-  p.input_current = (char*)p.input;
-  p.nodes_capacity = 1000; 
+  p.input_current = (char *)p.input;
+  p.nodes_capacity = 1000;
   p.nodes_number = 0;
-  p.nodes = (corax_rnode_t **)
-    calloc(p.nodes_capacity, sizeof(corax_rnode_t *));
+  p.nodes = (corax_rnode_t **)calloc(p.nodes_capacity, sizeof(corax_rnode_t *));
   assert(p.nodes);
   p.current_node = NULL;
   p.parent_node = NULL;
-  parse(&p); 
+  parse(&p);
   corax_rtree_t *rtree = build_rtree(&p);
   destroy_rtree_parser(&p);
   return rtree;
 }
-
-
-
-

@@ -1,45 +1,33 @@
 #include "GeneRaxMaster.hpp"
 
-#include <IO/Logger.hpp>
 #include <IO/FileSystem.hpp>
 #include <IO/LibpllParsers.hpp>
+#include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <maths/Parameters.hpp>
 #include <parallelization/Scheduler.hpp>
-#include <util/RecModelInfo.hpp>
 #include <sstream>
-
+#include <util/RecModelInfo.hpp>
 
 static std::string toArg(const std::string &str) {
   return str.size() ? str : "NONE";
 }
 
-
-void GeneRaxMaster::optimizeGeneTrees(Families &families,
-    const RecModelInfo &recModelInfo,
-    Parameters &rates,
-    const std::string &output,
-    const std::string &resultName,
-    const std::string &execPath, 
-    const std::string &speciesTreePath,
-    RecOpt recOpt,
-    bool madRooting,
-    double supportThreshold,
-    double recWeight,
-    bool enableRec,
-    bool enableLibpll,
-    unsigned int sprRadius,
-    unsigned int iteration,
-    bool schedulerSplitImplem,
-    long &elapsed,
-    bool inPlace) 
-{
+void GeneRaxMaster::optimizeGeneTrees(
+    Families &families, const RecModelInfo &recModelInfo, Parameters &rates,
+    const std::string &output, const std::string &resultName,
+    const std::string &execPath, const std::string &speciesTreePath,
+    RecOpt recOpt, bool madRooting, double supportThreshold, double recWeight,
+    bool enableRec, bool enableLibpll, unsigned int sprRadius,
+    unsigned int iteration, bool schedulerSplitImplem, long &elapsed,
+    bool inPlace) {
   auto start = Logger::getElapsedSec();
   std::stringstream outputDirName;
   outputDirName << "gene_optimization_" << iteration;
   std::string outputDir = FileSystem::joinPaths(output, outputDirName.str());
   FileSystem::mkdir(outputDir, true);
-  std::string commandFile = FileSystem::joinPaths(outputDir, "opt_genes_command.txt");
+  std::string commandFile =
+      FileSystem::joinPaths(outputDir, "opt_genes_command.txt");
   auto geneTreeSizes = LibpllParsers::parallelGetTreeSizes(families);
   ParallelOfstream os(commandFile);
   std::string ratesFile = FileSystem::joinPaths(outputDir, "dtl_rates.txt");
@@ -50,8 +38,10 @@ void GeneRaxMaster::optimizeGeneTrees(Families &families,
     auto &family = families[i];
     std::string familyOutput = FileSystem::joinPaths(output, resultName);
     familyOutput = FileSystem::joinPaths(familyOutput, family.name);
-    std::string geneTreePath = FileSystem::joinPaths(familyOutput, "geneTree.newick");
-    std::string checkpointPath = FileSystem::joinPaths(checkpointDir, family.name);
+    std::string geneTreePath =
+        FileSystem::joinPaths(familyOutput, "geneTree.newick");
+    std::string checkpointPath =
+        FileSystem::joinPaths(checkpointDir, family.name);
     if (inPlace) {
       // todobenoit make this the normal behavior?
       geneTreePath = family.startingGeneTree;
@@ -74,7 +64,7 @@ void GeneRaxMaster::optimizeGeneTrees(Families &families,
     }
     os << family.name << " ";
     os << cores << " "; // cores
-    os << taxa << " "; // cost
+    os << taxa << " ";  // cost
     os << "optimizeGeneTrees" << " ";
     os << family.startingGeneTree << " ";
     os << toArg(family.mappingFile) << " ";
@@ -84,26 +74,25 @@ void GeneRaxMaster::optimizeGeneTrees(Families &families,
       os << "NOALIGNMENT" << " ";
     }
     os << speciesTreePath << " ";
-    os << family.libpllModel  << " ";
+    os << family.libpllModel << " ";
     os << ratesFile << " ";
-    for (auto &str: recModelInfo.getArgv()) {
+    for (auto &str : recModelInfo.getArgv()) {
       os << str << " ";
     }
-    os << static_cast<int>(recOpt)  << " ";
+    os << static_cast<int>(recOpt) << " ";
     os << supportThreshold << " ";
-    os << recWeight  << " ";
-    os << static_cast<int>(enableRec)  << " ";
-    os << static_cast<int>(enableLibpll)  << " ";
-    os << sprRadius  << " ";
+    os << recWeight << " ";
+    os << static_cast<int>(enableRec) << " ";
+    os << static_cast<int>(enableLibpll) << " ";
+    os << sprRadius << " ";
     os << geneTreePath << " ";
     os << outputStats << " ";
     os << static_cast<int>(madRooting) << " ";
     os << checkpointPath << std::endl;
     family.startingGeneTree = geneTreePath;
     family.statsFile = outputStats;
-  } 
+  }
   os.close();
-  Scheduler::schedule(outputDir, commandFile, schedulerSplitImplem, execPath); 
+  Scheduler::schedule(outputDir, commandFile, schedulerSplitImplem, execPath);
   elapsed = (Logger::getElapsedSec() - start);
 }
-

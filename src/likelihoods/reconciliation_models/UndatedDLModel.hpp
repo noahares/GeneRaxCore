@@ -1,51 +1,49 @@
 #pragma once
 
-#include <likelihoods/reconciliation_models/GTBaseReconciliationModel.hpp>
-#include <likelihoods/LibpllEvaluation.hpp>
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
 #include <algorithm>
-#include <util/Scenario.hpp>
 #include <cmath>
-
-
-
-
+#include <likelihoods/LibpllEvaluation.hpp>
+#include <likelihoods/reconciliation_models/GTBaseReconciliationModel.hpp>
+#include <util/Scenario.hpp>
 
 /*
-* Implement the undated model described here:
-* https://github.com/ssolo/ALE/blob/master/misc/undated.pdf
-* In this implementation, we do not allow transfers, which 
-* allows a lot of algorithmic shortcuts
-*/
+ * Implement the undated model described here:
+ * https://github.com/ssolo/ALE/blob/master/misc/undated.pdf
+ * In this implementation, we do not allow transfers, which
+ * allows a lot of algorithmic shortcuts
+ */
 template <class REAL>
-class UndatedDLModel: public GTBaseReconciliationModel<REAL> {
+class UndatedDLModel : public GTBaseReconciliationModel<REAL> {
 public:
-  UndatedDLModel(PLLRootedTree &speciesTree, 
-      const GeneSpeciesMapping &geneSpeciesMappingp, 
-      const RecModelInfo &recModelInfo): 
-    GTBaseReconciliationModel<REAL>(speciesTree, 
-        geneSpeciesMappingp, 
-        recModelInfo) {}
-  
-  
+  UndatedDLModel(PLLRootedTree &speciesTree,
+                 const GeneSpeciesMapping &geneSpeciesMappingp,
+                 const RecModelInfo &recModelInfo)
+      : GTBaseReconciliationModel<REAL>(speciesTree, geneSpeciesMappingp,
+                                        recModelInfo) {}
+
   UndatedDLModel(const UndatedDLModel &) = delete;
-  UndatedDLModel & operator = (const UndatedDLModel &) = delete;
+  UndatedDLModel &operator=(const UndatedDLModel &) = delete;
   UndatedDLModel(UndatedDLModel &&) = delete;
-  UndatedDLModel & operator = (UndatedDLModel &&) = delete;
+  UndatedDLModel &operator=(UndatedDLModel &&) = delete;
   virtual ~UndatedDLModel();
-  
+
   // overloaded from parent
   virtual void setRates(const RatesVector &rates);
+
 protected:
   // overload from parent
-  virtual void setInitialGeneTree(PLLUnrootedTree &tree, corax_unode_t *forcedGeneRoot);
+  virtual void setInitialGeneTree(PLLUnrootedTree &tree,
+                                  corax_unode_t *forcedGeneRoot);
   // overload from parent
   virtual void updateCLV(corax_unode_t *geneNode);
   // overload from parent
   virtual REAL getGeneRootLikelihood(corax_unode_t *root) const;
-  virtual REAL getGeneRootLikelihood(corax_unode_t *root, corax_rnode_t *speciesRoot) {
-    return _dlclvs[root->node_index + this->_maxGeneId + 1][speciesRoot->node_index];
+  virtual REAL getGeneRootLikelihood(corax_unode_t *root,
+                                     corax_rnode_t *speciesRoot) {
+    return _dlclvs[root->node_index + this->_maxGeneId + 1]
+                  [speciesRoot->node_index];
   }
   // overload from parent
   virtual void recomputeSpeciesProbabilities();
@@ -53,42 +51,40 @@ protected:
   // overload from parent
   virtual void computeGeneRootLikelihood(corax_unode_t *virtualRoot);
   // overlead from parent
-  virtual void computeProbability(corax_unode_t *geneNode, corax_rnode_t *speciesNode, 
-      REAL &proba,
-      bool isVirtualRoot = false,
-      Scenario *scenario = nullptr,
-      Scenario::Event *event = nullptr,
-      bool stochastic = false);
+  virtual void computeProbability(corax_unode_t *geneNode,
+                                  corax_rnode_t *speciesNode, REAL &proba,
+                                  bool isVirtualRoot = false,
+                                  Scenario *scenario = nullptr,
+                                  Scenario::Event *event = nullptr,
+                                  bool stochastic = false);
+
 private:
   std::vector<double> _PD; // Duplication probability, per species branch
   std::vector<double> _PL; // Loss probability, per species branch
   std::vector<double> _PS; // Speciation probability, per species branch
   std::vector<double> _uE; // Extinction probability, per species branch
-  
+
   typedef std::vector<REAL> DLCLV;
   std::vector<DLCLV> _dlclvs;
- 
+
 private:
   std::vector<corax_rnode_s *> &getSpeciesNodesToUpdate() {
     return this->_allSpeciesNodes;
   }
-
 };
 
-
 template <class REAL>
-void UndatedDLModel<REAL>::setInitialGeneTree(PLLUnrootedTree &tree, corax_unode_t *forcedGeneRoot)
-{
+void UndatedDLModel<REAL>::setInitialGeneTree(PLLUnrootedTree &tree,
+                                              corax_unode_t *forcedGeneRoot) {
   GTBaseReconciliationModel<REAL>::setInitialGeneTree(tree, forcedGeneRoot);
   assert(this->getPrunedSpeciesNodeNumber());
   assert(this->_maxGeneId);
   std::vector<REAL> zeros(this->getPrunedSpeciesNodeNumber());
-  _dlclvs = std::vector<std::vector<REAL> >(2 * (this->_maxGeneId + 1),zeros);
+  _dlclvs = std::vector<std::vector<REAL>>(2 * (this->_maxGeneId + 1), zeros);
 }
 
 template <class REAL>
-void UndatedDLModel<REAL>::setRates(const RatesVector &rates)
-{
+void UndatedDLModel<REAL>::setRates(const RatesVector &rates) {
   assert(rates.size() == 2);
   auto &dupRates = rates[0];
   auto &lossRates = rates[1];
@@ -110,18 +106,18 @@ void UndatedDLModel<REAL>::setRates(const RatesVector &rates)
 }
 
 template <class REAL>
-void UndatedDLModel<REAL>::recomputeSpeciesProbabilities()
-{
+void UndatedDLModel<REAL>::recomputeSpeciesProbabilities() {
   if (!_uE.size()) {
     _uE = std::vector<double>(this->getPrunedSpeciesNodeNumber(), 0.0);
   }
-  for (auto speciesNode: getSpeciesNodesToUpdate()) {
+  for (auto speciesNode : getSpeciesNodesToUpdate()) {
     auto e = speciesNode->node_index;
     double a = _PD[e];
     double b = -1.0;
     double c = _PL[e];
     if (this->getSpeciesLeft(speciesNode)) {
-      c += _PS[e] * _uE[this->getSpeciesLeft(speciesNode)->node_index]  * _uE[this->getSpeciesRight(speciesNode)->node_index];
+      c += _PS[e] * _uE[this->getSpeciesLeft(speciesNode)->node_index] *
+           _uE[this->getSpeciesRight(speciesNode)->node_index];
     }
     double proba = solveSecondDegreePolynome(a, b, c);
     ASSERT_PROBA(proba)
@@ -129,33 +125,26 @@ void UndatedDLModel<REAL>::recomputeSpeciesProbabilities()
   }
 }
 
-template <class REAL>
-UndatedDLModel<REAL>::~UndatedDLModel() { }
+template <class REAL> UndatedDLModel<REAL>::~UndatedDLModel() {}
 
 template <class REAL>
-void UndatedDLModel<REAL>::updateCLV(corax_unode_t *geneNode)
-{
+void UndatedDLModel<REAL>::updateCLV(corax_unode_t *geneNode) {
   assert(geneNode);
-  for (auto speciesNode: getSpeciesNodesToUpdate()) {
-    computeProbability(geneNode, 
-        speciesNode, 
-        _dlclvs[geneNode->node_index][speciesNode->node_index]);
+  for (auto speciesNode : getSpeciesNodesToUpdate()) {
+    computeProbability(geneNode, speciesNode,
+                       _dlclvs[geneNode->node_index][speciesNode->node_index]);
   }
 }
 
-
 template <class REAL>
-void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rnode_t *speciesNode, 
-      REAL &proba,
-      bool isVirtualRoot,
-      Scenario *,
-      Scenario::Event *event,
-      bool stochastic)
-  
+void UndatedDLModel<REAL>::computeProbability(
+    corax_unode_t *geneNode, corax_rnode_t *speciesNode, REAL &proba,
+    bool isVirtualRoot, Scenario *, Scenario::Event *event, bool stochastic)
+
 {
   auto gid = geneNode->node_index;
-  corax_unode_t *leftGeneNode = 0;     
-  corax_unode_t *rightGeneNode = 0;     
+  corax_unode_t *leftGeneNode = 0;
+  corax_unode_t *rightGeneNode = 0;
   bool isGeneLeaf = !geneNode->next;
   if (!isGeneLeaf) {
     leftGeneNode = this->getLeft(geneNode, isVirtualRoot);
@@ -171,11 +160,10 @@ void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rno
   }
 
   if (event) {
-    event->geneNode = gid; 
+    event->geneNode = gid;
     event->speciesNode = e;
-    event->type = ReconciliationEventType::EVENT_None; 
+    event->type = ReconciliationEventType::EVENT_None;
   }
-
 
   proba = REAL();
   if (isSpeciesLeaf and isGeneLeaf) {
@@ -190,12 +178,12 @@ void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rno
     }
     return;
   }
-  
-  typedef std::array<REAL, 8>  ValuesArray;
+
+  typedef std::array<REAL, 8> ValuesArray;
   ValuesArray values;
   values[0] = values[1] = values[2] = values[3] = REAL();
   values[4] = values[5] = values[6] = values[7] = REAL();
-  
+
   if (not isGeneLeaf) {
     auto u_left = leftGeneNode->node_index;
     auto u_right = rightGeneNode->node_index;
@@ -205,8 +193,8 @@ void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rno
       values[1] = _dlclvs[u_left][g];
       values[0] *= _dlclvs[u_right][g];
       values[1] *= _dlclvs[u_right][f];
-      values[0] *= _PS[e]; 
-      values[1] *= _PS[e]; 
+      values[0] *= _PS[e];
+      values[1] *= _PS[e];
       scale(values[0]);
       scale(values[1]);
       proba += values[0];
@@ -225,21 +213,20 @@ void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rno
     values[3] *= (_uE[g] * _PS[e]);
     scale(values[3]);
     values[4] = _dlclvs[gid][g];
-    values[4] *=  (_uE[f] * _PS[e]);
+    values[4] *= (_uE[f] * _PS[e]);
     scale(values[4]);
     proba += values[3];
     proba += values[4];
   }
   // DL event
-  proba /= (1.0 - 2.0 * _PD[e] * _uE[e]); 
-  //ASSERT_PROBA(proba);
-  
+  proba /= (1.0 - 2.0 * _PD[e] * _uE[e]);
+  // ASSERT_PROBA(proba);
+
   if (event) {
     int maxValueIndex = 0;
     if (!stochastic) {
-      maxValueIndex =static_cast<int>(std::distance(values.begin(),
-          std::max_element(values.begin(), values.end())
-          ));
+      maxValueIndex = static_cast<int>(std::distance(
+          values.begin(), std::max_element(values.begin(), values.end())));
     } else {
       maxValueIndex = sampleIndex<ValuesArray, REAL>(values);
     }
@@ -247,7 +234,7 @@ void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rno
       event->type = ReconciliationEventType::EVENT_Invalid;
       return;
     }
-    switch(maxValueIndex) {
+    switch (maxValueIndex) {
     case 0:
       event->type = ReconciliationEventType::EVENT_S;
       event->leftGeneIndex = leftGeneNode->node_index;
@@ -280,13 +267,12 @@ void UndatedDLModel<REAL>::computeProbability(corax_unode_t *geneNode, corax_rno
     }
   }
 }
-  
+
 template <class REAL>
-REAL UndatedDLModel<REAL>::getGeneRootLikelihood(corax_unode_t *root) const
-{
+REAL UndatedDLModel<REAL>::getGeneRootLikelihood(corax_unode_t *root) const {
   REAL sum = REAL();
   auto u = root->node_index + this->_maxGeneId + 1;
-  for (auto speciesNode: this->_allSpeciesNodes) {
+  for (auto speciesNode : this->_allSpeciesNodes) {
     auto e = speciesNode->node_index;
     sum += _dlclvs[u][e];
   }
@@ -294,24 +280,20 @@ REAL UndatedDLModel<REAL>::getGeneRootLikelihood(corax_unode_t *root) const
 }
 
 template <class REAL>
-void UndatedDLModel<REAL>::computeGeneRootLikelihood(corax_unode_t *virtualRoot)
-{
+void UndatedDLModel<REAL>::computeGeneRootLikelihood(
+    corax_unode_t *virtualRoot) {
   auto u = virtualRoot->node_index;
-  for (auto speciesNode: getSpeciesNodesToUpdate()) {
+  for (auto speciesNode : getSpeciesNodesToUpdate()) {
     auto e = speciesNode->node_index;
     computeProbability(virtualRoot, speciesNode, _dlclvs[u][e], true);
   }
 }
 
-template <class REAL>
-REAL UndatedDLModel<REAL>::getLikelihoodFactor() const
-{
+template <class REAL> REAL UndatedDLModel<REAL>::getLikelihoodFactor() const {
   REAL factor(0.0);
-  for (auto speciesNode: this->_allSpeciesNodes) {
+  for (auto speciesNode : this->_allSpeciesNodes) {
     auto e = speciesNode->node_index;
     factor += (REAL(1.0) - REAL(_uE[e]));
   }
   return factor;
 }
-
-

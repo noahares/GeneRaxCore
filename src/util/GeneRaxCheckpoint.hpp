@@ -1,10 +1,9 @@
 #pragma once
 
-#include <string>
 #include <corax/corax.h>
 #include <maths/Parameters.hpp>
+#include <string>
 class JointTree;
-
 
 struct GeneRaxCheckpoint {
   std::string path;
@@ -15,10 +14,6 @@ struct GeneRaxCheckpoint {
   std::string geneTreeNewickStr;
 
   GeneRaxCheckpoint(const std::string checkpointPath);
-  
 
   void save(bool masterRankOnly);
-
 };
-
-

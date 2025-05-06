@@ -1,46 +1,38 @@
 #include "PLLRootedTree.hpp"
 
 #include <IO/Logger.hpp>
-#include <set>
 #include <cstring>
 #include <maths/Random.hpp>
 #include <parallelization/ParallelContext.hpp>
+#include <set>
 #include <sstream>
 #include <trees/PLLUnrootedTree.hpp>
 
-static void * xmalloc(size_t size)
-{ 
-  void * t;
+static void *xmalloc(size_t size) {
+  void *t;
   t = malloc(size);
   return t;
-} 
-  
-static char * xstrdup(const char * s)
-{ 
+}
+
+static char *xstrdup(const char *s) {
   size_t len = strlen(s);
-  char * p = (char *)xmalloc(len+1);
-  return strcpy(p,s);
-} 
+  char *p = (char *)xmalloc(len + 1);
+  return strcpy(p, s);
+}
 
-
-static void dealloc_data(corax_rnode_t * node, void (*cb_destroy)(void *))
-{
-  if (node->data)
-  {
+static void dealloc_data(corax_rnode_t *node, void (*cb_destroy)(void *)) {
+  if (node->data) {
     if (cb_destroy)
       cb_destroy(node->data);
   }
 }
 
-void corax_rtree_destroy(corax_rtree_t * tree,
-                                  void (*cb_destroy)(void *))
-{
+void corax_rtree_destroy(corax_rtree_t *tree, void (*cb_destroy)(void *)) {
   unsigned int i;
-  corax_rnode_t * node;
+  corax_rnode_t *node;
 
   /* deallocate all nodes */
-  for (i = 0; i < tree->tip_count + tree->inner_count; ++i)
-  {
+  for (i = 0; i < tree->tip_count + tree->inner_count; ++i) {
     node = tree->nodes[i];
     dealloc_data(node, cb_destroy);
 
@@ -55,32 +47,24 @@ void corax_rtree_destroy(corax_rtree_t * tree,
   free(tree);
 }
 
-
-static void fill_nodes_recursive(corax_unode_t * node,
-                                 corax_unode_t ** array,
+static void fill_nodes_recursive(corax_unode_t *node, corax_unode_t **array,
                                  unsigned int array_size,
-                                 unsigned int * tip_index,
-                                 unsigned int * inner_index,
-                                 unsigned int level)
-{
+                                 unsigned int *tip_index,
+                                 unsigned int *inner_index,
+                                 unsigned int level) {
   unsigned int index;
-  if (!node->next)
-  {
+  if (!node->next) {
     /* tip node */
     index = *tip_index;
     *tip_index += 1;
-  }
-  else
-  {
+  } else {
     /* inner node */
-    corax_unode_t * snode = level ? node->next : node;
-    do 
-    {
-      fill_nodes_recursive(snode->back, array, array_size, tip_index, 
-                           inner_index, level+1);
+    corax_unode_t *snode = level ? node->next : node;
+    do {
+      fill_nodes_recursive(snode->back, array, array_size, tip_index,
+                           inner_index, level + 1);
       snode = snode->next;
-    }
-    while (snode != node);
+    } while (snode != node);
 
     index = *inner_index;
     *inner_index += 1;
@@ -90,31 +74,26 @@ static void fill_nodes_recursive(corax_unode_t * node,
   array[index] = node;
 }
 
-static unsigned int utree_count_nodes_recursive(corax_unode_t * node, 
-                                                unsigned int * tip_count,
-                                                unsigned int * inner_count,
-                                                unsigned int level)
-{
-  if (!node->next)
-  {
+static unsigned int utree_count_nodes_recursive(corax_unode_t *node,
+                                                unsigned int *tip_count,
+                                                unsigned int *inner_count,
+                                                unsigned int level) {
+  if (!node->next) {
     *tip_count += 1;
     return 1;
-  }
-  else
-  {
+  } else {
     unsigned int count = 0;
 
-    corax_unode_t * snode = level ? node->next : node;
-	do 
-	{
-	  count += utree_count_nodes_recursive(snode->back, tip_count, inner_count, level+1);
-	  snode = snode->next;
-	}
-	while (snode != node);
+    corax_unode_t *snode = level ? node->next : node;
+    do {
+      count += utree_count_nodes_recursive(snode->back, tip_count, inner_count,
+                                           level + 1);
+      snode = snode->next;
+    } while (snode != node);
 
     *inner_count += 1;
-	
-	return count + 1;
+
+    return count + 1;
   }
 }
 
@@ -125,8 +104,7 @@ static unsigned int utree_count_nodes_recursive(corax_unode_t * node,
  *  on the tip labels (used in areIsomorphicAux)
  */
 static const char *orderChildren(corax_rnode_t *node,
-    std::vector<bool> &leftFirst)
-{
+                                 std::vector<bool> &leftFirst) {
   if (!node->left) {
     return node->label;
   }
@@ -146,15 +124,13 @@ static const char *orderChildren(corax_rnode_t *node,
  *  leftFirst1 and leftFirst2 must have been filled with
  *  the orderChildren function
  */
-static bool areIsomorphicAux(corax_rnode_t *node1,
-    corax_rnode_t *node2,
-    const std::vector<bool> &leftFirst1,
-    const std::vector<bool> &leftFirst2)
-{
+static bool areIsomorphicAux(corax_rnode_t *node1, corax_rnode_t *node2,
+                             const std::vector<bool> &leftFirst1,
+                             const std::vector<bool> &leftFirst2) {
   if (!node1->left || !node2->left) {
     // at least one is a leaf
     if (node1->left || node2->left) {
-      // only one is a leaf 
+      // only one is a leaf
       return false;
     }
     return strcmp(node1->label, node2->label) == 0;
@@ -170,25 +146,22 @@ static bool areIsomorphicAux(corax_rnode_t *node1,
   if (!leftFirst2[node2->node_index]) {
     std::swap(l2, r2);
   }
-  return areIsomorphicAux(l1, l2, leftFirst1, leftFirst2) 
-    && areIsomorphicAux(r1, r2, leftFirst1, leftFirst2);
+  return areIsomorphicAux(l1, l2, leftFirst1, leftFirst2) &&
+         areIsomorphicAux(r1, r2, leftFirst1, leftFirst2);
 }
 
 bool PLLRootedTree::areIsomorphic(const PLLRootedTree &t1,
-    const PLLRootedTree &t2)
-{
+                                  const PLLRootedTree &t2) {
   if (t1.getNodeNumber() != t2.getNodeNumber()) {
     return false;
   }
   std::vector<bool> leftFirst1(t1.getNodeNumber(), false);
   std::vector<bool> leftFirst2(t2.getNodeNumber(), false);
-  return areIsomorphicAux(t1.getRoot(), t2.getRoot(), 
-      leftFirst1, leftFirst2);
+  return areIsomorphicAux(t1.getRoot(), t2.getRoot(), leftFirst1, leftFirst2);
 }
 
-
-void PLLRootedTree::setSon(corax_rnode_t *parent, corax_rnode_t *newSon, bool left)
-{
+void PLLRootedTree::setSon(corax_rnode_t *parent, corax_rnode_t *newSon,
+                           bool left) {
   newSon->parent = parent;
   if (left) {
     parent->left = newSon;
@@ -197,9 +170,10 @@ void PLLRootedTree::setSon(corax_rnode_t *parent, corax_rnode_t *newSon, bool le
   }
 }
 
-
-static corax_rnode_t *createNode(const std::string &label, std::vector<corax_rnode_t *> &allNodes) {
-  corax_rnode_t *node = static_cast<corax_rnode_t *>(malloc(sizeof(corax_rnode_t)));
+static corax_rnode_t *createNode(const std::string &label,
+                                 std::vector<corax_rnode_t *> &allNodes) {
+  corax_rnode_t *node =
+      static_cast<corax_rnode_t *>(malloc(sizeof(corax_rnode_t)));
   node->label = 0;
   if (label.size()) {
     node->label = static_cast<char *>(calloc(label.size() + 1, sizeof(char)));
@@ -216,19 +190,15 @@ static corax_rnode_t *createNode(const std::string &label, std::vector<corax_rno
   return node;
 }
 
-static void destroyNodeData(void *)
-{
-
-}
+static void destroyNodeData(void *) {}
 
 void rtreeDestroy(corax_rtree_t *rtree) {
-  if(!rtree)
+  if (!rtree)
     return;
   corax_rtree_destroy(rtree, destroyNodeData);
 }
 
-static corax_rtree_t *buildUtree(const std::string &str, bool isFile)
-{
+static corax_rtree_t *buildUtree(const std::string &str, bool isFile) {
   if (isFile) {
     return LibpllParsers::readRootedFromFile(str);
   } else {
@@ -236,22 +206,20 @@ static corax_rtree_t *buildUtree(const std::string &str, bool isFile)
   }
 }
 
-PLLRootedTree::PLLRootedTree(const std::string &str, bool isFile):
-  _tree(buildUtree(str, isFile), rtreeDestroy)
-{
+PLLRootedTree::PLLRootedTree(const std::string &str, bool isFile)
+    : _tree(buildUtree(str, isFile), rtreeDestroy) {
   ensureUniqueLabels();
   setMissingBranchLengths();
 }
 
-PLLRootedTree::PLLRootedTree(const std::unordered_set<std::string> &labels):
-  _tree(buildRandomTree(labels), rtreeDestroy)
-{
+PLLRootedTree::PLLRootedTree(const std::unordered_set<std::string> &labels)
+    : _tree(buildRandomTree(labels), rtreeDestroy) {
   ensureUniqueLabels();
   setMissingBranchLengths();
 }
 
-std::unique_ptr<PLLRootedTree> PLLRootedTree::buildFromStrOrFile(const std::string &strOrFile)
-{
+std::unique_ptr<PLLRootedTree>
+PLLRootedTree::buildFromStrOrFile(const std::string &strOrFile) {
   std::unique_ptr<PLLRootedTree> res;
   try {
     res = std::make_unique<PLLRootedTree>(strOrFile, true);
@@ -260,10 +228,9 @@ std::unique_ptr<PLLRootedTree> PLLRootedTree::buildFromStrOrFile(const std::stri
   }
   return res;
 }
-  
-  
-std::string PLLRootedTree::getRootedNewickFromOutgroup(corax_unode_t *outgroup)  
-{
+
+std::string
+PLLRootedTree::getRootedNewickFromOutgroup(corax_unode_t *outgroup) {
   auto rootedNewick = std::string("(");
   auto temp = PLLUnrootedTree::getSubtreeString(outgroup->back);
   auto begin = temp.find_first_of('(') + 1;
@@ -273,65 +240,55 @@ std::string PLLRootedTree::getRootedNewickFromOutgroup(corax_unode_t *outgroup)
   return rootedNewick;
 }
 
-std::unique_ptr<PLLRootedTree> PLLRootedTree::buildFromOutgroup(corax_unode_t *outgroup)
-{
+std::unique_ptr<PLLRootedTree>
+PLLRootedTree::buildFromOutgroup(corax_unode_t *outgroup) {
   auto rootedNewick = getRootedNewickFromOutgroup(outgroup);
   return std::make_unique<PLLRootedTree>(rootedNewick, false);
-
 }
-void PLLRootedTree::save(const std::string &fileName) const
-{
+void PLLRootedTree::save(const std::string &fileName) const {
   LibpllParsers::saveRtree(_tree->root, fileName);
 }
-  
-std::string PLLRootedTree::getNewickString() const
-{
+
+std::string PLLRootedTree::getNewickString() const {
   char *newickStr = corax_rtree_export_newick(_tree.get()->root, 0);
   auto newick = std::string(newickStr);
   free(newickStr);
   return newick;
 }
-  
 
-void PLLRootedTree::setMissingBranchLengths(double minBL)
-{
-  for (auto node: getNodes()) {
+void PLLRootedTree::setMissingBranchLengths(double minBL) {
+  for (auto node : getNodes()) {
     if (0.0 == node->length) {
       node->length = minBL;
     }
   }
 }
 
-void PLLRootedTree::equalizeBranchLengths(double stdBL)
-{
-  for (auto node: getNodes()) {
+void PLLRootedTree::equalizeBranchLengths(double stdBL) {
+  for (auto node : getNodes()) {
     node->length = stdBL;
   }
 }
 
-static void setNodeLabel(corax_rnode_t *node, const std::string &label)
-{
+static void setNodeLabel(corax_rnode_t *node, const std::string &label) {
   free(node->label);
-  node->label = static_cast<char*>(malloc(sizeof(char) * (label.size() + 1)));
+  node->label = static_cast<char *>(malloc(sizeof(char) * (label.size() + 1)));
   std::strcpy(node->label, label.c_str());
 }
-  
-void PLLRootedTree::setLabel(unsigned int nodeIndex, const std::string &label)
-{
+
+void PLLRootedTree::setLabel(unsigned int nodeIndex, const std::string &label) {
   setNodeLabel(getNode(nodeIndex), label);
 }
-  
-static bool isFloat(const std::string &str) 
-{
+
+static bool isFloat(const std::string &str) {
   std::istringstream iss(str);
   float f = 0.0;
-  iss >> std::noskipws >> f; 
-  return iss.eof() && !iss.fail(); 
+  iss >> std::noskipws >> f;
+  return iss.eof() && !iss.fail();
 }
 
 static void getUniqueLabel(const std::unordered_set<std::string> &labels,
-    std::string &prefix)
-{
+                           std::string &prefix) {
   while (prefix.back() == '_') {
     prefix.pop_back();
   }
@@ -347,15 +304,15 @@ static void getUniqueLabel(const std::unordered_set<std::string> &labels,
   prefix = newLabel;
 }
 
-void PLLRootedTree::ensureUniqueLabels(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
-{
+void PLLRootedTree::ensureUniqueLabels(
+    const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
   // start with the leaf labels
   auto seenLabels = getLabels(true);
   seenLabels.insert("");
   // the most left leaf label for each node
   std::vector<std::string> anyLeafLabel(getNodeNumber());
   // traverse the tree and rename nodes if needed
-  for (auto node: getPostOrderNodes()) {
+  for (auto node : getPostOrderNodes()) {
     if (!node->left) {
       anyLeafLabel[node->node_index] = node->label;
       continue;
@@ -363,7 +320,8 @@ void PLLRootedTree::ensureUniqueLabels(const std::unordered_set<corax_rnode_t *>
     anyLeafLabel[node->node_index] = anyLeafLabel[node->left->node_index];
     // check the node label
     std::string label(node->label ? node->label : "");
-    bool isInvalid = nodesToInvalidate && (nodesToInvalidate->end() != nodesToInvalidate->find(node));
+    bool isInvalid = nodesToInvalidate && (nodesToInvalidate->end() !=
+                                           nodesToInvalidate->find(node));
     bool isDuplicated = seenLabels.end() != seenLabels.find(label);
     bool isNumeric = isFloat(label);
     if (isInvalid || isDuplicated || isNumeric) {
@@ -380,76 +338,59 @@ void PLLRootedTree::ensureUniqueLabels(const std::unordered_set<corax_rnode_t *>
   }
 }
 
-void PLLRootedTree::labelRootedTree(const std::string &unlabelledNewickFile, 
-      const std::string &labelledNewickFile)
-{
+void PLLRootedTree::labelRootedTree(const std::string &unlabelledNewickFile,
+                                    const std::string &labelledNewickFile) {
   PLLRootedTree tree(unlabelledNewickFile);
   tree.ensureUniqueLabels();
   tree.save(labelledNewickFile);
 }
-  
-CArrayRange<corax_rnode_t*> PLLRootedTree::getLeaves() const
-{
-  return CArrayRange<corax_rnode_t*>(_tree->nodes, getLeafNumber());
+
+CArrayRange<corax_rnode_t *> PLLRootedTree::getLeaves() const {
+  return CArrayRange<corax_rnode_t *>(_tree->nodes, getLeafNumber());
 }
 
-CArrayRange<corax_rnode_t*> PLLRootedTree::getInnerNodes() const
-{
-  return CArrayRange<corax_rnode_t*>(_tree->nodes + getLeafNumber(), getInnerNodeNumber());
+CArrayRange<corax_rnode_t *> PLLRootedTree::getInnerNodes() const {
+  return CArrayRange<corax_rnode_t *>(_tree->nodes + getLeafNumber(),
+                                      getInnerNodeNumber());
 }
 
-CArrayRange<corax_rnode_t*> PLLRootedTree::getNodes() const
-{
-  return CArrayRange<corax_rnode_t*>(_tree->nodes, getNodeNumber());
+CArrayRange<corax_rnode_t *> PLLRootedTree::getNodes() const {
+  return CArrayRange<corax_rnode_t *>(_tree->nodes, getNodeNumber());
 }
 
-unsigned int PLLRootedTree::getNodeNumber() const
-{
+unsigned int PLLRootedTree::getNodeNumber() const {
   return getLeafNumber() + getInnerNodeNumber();
 }
 
-unsigned int PLLRootedTree::getLeafNumber() const
-{
-  return _tree->tip_count;
-}
+unsigned int PLLRootedTree::getLeafNumber() const { return _tree->tip_count; }
 
-unsigned int PLLRootedTree::getInnerNodeNumber() const
-{
+unsigned int PLLRootedTree::getInnerNodeNumber() const {
   return _tree->inner_count;
 }
-  
-corax_rnode_t *PLLRootedTree::getRoot() const
-{
-  return _tree->root;
-}
 
-corax_rnode_t *PLLRootedTree::getNode(unsigned int node_index) const
-{
+corax_rnode_t *PLLRootedTree::getRoot() const { return _tree->root; }
+
+corax_rnode_t *PLLRootedTree::getNode(unsigned int node_index) const {
   return _tree->nodes[node_index];
 }
-  
-corax_rnode_t *PLLRootedTree::getParent(unsigned int node_index) const 
-{
+
+corax_rnode_t *PLLRootedTree::getParent(unsigned int node_index) const {
   return getNode(node_index)->parent;
 }
 
-corax_rnode_t *PLLRootedTree::getNeighbor(unsigned int node_index) const
-{
+corax_rnode_t *PLLRootedTree::getNeighbor(unsigned int node_index) const {
   auto node = getNode(node_index);
   auto parent = node->parent;
   assert(parent);
   return parent->left == node ? parent->right : parent->left;
 }
 
-
-corax_rnode_t *PLLRootedTree::getAnyInnerNode() const
-{
+corax_rnode_t *PLLRootedTree::getAnyInnerNode() const {
   return getNode(getLeafNumber());
 }
-  
-void PLLRootedTree::getLeafLabelsUnder(corax_rnode_t *node,
-    std::unordered_set<std::string> &labels)
-{
+
+void PLLRootedTree::getLeafLabelsUnder(
+    corax_rnode_t *node, std::unordered_set<std::string> &labels) {
   if (node->left) {
     getLeafLabelsUnder(node->left, labels);
     getLeafLabelsUnder(node->right, labels);
@@ -460,11 +401,10 @@ void PLLRootedTree::getLeafLabelsUnder(corax_rnode_t *node,
   }
 }
 
-
-std::unordered_set<std::string> PLLRootedTree::getLabels(bool leavesOnly) const
-{
+std::unordered_set<std::string>
+PLLRootedTree::getLabels(bool leavesOnly) const {
   std::unordered_set<std::string> res;
-  for (auto node: (leavesOnly ? getLeaves() : getNodes())) {
+  for (auto node : (leavesOnly ? getLeaves() : getNodes())) {
     if (node->label) {
       res.insert(node->label);
     }
@@ -472,25 +412,26 @@ std::unordered_set<std::string> PLLRootedTree::getLabels(bool leavesOnly) const
   return res;
 }
 
-corax_rtree_t *PLLRootedTree::buildRandomTree(const std::unordered_set<std::string> &leafLabels)
-{
+corax_rtree_t *PLLRootedTree::buildRandomTree(
+    const std::unordered_set<std::string> &leafLabels) {
   std::set<std::string> leaves;
-  for (auto &leaf: leafLabels) {
+  for (auto &leaf : leafLabels) {
     leaves.insert(leaf);
   }
   std::vector<corax_rnode_t *> allNodes;
   corax_rnode_t *root = 0;
-  for (auto &label: leaves) {
+  for (auto &label : leaves) {
     if (allNodes.size() == 0) {
       root = createNode(label, allNodes);
       continue;
     }
-    auto brother = allNodes[static_cast<size_t>(Random::getInt()) % allNodes.size()];
+    auto brother =
+        allNodes[static_cast<size_t>(Random::getInt()) % allNodes.size()];
     auto parent = createNode("", allNodes);
     auto node = createNode(label, allNodes);
     auto grandpa = brother->parent;
     if (grandpa) {
-      setSon(grandpa, parent, grandpa->left == brother); 
+      setSon(grandpa, parent, grandpa->left == brother);
     } else {
       root = parent;
     }
@@ -500,29 +441,28 @@ corax_rtree_t *PLLRootedTree::buildRandomTree(const std::unordered_set<std::stri
   }
   auto res = static_cast<corax_rtree_t *>(malloc(sizeof(corax_rtree_t)));
   res->root = root;
-  res->nodes = static_cast<corax_rnode_t**>(malloc(sizeof(corax_rnode_t*) * allNodes.size()));
+  res->nodes = static_cast<corax_rnode_t **>(
+      malloc(sizeof(corax_rnode_t *) * allNodes.size()));
   for (unsigned int i = 0; i < allNodes.size(); ++i) {
     res->nodes[i] = allNodes[i];
   }
   res->tip_count = static_cast<unsigned int>(allNodes.size()) / 2 + 1;
   res->inner_count = static_cast<unsigned int>(allNodes.size()) / 2;
   res->edge_count = static_cast<unsigned int>(allNodes.size()) - 1;
-  
+
   return res;
 }
 
-StringToUintMap PLLRootedTree::getLabelToIntMap()
-{
+StringToUintMap PLLRootedTree::getLabelToIntMap() {
   StringToUintMap map;
-  for (auto node: getLeaves()) {
+  for (auto node : getLeaves()) {
     map.insert({std::string(node->label), node->node_index});
   }
   return map;
 }
- 
-static void fillPostOrder(corax_rnode_t *node, 
-    std::vector<corax_rnode_t*> &nodes)
-{
+
+static void fillPostOrder(corax_rnode_t *node,
+                          std::vector<corax_rnode_t *> &nodes) {
   if (node->left) {
     fillPostOrder(node->left, nodes);
     fillPostOrder(node->right, nodes);
@@ -530,69 +470,61 @@ static void fillPostOrder(corax_rnode_t *node,
   nodes.push_back(node);
 }
 
-std::vector<corax_rnode_t*> PLLRootedTree::getPostOrderNodes() const
-{ 
-  std::vector<corax_rnode_t*> nodes;
+std::vector<corax_rnode_t *> PLLRootedTree::getPostOrderNodes() const {
+  std::vector<corax_rnode_t *> nodes;
   fillPostOrder(getRoot(), nodes);
   return nodes;
 }
 
-void PLLRootedTree::onSpeciesTreeChange(const std::unordered_set<corax_rnode_t *> *nodesToInvalidate)
-{
+void PLLRootedTree::onSpeciesTreeChange(
+    const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
   ensureUniqueLabels(nodesToInvalidate);
   if (_lcaCache) {
     buildLCACache();
   }
 }
 
-corax_rnode_t *PLLRootedTree::getLCA(corax_rnode_t *n1, corax_rnode_t *n2)
-{
+corax_rnode_t *PLLRootedTree::getLCA(corax_rnode_t *n1, corax_rnode_t *n2) {
   if (!n1) {
     return n2;
   }
   if (!n2) {
     return n1;
-  } 
+  }
   return getLCA(n1->node_index, n2->node_index);
 }
-  
-corax_rnode_t *PLLRootedTree::getLCA(unsigned int nodeIndex1, unsigned int nodeIndex2)
-{
+
+corax_rnode_t *PLLRootedTree::getLCA(unsigned int nodeIndex1,
+                                     unsigned int nodeIndex2) {
   if (!_lcaCache) {
     buildLCACache();
   }
   return _lcaCache->lcas[nodeIndex1][nodeIndex2];
-  
 }
-  
-bool PLLRootedTree::areParents(corax_rnode_t *n1, corax_rnode_t *n2)
-{
+
+bool PLLRootedTree::areParents(corax_rnode_t *n1, corax_rnode_t *n2) {
   if (!_lcaCache) {
     buildLCACache();
   }
   return _lcaCache->parents[n1->node_index][n2->node_index];
 }
 
-std::vector<bool> &PLLRootedTree::getParentsCache(corax_rnode_t *n1)
-{
+std::vector<bool> &PLLRootedTree::getParentsCache(corax_rnode_t *n1) {
   if (!_lcaCache) {
     buildLCACache();
   }
   return _lcaCache->parents[n1->node_index];
 }
 
-std::vector<bool> &PLLRootedTree::getAncestorssCache(corax_rnode_t *n1)
-{
+std::vector<bool> &PLLRootedTree::getAncestorssCache(corax_rnode_t *n1) {
   if (!_lcaCache) {
     buildLCACache();
   }
   return _lcaCache->ancestors[n1->node_index];
 }
-  
-static void fillWithChildren(corax_rnode_t *n1,
-    corax_rnode_t *n2,
-    std::vector<corax_rnode_t *> &n1lcas)
-{
+
+static void fillWithChildren(corax_rnode_t *n1, corax_rnode_t *n2,
+                             std::vector<corax_rnode_t *> &n1lcas) {
   if (!n2) {
     return;
   }
@@ -606,12 +538,9 @@ static void fillWithChildren(corax_rnode_t *n1,
  * traverse all nodes from the root to the leaves with n2
  * to fill n1 LCAs
  */
-static void findn1LCAs(corax_rnode_t *n1,
-    corax_rnode_t *n2,
-    corax_rnode_t *lca,
-    const std::unordered_set<corax_rnode_t*> &n1Ancestors,
-    std::vector<corax_rnode_t *> &n1lcas)
-{
+static void findn1LCAs(corax_rnode_t *n1, corax_rnode_t *n2, corax_rnode_t *lca,
+                       const std::unordered_set<corax_rnode_t *> &n1Ancestors,
+                       std::vector<corax_rnode_t *> &n1lcas) {
   if (!n2) {
     // end of the recursion
     return;
@@ -632,9 +561,7 @@ static void findn1LCAs(corax_rnode_t *n1,
   }
 }
 
-
-static void findLCAs(corax_rnode_t *n1, std::vector<corax_rnode_t *> &n1lcas)
-{
+static void findLCAs(corax_rnode_t *n1, std::vector<corax_rnode_t *> &n1lcas) {
   std::unordered_set<corax_rnode_t *> n1Ancestors;
   auto it = n1;
   auto root = n1;
@@ -646,19 +573,18 @@ static void findLCAs(corax_rnode_t *n1, std::vector<corax_rnode_t *> &n1lcas)
   findn1LCAs(n1, root, root, n1Ancestors, n1lcas);
 }
 
-void PLLRootedTree::buildLCACache()
-{
+void PLLRootedTree::buildLCACache() {
   auto N = getNodeNumber();
   _lcaCache = std::make_unique<LCACache>();
   std::vector<corax_rnode_t *> nulls(N, nullptr);
-  _lcaCache->lcas = std::vector<std::vector<corax_rnode_t *> >(N, nulls);
+  _lcaCache->lcas = std::vector<std::vector<corax_rnode_t *>>(N, nulls);
   std::vector<bool> falses(N, false);
-  _lcaCache->parents = std::vector<std::vector<bool > >(N, falses);
-  _lcaCache->ancestors = std::vector<std::vector<bool > >(N, falses);
-  for (auto n: getNodes()) {
+  _lcaCache->parents = std::vector<std::vector<bool>>(N, falses);
+  _lcaCache->ancestors = std::vector<std::vector<bool>>(N, falses);
+  for (auto n : getNodes()) {
     findLCAs(n, _lcaCache->lcas[n->node_index]);
   }
-  for (auto n1: getNodes()) {
+  for (auto n1 : getNodes()) {
     auto n2 = n1;
     while (n2) {
       _lcaCache->parents[n1->node_index][n2->node_index] = true;
@@ -667,11 +593,9 @@ void PLLRootedTree::buildLCACache()
       n2 = n2->parent;
     }
   }
-
 }
 
-StringToUint PLLRootedTree::getDeterministicLabelToId() const
-{
+StringToUint PLLRootedTree::getDeterministicLabelToId() const {
   StringToUint res;
   auto v = getDeterministicIdToLabel();
   for (unsigned int i = 0; i < v.size(); ++i) {
@@ -680,27 +604,25 @@ StringToUint PLLRootedTree::getDeterministicLabelToId() const
   return res;
 }
 
-std::vector<std::string> PLLRootedTree::getDeterministicIdToLabel() const
-{
+std::vector<std::string> PLLRootedTree::getDeterministicIdToLabel() const {
   std::vector<std::string> labels;
-  for (auto node: getNodes()) {
-    labels.push_back(std::string(node->label)); 
+  for (auto node : getNodes()) {
+    labels.push_back(std::string(node->label));
   }
   std::sort(labels.begin(), labels.end());
   return labels;
 }
-  
-std::vector<unsigned int> 
-PLLRootedTree::getNodeIndexMapping(PLLRootedTree &otherTree)
-{
+
+std::vector<unsigned int>
+PLLRootedTree::getNodeIndexMapping(PLLRootedTree &otherTree) {
   assert(otherTree.getNodeNumber() == getNodeNumber());
-  std::map<std::string, corax_rnode_t*> otherTreeLabelToNode;
-  for (auto node: otherTree.getLeaves()) {
+  std::map<std::string, corax_rnode_t *> otherTreeLabelToNode;
+  for (auto node : otherTree.getLeaves()) {
     std::string label(node->label);
     otherTreeLabelToNode[label] = node;
   }
   std::vector<unsigned int> mapping(getNodeNumber(), 0);
-  for (auto node: this->getPostOrderNodes()) {
+  for (auto node : this->getPostOrderNodes()) {
     corax_rnode_t *otherNode = nullptr;
     if (!node->left) {
       // leaf case
@@ -719,22 +641,20 @@ PLLRootedTree::getNodeIndexMapping(PLLRootedTree &otherTree)
   return mapping;
 }
 
-static corax_unode_t * rtree_unroot(corax_rnode_t * root, corax_unode_t * back)
-{
-  corax_unode_t * uroot = (corax_unode_t *)calloc(1,sizeof(corax_unode_t));
+static corax_unode_t *rtree_unroot(corax_rnode_t *root, corax_unode_t *back) {
+  corax_unode_t *uroot = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
   uroot->back = back;
   uroot->label = (root->label) ? xstrdup(root->label) : NULL;
   uroot->length = uroot->back->length;
 
-  if (!root->left)
-  {
+  if (!root->left) {
     uroot->next = NULL;
     return uroot;
   }
 
-  uroot->next = (corax_unode_t *)calloc(1,sizeof(corax_unode_t));
+  uroot->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
 
-  uroot->next->next = (corax_unode_t *)calloc(1,sizeof(corax_unode_t));
+  uroot->next->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
   uroot->next->next->next = uroot;
 
   uroot->next->length = root->left->length;
@@ -745,35 +665,33 @@ static corax_unode_t * rtree_unroot(corax_rnode_t * root, corax_unode_t * back)
   return uroot;
 }
 
-corax_utree_t * corax_rtree_unroot(corax_rtree_t * tree)
-{
-  corax_rnode_t * root = tree->root;
+corax_utree_t *corax_rtree_unroot(corax_rtree_t *tree) {
+  corax_rnode_t *root = tree->root;
 
-  corax_rnode_t * new_root;
+  corax_rnode_t *new_root;
 
-  corax_unode_t * uroot = (corax_unode_t*)calloc(1,sizeof(corax_unode_t));
+  corax_unode_t *uroot = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
 
-  uroot->next = (corax_unode_t *)calloc(1,sizeof(corax_unode_t));
+  uroot->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
 
-  uroot->next->next = (corax_unode_t *)calloc(1,sizeof(corax_unode_t));
+  uroot->next->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
 
   uroot->next->next->next = uroot;
   uroot->length = root->left->length + root->right->length;
 
   /* get the first root child that has descendants and make  it the new root */
-  if (root->left->left)
-  {
+  if (root->left->left) {
     new_root = root->left;
-    uroot->back = rtree_unroot(root->right,uroot);
+    uroot->back = rtree_unroot(root->right, uroot);
     /* TODO: Need to clean uroot in case of error */
-    if (!uroot->back) return NULL;
-  }
-  else
-  {
+    if (!uroot->back)
+      return NULL;
+  } else {
     new_root = root->right;
-    uroot->back = rtree_unroot(root->left,uroot);
+    uroot->back = rtree_unroot(root->left, uroot);
     /* TODO: Need to clean uroot in case of error*/
-    if (!uroot->back) return NULL;
+    if (!uroot->back)
+      return NULL;
   }
 
   uroot->label = (new_root->label) ? xstrdup(new_root->label) : NULL;
@@ -782,30 +700,30 @@ corax_utree_t * corax_rtree_unroot(corax_rtree_t * tree)
   uroot->next->length = new_root->left->length;
   uroot->next->back = rtree_unroot(new_root->left, uroot->next);
   /* TODO: Need to clean uroot in case of error*/
-  if (!uroot->next->back) return NULL;
+  if (!uroot->next->back)
+    return NULL;
 
   uroot->next->next->label = uroot->label;
   uroot->next->next->length = new_root->right->length;
   uroot->next->next->back = rtree_unroot(new_root->right, uroot->next->next);
   /* TODO: Need to clean uroot in case of error*/
-  if (!uroot->next->next->back) return NULL;
+  if (!uroot->next->next->back)
+    return NULL;
 
-  return corax_utree_wraptree(uroot,0);
+  return corax_utree_wraptree(uroot, 0);
 }
-  
-  
- using LabelNodeIndex = std::pair<std::string, unsigned int>;
 
-bool PLLRootedTree::areNodeIndicesParallelConsistent() const
-{
+using LabelNodeIndex = std::pair<std::string, unsigned int>;
+
+bool PLLRootedTree::areNodeIndicesParallelConsistent() const {
   bool ok = true;
   std::vector<LabelNodeIndex> toSort;
-  for (auto node: getPostOrderNodes()) {
+  for (auto node : getPostOrderNodes()) {
     toSort.push_back(LabelNodeIndex(node->label, node->node_index));
     ok &= ParallelContext::isIntEqual(node->node_index);
   }
   std::sort(toSort.begin(), toSort.end());
-  for (auto t: toSort) {
+  for (auto t : toSort) {
     ok &= ParallelContext::isIntEqual(t.second);
   }
   return ok;
@@ -814,11 +732,9 @@ bool PLLRootedTree::areNodeIndicesParallelConsistent() const
 struct DatedNode {
   double date;
   corax_rnode_s *node;
-  DatedNode(double date, corax_rnode_s *node):
-    date(date),
-    node(node) {}
+  DatedNode(double date, corax_rnode_s *node) : date(date), node(node) {}
 
-  bool operator < (const DatedNode &dn) const {
+  bool operator<(const DatedNode &dn) const {
     if (date != dn.date) {
       return date < dn.date;
     } else {
@@ -827,13 +743,10 @@ struct DatedNode {
       return label1 < label2;
     }
   }
-
 };
 
-static void fillDatedNodesRec(corax_rnode_t *node,
-    double depth,
-    std::vector<DatedNode> &datedNodes)
-{
+static void fillDatedNodesRec(corax_rnode_t *node, double depth,
+                              std::vector<DatedNode> &datedNodes) {
   if (!node->left) {
     return;
   }
@@ -842,24 +755,22 @@ static void fillDatedNodesRec(corax_rnode_t *node,
   fillDatedNodesRec(node->left, depth, datedNodes);
   fillDatedNodesRec(node->right, depth, datedNodes);
 }
-  
 
-std::vector<corax_rnode_t *> PLLRootedTree::getOrderedSpeciations() const
-{
+std::vector<corax_rnode_t *> PLLRootedTree::getOrderedSpeciations() const {
   std::vector<corax_rnode_t *> speciations;
   std::vector<DatedNode> datedNodes;
   fillDatedNodesRec(getRoot(), 0.0, datedNodes);
   std::sort(datedNodes.begin(), datedNodes.end());
-  for (const auto &datedNode: datedNodes) {
+  for (const auto &datedNode : datedNodes) {
     speciations.push_back(datedNode.node);
   }
   return speciations;
 }
 
-std::unordered_map<std::string, corax_rnode_t *> PLLRootedTree::getLabelToNode(bool leafOnly)
-{
+std::unordered_map<std::string, corax_rnode_t *>
+PLLRootedTree::getLabelToNode(bool leafOnly) {
   std::unordered_map<std::string, corax_rnode_t *> res;
-  for (auto node: getNodes()) {
+  for (auto node : getNodes()) {
     if (leafOnly && node->right) {
       continue;
     }
@@ -869,25 +780,23 @@ std::unordered_map<std::string, corax_rnode_t *> PLLRootedTree::getLabelToNode(b
   return res;
 }
 
-std::string PLLRootedTree::buildConsensusTree(
-    const std::vector<std::string> &strOrFiles, 
-      double threshold)
-{
+std::string
+PLLRootedTree::buildConsensusTree(const std::vector<std::string> &strOrFiles,
+                                  double threshold) {
   const std::string OUTGROUP_LABEL = "alerax_internal_str_for_outgroup";
-  std::vector<std::shared_ptr<PLLUnrootedTree> > outgroupTrees;
-  for (auto &str: strOrFiles) {
+  std::vector<std::shared_ptr<PLLUnrootedTree>> outgroupTrees;
+  for (auto &str : strOrFiles) {
     auto tree = PLLRootedTree::buildFromStrOrFile(str);
-    outgroupTrees.push_back(PLLUnrootedTree::buildWithOutgroupFromRooted(
-        *tree, OUTGROUP_LABEL)); 
+    outgroupTrees.push_back(
+        PLLUnrootedTree::buildWithOutgroupFromRooted(*tree, OUTGROUP_LABEL));
   }
   // this is the unrooted consensus newick with the outgroup
-  auto consensusStr = PLLUnrootedTree::buildConsensusTree(outgroupTrees,
-      threshold);
+  auto consensusStr =
+      PLLUnrootedTree::buildConsensusTree(outgroupTrees, threshold);
   PLLUnrootedTree consensus(consensusStr, false);
   // convert it to rooted consensus string
   auto rootedStr = PLLRootedTree::getRootedNewickFromOutgroup(
       consensus.findLeaf(OUTGROUP_LABEL));
-  
-  return rootedStr;
 
+  return rootedStr;
 }

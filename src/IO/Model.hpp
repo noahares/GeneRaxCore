@@ -4,13 +4,12 @@
  * This file was copied from RAxML-NG
  */
 
-#include <algorithm>
-#include <unordered_map>
-#include <corax/model/evolmodel.hpp>
-#include <corax/corax.h>
 #include <IO/RaxmlTypes.hpp>
+#include <algorithm>
+#include <corax/corax.h>
+#include <corax/model/evolmodel.hpp>
 #include <memory>
 #include <stdexcept>
-
+#include <unordered_map>
 
 using Model = corax::model::EvolModel;

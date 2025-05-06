@@ -11,13 +11,7 @@ std::ofstream *Logger::rankLogFile = nullptr;
 std::ofstream *Logger::saveLogFile = nullptr;
 bool Logger::inited = false;
 
-
-Logger::Logger():
-  _os(&std::cout),
-  _silent(true)
-{
-  setType(lt_info);
-}
+Logger::Logger() : _os(&std::cout), _silent(true) { setType(lt_info); }
 
 void Logger::init() {
   if (inited) {
@@ -35,17 +29,15 @@ void Logger::init() {
   ParallelContext::barrier();
 }
 
-void Logger::initRankFileOutput()
-{
+void Logger::initRankFileOutput() {
   if (!rankLogFile) {
-    std::string rankLog = outputdir + "rank_" + std::to_string(ParallelContext::getRank())
-      + ".log";
+    std::string rankLog = outputdir + "rank_" +
+                          std::to_string(ParallelContext::getRank()) + ".log";
     rankLogFile = new std::ofstream(rankLog);
   }
 }
 
-void Logger::initFileOutput(const std::string &output)
-{
+void Logger::initFileOutput(const std::string &output) {
   Logger::outputdir = output;
   // only the master rank can write to the log file
   if (ParallelContext::getRank()) {
@@ -59,8 +51,6 @@ void Logger::initFileOutput(const std::string &output)
 }
 
 void Logger::close() {
-  delete(logFile);
+  delete (logFile);
   logFile = saveLogFile = nullptr;
 }
-
-

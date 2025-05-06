@@ -3,18 +3,15 @@
 #include <trees/PLLRootedTree.hpp>
 
 struct Highway {
-  Highway():src(nullptr), dest(nullptr), proba(0.0) {}
+  Highway() : src(nullptr), dest(nullptr), proba(0.0) {}
 
-  Highway(corax_rnode_t *src, corax_rnode_t *dest):
-    src(src),
-    dest(dest),
-    proba(0.1)
-  {}
+  Highway(corax_rnode_t *src, corax_rnode_t *dest)
+      : src(src), dest(dest), proba(0.1) {}
   corax_rnode_t *src;
   corax_rnode_t *dest;
   double proba;
 
-  friend std::ostream& operator<<(std::ostream& os, const Highway &h) {
+  friend std::ostream &operator<<(std::ostream &os, const Highway &h) {
     os << "(" << h.src->label << " -> " << h.dest->label << ")";
     return os;
   }
@@ -23,7 +20,6 @@ struct Highway {
     return src == other.src && dest == other.dest;
   }
 };
-
 
 /**
  *  Functions to parse a file containing a list of candidate
@@ -36,7 +32,5 @@ struct Highway {
 class HighwayCandidateParser {
 public:
   static std::vector<Highway> parse(const std::string &candidateFile,
-      PLLRootedTree &speciesTree);
-
-
+                                    PLLRootedTree &speciesTree);
 };

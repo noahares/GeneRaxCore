@@ -1,79 +1,65 @@
 #pragma once
 
+#include <IO/Logger.hpp>
 #include <cassert>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <IO/Logger.hpp>
 
 using StringToUintMap = std::unordered_map<std::string, unsigned int>;
 
 /**
- *  Reconciliation models 
+ *  Reconciliation models
  */
-enum class RecModel {
-  UndatedDL, 
-  UndatedDTL, 
-  ParsimonyD,
-  SimpleDS
-};
-
+enum class RecModel { UndatedDL, UndatedDTL, ParsimonyD, SimpleDS };
 
 /*
  *  DTLRates numerical optimization methods
  */
-enum class RecOpt {
-  Grid, Simplex, Gradient, LBFGSB, GSL_SIMPLEX, None
-};
+enum class RecOpt { Grid, Simplex, Gradient, LBFGSB, GSL_SIMPLEX, None };
 
 /**
  *  Describe which (DTL) parameters are shared or can take different values:
  *  GLOBAL: all rates are shared among all families and species
- *  ORIGINATION_PER_SPECIES: each species has a different set of origination probabilities. The other rates are global
- *  PER_SPECIES: each species has a different set of rates, common to all families
- *  PER_FAMILY: each species has a different set of rates, common to all species
- *  CUSTOM: the user can describe the parametrization in a file. Each families have the same set of rates
+ *  ORIGINATION_PER_SPECIES: each species has a different set of origination
+ * probabilities. The other rates are global PER_SPECIES: each species has a
+ * different set of rates, common to all families PER_FAMILY: each species has a
+ * different set of rates, common to all species CUSTOM: the user can describe
+ * the parametrization in a file. Each families have the same set of rates
  */
 enum class ModelParametrization {
-  GLOBAL, PER_SPECIES, ORIGINATION_PER_SPECIES, PER_FAMILY, CUSTOM
+  GLOBAL,
+  PER_SPECIES,
+  ORIGINATION_PER_SPECIES,
+  PER_FAMILY,
+  CUSTOM
 };
 
 /*
  * Gene tree search mode
  */
-enum class GeneSearchStrategy {
-  SPR, EVAL, SKIP
-};
+enum class GeneSearchStrategy { SPR, EVAL, SKIP };
 
 /**
  * Species tree search mode
  */
-enum class SpeciesSearchStrategy {
-  SPR, TRANSFERS, HYBRID, REROOT, EVAL, SKIP
-};
+enum class SpeciesSearchStrategy { SPR, TRANSFERS, HYBRID, REROOT, EVAL, SKIP };
 
 /**
  *  Transfer constraint
  */
-enum class TransferConstaint {
-  NONE, PARENTS, RELDATED
-};
+enum class TransferConstaint { NONE, PARENTS, RELDATED };
 
-enum class OriginationStrategy {
-  UNIFORM, ROOT, LCA, OPTIMIZE
-};
+enum class OriginationStrategy { UNIFORM, ROOT, LCA, OPTIMIZE };
 
 /*
  *  Output formats for reconciled gene trees
  */
-enum class ReconciliationFormat {
-  NHX = 0, RecPhyloXML, NewickEvents, ALE
-};
-
+enum class ReconciliationFormat { NHX = 0, RecPhyloXML, NewickEvents, ALE };
 
 /**
  * Nature of a reconciliation event
- */ 
+ */
 enum class ReconciliationEventType {
   EVENT_S = 0,  // speciation
   EVENT_SL,     // speciation and loss
@@ -86,16 +72,14 @@ enum class ReconciliationEventType {
   EVENT_Invalid // invalid event
 };
 
-
-
 /*
  * Defines how to reuse computations when computing
  * the reconciliation likelihood
  */
 enum class PartialLikelihoodMode {
-  PartialGenes = 0, // reuse per-gene CLVs 
-  PartialSpecies, // reuse per-species CLVs
-  NoPartial // always recompute all CLVs from scratch
+  PartialGenes = 0, // reuse per-gene CLVs
+  PartialSpecies,   // reuse per-species CLVs
+  NoPartial         // always recompute all CLVs from scratch
 };
 
 enum class SpeciesTreeAlgorithm {
@@ -117,8 +101,8 @@ enum class SpeciesTreeAlgorithm {
 enum class CCPRooting {
   // the input trees are considered unrooted and all root position
   // have the same frequency
-  UNIFORM = 0, 
-  // the input trees must be rooted and the alternative 
+  UNIFORM = 0,
+  // the input trees must be rooted and the alternative
   // root positions have a null frequency
   ROOTED,
   // the input trees are considered unrooted and MAD rooting
@@ -136,46 +120,46 @@ public:
   /**
    * @param m reconciliation model
    * @return the number of free parameters allowed by the model
-   */ 
-  static unsigned int freeParameters(RecModel m)  {
+   */
+  static unsigned int freeParameters(RecModel m) {
     switch (m) {
-      case RecModel::UndatedDL:
-        return 2;
-      case RecModel::UndatedDTL:
-        return 3;
-      case RecModel::ParsimonyD:
-        return 0;
-      case RecModel::SimpleDS:
-        return 1;
-      default:
-        assert(false);
-        return 0;
+    case RecModel::UndatedDL:
+      return 2;
+    case RecModel::UndatedDTL:
+      return 3;
+    case RecModel::ParsimonyD:
+      return 0;
+    case RecModel::SimpleDS:
+      return 1;
+    default:
+      assert(false);
+      return 0;
     }
   }
 
-  static std::vector<std::string> parameterNames(RecModel m)  {
+  static std::vector<std::string> parameterNames(RecModel m) {
     std::vector<std::string> res;
     switch (m) {
-      case RecModel::UndatedDL:
-        res.push_back("D");
-        res.push_back("L");
-        break;
-      case RecModel::UndatedDTL:
-        res.push_back("D");
-        res.push_back("L");
-        res.push_back("T");
-        break;
-      case RecModel::ParsimonyD:
-        break;
-      case RecModel::SimpleDS:
-        res.push_back("D");
-        break;
+    case RecModel::UndatedDL:
+      res.push_back("D");
+      res.push_back("L");
+      break;
+    case RecModel::UndatedDTL:
+      res.push_back("D");
+      res.push_back("L");
+      res.push_back("T");
+      break;
+    case RecModel::ParsimonyD:
+      break;
+    case RecModel::SimpleDS:
+      res.push_back("D");
+      break;
     }
     return res;
   }
 
-  static ModelParametrization strToModelParametrization(const std::string &str) 
-  {
+  static ModelParametrization
+  strToModelParametrization(const std::string &str) {
     if ("GLOBAL" == str) {
       return ModelParametrization::GLOBAL;
     } else if (str == "PER-SPECIES") {
@@ -193,8 +177,7 @@ public:
    * @param m reconciliation model
    * @return true if the model accounts for horizontal gene transfers
    */
-  static bool accountsForTransfers(RecModel m) 
-  {
+  static bool accountsForTransfers(RecModel m) {
     switch (m) {
     case RecModel::UndatedDL:
     case RecModel::ParsimonyD:
@@ -207,8 +190,7 @@ public:
     return false;
   }
 
-  static SpeciesTreeAlgorithm strToSpeciesTree(const std::string &str) 
-  {
+  static SpeciesTreeAlgorithm strToSpeciesTree(const std::string &str) {
     if (str == std::string("MiniNJ")) {
       return SpeciesTreeAlgorithm::MiniNJ;
     } else if (str == std::string("NJst")) {
@@ -221,23 +203,21 @@ public:
       return SpeciesTreeAlgorithm::Cherry;
     } else if (str == std::string("CherryPro")) {
       return SpeciesTreeAlgorithm::CherryPro;
-    } else if (str == std::string("Random") || 
-        str == std::string("random")) {
+    } else if (str == std::string("Random") || str == std::string("random")) {
       return SpeciesTreeAlgorithm::Random;
     } else {
       return SpeciesTreeAlgorithm::User;
     }
   }
 
-
   static const char *getEventName(ReconciliationEventType type) {
-    static const char *eventNames[]  = {"S", "SL", "D", "DL", "T", "TL", "L", "Leaf", "Invalid"};
+    static const char *eventNames[] = {"S",  "SL", "D",    "DL",     "T",
+                                       "TL", "L",  "Leaf", "Invalid"};
     return eventNames[static_cast<int>(type)];
   }
-  
-  static std::string originationToStr(OriginationStrategy os)
-  {
-    switch(os) {
+
+  static std::string originationToStr(OriginationStrategy os) {
+    switch (os) {
     case OriginationStrategy::UNIFORM:
       return "UNIFORM";
     case OriginationStrategy::ROOT:
@@ -250,22 +230,18 @@ public:
     exit(41);
   }
 
-  static OriginationStrategy strToOrigination(const std::string &str) 
-  {
+  static OriginationStrategy strToOrigination(const std::string &str) {
     if (str == "UNIFORM") {
       return OriginationStrategy::UNIFORM;
-    }  else if (str == "ROOT") {
+    } else if (str == "ROOT") {
       return OriginationStrategy::ROOT;
-    }  else if (str == "LCA") {
+    } else if (str == "LCA") {
       return OriginationStrategy::LCA;
-    }  else if (str == "OPTIMIZE") {
+    } else if (str == "OPTIMIZE") {
       return OriginationStrategy::OPTIMIZE;
     } else {
       Logger::info << "Invalid origination strategy " << str << std::endl;
       exit(41);
     }
   }
-
 };
-
-

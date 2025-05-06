@@ -2,8 +2,6 @@
 
 #include <string>
 
-
-
 /**
  *  Schedules jobs with the external dependency MPIScheduler,
  *  allowing to schedule independent jobs in parallel with a
@@ -22,10 +20,6 @@ public:
   Scheduler() = delete;
 
   static void schedule(const std::string &outputDir,
-      const std::string &commandFile,
-      bool splitImplem,
-      const std::string &execPath);
-
+                       const std::string &commandFile, bool splitImplem,
+                       const std::string &execPath);
 };
-
-

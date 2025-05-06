@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-
-
 struct FamilyInfo {
   std::string name;
   std::string startingGeneTree;
@@ -15,9 +13,7 @@ struct FamilyInfo {
   std::string statsFile;
   std::string likelihoodFile;
   unsigned int color;
-  FamilyInfo() {
-    reset();
-  }
+  FamilyInfo() { reset(); }
   void reset() {
     name = "";
     startingGeneTree = "__random__";
@@ -36,8 +32,10 @@ typedef std::vector<FamilyInfo> Families;
 class Family {
 public:
   Family() = delete;
-  static void filterFamilies(Families &families, const std::string &speciesTreeFile, bool checkAlignments, bool checkSpeciesTree);
-  static void printStats(Families &families, const std::string &speciesTreeFile, const std::string &coverageFile, const std::string &fractionMissingFile);
+  static void filterFamilies(Families &families,
+                             const std::string &speciesTreeFile,
+                             bool checkAlignments, bool checkSpeciesTree);
+  static void printStats(Families &families, const std::string &speciesTreeFile,
+                         const std::string &coverageFile,
+                         const std::string &fractionMissingFile);
 };
-
-

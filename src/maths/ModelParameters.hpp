@@ -1,8 +1,8 @@
 #pragma once
 
 #include <maths/ModelParameters.hpp>
-#include <util/enums.hpp>
 #include <util/RecModelInfo.hpp>
+#include <util/enums.hpp>
 
 /**
  *  Hold the reconciliation rates, information about the model,
@@ -10,35 +10,27 @@
  */
 class ModelParameters {
 public:
-  ModelParameters()
-  {
-  }
-  
+  ModelParameters() {}
+
   /**
-   *  @param rates Starting rates 
-   *  @param info Reconciliation model information 
+   *  @param rates Starting rates
+   *  @param info Reconciliation model information
    */
-  ModelParameters(const Parameters &rates,
-      unsigned int familiesNumber,
-      const RecModelInfo &info):
-    rates((info.perFamilyRates ? familiesNumber : 1), rates),
-    info(info),
-    familiesNumber(familiesNumber)
-  {
-  
-  }
+  ModelParameters(const Parameters &rates, unsigned int familiesNumber,
+                  const RecModelInfo &info)
+      : rates((info.perFamilyRates ? familiesNumber : 1), rates), info(info),
+        familiesNumber(familiesNumber) {}
 
   Parameters getRates(unsigned int familyIndex) const {
     if (info.perFamilyRates) {
       return rates.getSubParameters(familyIndex * info.modelFreeParameters(),
-          info.modelFreeParameters());
+                                    info.modelFreeParameters());
     } else {
       return rates;
     }
   }
- 
-  void setRates(unsigned int familyIndex, const Parameters &newRates)
-  {
+
+  void setRates(unsigned int familyIndex, const Parameters &newRates) {
     for (unsigned int i = 0; i < info.modelFreeParameters(); ++i) {
       rates[info.modelFreeParameters() * familyIndex + i] = newRates[i];
     }

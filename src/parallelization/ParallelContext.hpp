@@ -1,14 +1,13 @@
 #pragma once
 
 #include <fstream>
-#include <vector>
 #include <stack>
+#include <vector>
 #ifdef WITH_MPI
-  #include <mpi.h>
+#include <mpi.h>
 #else
-  typedef int MPI_Comm;
+typedef int MPI_Comm;
 #endif
-
 
 /**
  * Singleton class that handles parallelization routines
@@ -18,13 +17,15 @@ public:
   ParallelContext() = delete;
 
   /**
-   *  Initialize the parallel context. Must always be called at the start of the programm
+   *  Initialize the parallel context. Must always be called at the start of the
+   * programm
    *  @param commPtr a pointer to the MPI communicator used by this programm
    */
   static void init(void *commPtr);
 
   /**
-   *  Terminates the parallel context. Must always be called at the end of the programm
+   *  Terminates the parallel context. Must always be called at the end of the
+   * programm
    */
   static void finalize();
 
@@ -43,9 +44,11 @@ public:
    *  @param localValue input value for this rank
    *  @param allValues output values for all rank (indexed with the rank index)
    */
-  static void allGatherDouble(double localValue, std::vector<double> &allValues);
+  static void allGatherDouble(double localValue,
+                              std::vector<double> &allValues);
   static void allGatherInt(int localValue, std::vector<int> &allValues);
-  static void allGatherUInt(unsigned int localValue, std::vector<unsigned int> &allValues);
+  static void allGatherUInt(unsigned int localValue,
+                            std::vector<unsigned int> &allValues);
 
   static bool isRandConsistent();
   static void makeRandConsistent();
@@ -53,28 +56,30 @@ public:
   static bool isDoubleEqual(double value);
 
   /**
-   * Concatenates vectors of same sizes 
+   * Concatenates vectors of same sizes
    */
-  static void concatenateIntVectors(const std::vector<int> &localVector, std::vector<int> &globalVector);
-  static void concatenateUIntVectors(const std::vector<unsigned int> &localVector, 
-    std::vector<unsigned int> &globalVector);
+  static void concatenateIntVectors(const std::vector<int> &localVector,
+                                    std::vector<int> &globalVector);
+  static void
+  concatenateUIntVectors(const std::vector<unsigned int> &localVector,
+                         std::vector<unsigned int> &globalVector);
 
   /**
-   * Concatenates vectors of different sizes 
+   * Concatenates vectors of different sizes
    */
-  static void concatenateHetherogeneousUIntVectors(
-      std::vector<unsigned int> localVector, 
-      std::vector<unsigned int> &globalVector);
-  static void concatenateHetherogeneousDoubleVectors(
-      const std::vector<double> &localVector, 
-      std::vector<double> &globalVector);
-  
+  static void
+  concatenateHetherogeneousUIntVectors(std::vector<unsigned int> localVector,
+                                       std::vector<unsigned int> &globalVector);
+  static void
+  concatenateHetherogeneousDoubleVectors(const std::vector<double> &localVector,
+                                         std::vector<double> &globalVector);
+
   static void sumDouble(double &value);
   static void sumUInt(unsigned int &value);
   static void sumVectorDouble(std::vector<double> &value);
   static void sumVectorUInt(std::vector<unsigned int> &value);
   static void maxUInt(unsigned int &value);
-  static void sumULong(unsigned long &value); 
+  static void sumULong(unsigned long &value);
   static void parallelAnd(bool &value);
 
   /**
@@ -88,13 +93,11 @@ public:
 
   /**
    *  Get the highest value from all ranks
-   *  @param value as input, the value for the current rank. As output, 
+   *  @param value as input, the value for the current rank. As output,
    *    the highest value among the ranks
    *  @param bestRank the rank that has the highest value
    */
   static unsigned int getMax(double &value, unsigned int &bestRank);
-  
-  
 
   /**
    *  When having a given number of independant tasks, subdivide
@@ -113,7 +116,7 @@ public:
    *  in the scheduler?
    */
   static bool allowSchedulerSplitImplementation();
-  static MPI_Comm &getComm() {return _commStack.top();}
+  static MPI_Comm &getComm() { return _commStack.top(); }
 
   static void pushSequentialContext();
   static void popContext();
@@ -126,22 +129,17 @@ private:
   static std::stack<MPI_Comm> _commStack;
   static std::stack<bool> _ownsMPIContextStack;
   static bool _mpiEnabled;
-  class ParallelException: public std::exception
-  {
+  class ParallelException : public std::exception {
   public:
-    ParallelException(int errorCode) 
-    {
+    ParallelException(int errorCode) {
       msg_ = "Program failed with error " + std::to_string(errorCode);
     }
-    
+
     virtual ~ParallelException() {}
 
-    virtual const char* what() const noexcept
-    {
-      return msg_.c_str();
-    }
+    virtual const char *what() const noexcept { return msg_.c_str(); }
+
   private:
     std::string msg_;
   };
 };
-

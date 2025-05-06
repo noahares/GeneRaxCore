@@ -1,13 +1,11 @@
 #pragma once
 
+#include "parallelization/ParallelContext.hpp"
 #include <chrono>
 #include <fstream>
 #include <iostream>
-#include "parallelization/ParallelContext.hpp"
 
 using TimePoint = std::chrono::high_resolution_clock::time_point;
-
-
 
 /**
  *  All logs are printed to std::cout.
@@ -20,19 +18,16 @@ using TimePoint = std::chrono::high_resolution_clock::time_point;
  *  Logger::timed also prints the elapsed time since the start of the program
  *  Logger::error is used for errors and prefixes messages with [Error]
  */
-class Logger: public std::ofstream
-{
+class Logger : public std::ofstream {
 private:
-  enum LoggerType {
-    lt_info, lt_error, lt_timed, lt_perrank
-  };
+  enum LoggerType { lt_info, lt_error, lt_timed, lt_perrank };
   LoggerType _type;
   std::ostream *_os; // I do not own this one
   bool _silent;
 
   Logger();
-  void setType(LoggerType type) {_type = type;}
-  void setStream(std::ostream &os) {_os = &os;}
+  void setType(LoggerType type) { _type = type; }
+  void setStream(std::ostream &os) { _os = &os; }
 
 public:
   static void init();
@@ -40,8 +35,8 @@ public:
 
   static void initFileOutput(const std::string &output);
 
-  static void mute() {info._silent = true;}
-  static void unmute() {info._silent = false;}
+  static void mute() { info._silent = true; }
+  static void unmute() { info._silent = false; }
 
   // if true, the MPI rank can't write logs
   bool isSilent() {
@@ -51,12 +46,11 @@ public:
     if (_type == lt_perrank) {
       return false;
     }
-    return (_type == lt_timed || _type == lt_info) && ParallelContext::getRank();
+    return (_type == lt_timed || _type == lt_info) &&
+           ParallelContext::getRank();
   }
 
-  static void enableLogFile(bool enable) {
-    logFile = enable ? saveLogFile : 0;
-  }
+  static void enableLogFile(bool enable) { logFile = enable ? saveLogFile : 0; }
 
   static long getElapsedSec() {
     auto finish = std::chrono::high_resolution_clock::now();
@@ -64,15 +58,13 @@ public:
     return std::chrono::duration_cast<std::chrono::seconds>(elapsed).count();
   }
 
-  template <typename T>
-  Logger& operator << (T&& message)
-  {
+  template <typename T> Logger &operator<<(T &&message) {
     if (isSilent()) {
       return *this;
     }
     if (_type == lt_timed) {
       auto seconds = getElapsedSec();
-      auto hours  = seconds / 3600;
+      auto hours = seconds / 3600;
       auto minutes = (seconds % 3600) / 60;
       seconds = seconds % 60;
       char time[30];
@@ -105,8 +97,7 @@ public:
     }
   }
 
-  Logger& operator << (std::ostream& (*manip)(std::ostream&))
-  {
+  Logger &operator<<(std::ostream &(*manip)(std::ostream &)) {
     if (isSilent()) {
       return *this;
     }
@@ -136,7 +127,4 @@ public:
   static std::ofstream *rankLogFile;
   static std::ofstream *saveLogFile;
   static bool inited;
-
 };
-
-

@@ -10,7 +10,7 @@ public:
    *  @param argc Number of parameters
    *  @param argv Parameters
    *  @param comm MPI communicator (or null if none)
-   *  
+   *
    */
-  static int runRaxmlOptimization(int argc, char** argv, void* comm);
+  static int runRaxmlOptimization(int argc, char **argv, void *comm);
 };

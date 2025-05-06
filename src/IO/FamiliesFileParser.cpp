@@ -1,19 +1,13 @@
 #include "FamiliesFileParser.hpp"
-#include <fstream>
-#include <algorithm>
 #include <IO/Logger.hpp>
+#include <algorithm>
+#include <fstream>
 #include <parallelization/ParallelContext.hpp>
 
-enum FFPStep {
-  header,
-  reading_family
-};
+enum FFPStep { header, reading_family };
 
-
-static bool update_family(const std::string &line, 
-    FamilyInfo &currentFamily,
-    Families &families)
-{
+static bool update_family(const std::string &line, FamilyInfo &currentFamily,
+                          Families &families) {
   if (line[0] == '-') {
     if (currentFamily.name.size()) {
       families.push_back(currentFamily);
@@ -42,22 +36,22 @@ static bool update_family(const std::string &line,
   return true;
 }
 
-Families FamiliesFileParser::parseFamiliesFile(const std::string &familiesFile)
-{
+Families
+FamiliesFileParser::parseFamiliesFile(const std::string &familiesFile) {
   Families families;
   std::ifstream reader(familiesFile);
   std::string line;
   FFPStep step = header;
   FamilyInfo currentFamily;
   int lineNumber = -1;
-  while (getline(reader, line))  {
+  while (getline(reader, line)) {
     lineNumber++;
     line.erase(remove_if(line.begin(), line.end(), ::isspace), line.end());
     line = line.substr(0, line.find("#"));
     if (!line.size() || line[0] == '#') {
       continue;
     }
-    switch(step) {
+    switch (step) {
     case header:
       if (line == "[FAMILIES]") {
         step = reading_family;
@@ -65,17 +59,17 @@ Families FamiliesFileParser::parseFamiliesFile(const std::string &familiesFile)
       break;
     case reading_family:
       if (!update_family(line, currentFamily, families)) {
-        Logger::error << "Error when parsing " << familiesFile << ":" << lineNumber << std::endl;
+        Logger::error << "Error when parsing " << familiesFile << ":"
+                      << lineNumber << std::endl;
         ParallelContext::abort(1);
       }
       break;
     }
   }
-  
-  // terminate 
+
+  // terminate
   if (step == reading_family) {
     families.push_back(currentFamily);
   }
   return families;
 }
-
