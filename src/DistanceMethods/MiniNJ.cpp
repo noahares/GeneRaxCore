@@ -5,7 +5,7 @@
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
 #include <algorithm>
-#include <parallelization //ParallelContext.hpp>
+#include <parallelization/ParallelContext.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <trees/PLLUnrootedTree.hpp>
 

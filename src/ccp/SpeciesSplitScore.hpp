@@ -1,5 +1,7 @@
 #pragma once
 
+#include <trees/PLLRootedTree.hpp>
+
 class SpeciesSplitScore {
 public:
   virtual ~SpeciesSplitScore() {};

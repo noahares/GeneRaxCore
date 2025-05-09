@@ -13,6 +13,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include <corax/core/partition.h>
+
 enum class StartingTree { random, parsimony, user };
 
 enum class Command {
