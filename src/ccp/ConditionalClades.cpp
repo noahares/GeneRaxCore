@@ -1,10 +1,11 @@
-
 #include "ConditionalClades.hpp"
-#include <IO/Logger.hpp>
+
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+
+#include <IO/Logger.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/PLLUnrootedTree.hpp>
 
@@ -193,9 +194,9 @@ extractClades(const WeightedTrees &weightedTrees,
   // clade always comes after its child clades in the CID ordering
   for (auto it = orderedClades.begin(); it != orderedClades.end(); ++it) {
     auto &clade = *it;
-    unsigned int CID = cidToClade.size();
+    unsigned int cid = cidToClade.size();
     cidToClade.push_back(clade);
-    cladeToCID[clade] = CID;
+    cladeToCID[clade] = cid;
   }
   // so far we have only added the non-trivial clades. Now we add
   // the trivial clades
@@ -525,7 +526,7 @@ void ConditionalClades::_fillCCP(
   _allCladeSplits.resize(cladesNumber);
   auto rootCID = cladesNumber - 1;
   CCPClade fullClade(_CIDToClade[0].size(), true);
-  assert(rootCID = _cladeToCID[fullClade]);
+  assert(rootCID == _cladeToCID[fullClade]);
   for (unsigned int cid = 0; cid < cladesNumber; ++cid) {
     auto &clade = _CIDToClade[cid];
     auto &cladeSplits = _allCladeSplits[cid];
