@@ -92,7 +92,7 @@ static void printEventALE(const Scenario::Event &event,
     switch (event.type) {
     case ReconciliationEventType::EVENT_S:
     case ReconciliationEventType::EVENT_SL:
-      os << "S@" << label;
+      os << label;
       break;
     case ReconciliationEventType::EVENT_D:
     case ReconciliationEventType::EVENT_DL:
@@ -102,9 +102,6 @@ static void printEventALE(const Scenario::Event &event,
     case ReconciliationEventType::EVENT_TL:
       os << "T@" << label << "->"
          << speciesTree->nodes[event.destSpeciesNode]->label;
-      break;
-    case ReconciliationEventType::EVENT_None:
-      os << "S@" << label << "...";
       break;
     default:
       break;
@@ -134,11 +131,12 @@ static void recursivelySaveReconciliationsALE(
                                       os);
     os << ")";
   }
-  for (auto &event : geneToEvents[node->node_index]) {
-    printEventALE(event, speciesTree, node, os);
-  }
   if (!node->next) {
     os << node->label;
+  } else {
+    for (auto &event : geneToEvents[node->node_index]) {
+      printEventALE(event, speciesTree, node, os);
+    }
   }
   if (!isVirtualRoot) {
     os << ":" << node->length;
