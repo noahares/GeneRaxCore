@@ -12,7 +12,7 @@
 const char *Scenario::eventNames[] = {"S",  "SL", "D",    "DL",     "T",
                                       "TL", "L",  "Leaf", "Invalid"};
 
-const unsigned int Scenario::EVENT_TYPE_NUMBER = 8;
+const unsigned int Scenario::EVENT_TYPE_NUMBER = 9;
 
 struct TransferPair {
   double count;
@@ -131,7 +131,7 @@ dumpSpeciesEventCountVector(ParallelOfstream &os,
                             const std::vector<double> &eventCounts,
                             const std::vector<std::string> &indexToLabel) {
   os << "species_label, speciations, duplications, losses, transfers, "
-        "presence, origination, copies, singletons"
+        "presence, origination, copies, singletons, transfers_to"
      << std::endl;
   auto N = indexToLabel.size();
   assert(Scenario::EVENT_TYPE_NUMBER * N == eventCounts.size());
@@ -155,7 +155,7 @@ static void dumpSpeciesToEventCount(
     const std::unordered_map<std::string, std::vector<double>>
         &speciesToEventCount) {
   os << "species_label, speciations, duplications, losses, transfers, "
-        "presence, origination, copies, singletons"
+        "presence, origination, copies, singletons, transfers_to"
      << std::endl;
   std::vector<double> defaultCount(Scenario::EVENT_TYPE_NUMBER, 0.0);
   for (auto &it : speciesToEventCount) {
@@ -196,6 +196,7 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename,
   // 5: origination
   // 6: gene copies
   // 7: singletons
+  // 8: transfer to
   for (auto &event : _events) {
     auto &eventCount =
         speciesToEventCount[_speciesTree->nodes[event.speciesNode]->label];
@@ -226,10 +227,12 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename,
       break;
     case ReconciliationEventType::EVENT_T:
       eventCount[3]++;
+      speciesToEventCount[_speciesTree->nodes[event.destSpeciesNode]->label][8]++;
       break;
     case ReconciliationEventType::EVENT_TL:
       eventCount[2]++;
       eventCount[3]++;
+      speciesToEventCount[_speciesTree->nodes[event.destSpeciesNode]->label][8]++;
       break;
     case ReconciliationEventType::EVENT_L:
     case ReconciliationEventType::EVENT_Invalid:
