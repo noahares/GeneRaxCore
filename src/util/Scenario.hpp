@@ -130,9 +130,17 @@ public:
   /**
    * Various methods to save information from the Scenario
    */
+  static void printEventsHeader(ParallelOfstream &os);
+  static void printTransfersHeader(ParallelOfstream &os);
+  static void printPerSpeciesEventCountsHeader(ParallelOfstream &os);
   void saveEventsCounts(const std::string &filename,
                         bool masterRankOnly = true);
-  void saveTransfers(const std::string &filename, bool masterRankOnly = true);
+  void saveEventsCounts(ParallelOfstream& os,
+                        bool masterRankOnly = true);
+  void saveTransfers(const std::string &filename,
+                     bool masterRankOnly = true);
+  void saveTransfers(ParallelOfstream& os,
+                     bool masterRankOnly = true);
   double countTransfer(const std::string &from, const std::string &to);
   static void mergeTransfers(const PLLRootedTree &speciesTree,
                              const std::string &filename,
@@ -159,6 +167,8 @@ public:
   void saveAllOrthoGroups(std::string &filename,
                           bool masterRankOnly = true) const;
   void savePerSpeciesEventsCounts(const std::string &filename,
+                                  bool masterRankOnl = true);
+  void savePerSpeciesEventsCounts(ParallelOfstream& os,
                                   bool masterRankOnl = true);
   static void mergePerSpeciesEventCounts(
       const PLLRootedTree &tree, const std::string &filename,
