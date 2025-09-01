@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.1)
+cmake_minimum_required(VERSION 3.11)
 
 project(GeneRaxCoreProject
         VERSION 0.0)
@@ -47,7 +47,6 @@ set(GENERAXCORE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/
    ${MPISCHEDULER_INCLUDE_DIRS}
    CACHE INTERNAL "${PROJECT_NAME}: Include dirs"
   )
-  
+
 
 add_subdirectory(src)
-
