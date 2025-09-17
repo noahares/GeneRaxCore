@@ -11,15 +11,16 @@
 
 struct TreeWraper {
   std::shared_ptr<PLLUnrootedTree> tree;
+  std::shared_ptr<PLLRootedTree> rtree;
   corax_unode_t *root;
   size_t hash;
   double ll;
   TreeWraper(const std::string newickStr, bool rooted)
-      : root(nullptr), ll(0.0) {
+      : rtree(nullptr), root(nullptr), ll(0.0) {
     tree = std::make_shared<PLLUnrootedTree>(newickStr, false);
     if (rooted) {
-      PLLRootedTree rootedTree(newickStr, false);
-      root = tree->getVirtualRoot(rootedTree);
+      rtree = std::make_shared<PLLRootedTree>(newickStr, false);
+      root = tree->getVirtualRoot(*rtree);
       hash = tree->getRootedTreeHash(root);
     } else {
       hash = tree->getUnrootedTreeHash();
@@ -27,8 +28,7 @@ struct TreeWraper {
   }
 
   bool operator==(const TreeWraper &other) const {
-    return root == other.root &&
-           PLLUnrootedTree::areIsomorphic(*tree, *(other.tree));
+    return (root && other.root) ? *rtree == *other.rtree : *tree == *other.tree;
   }
 };
 

@@ -740,12 +740,10 @@ static corax_unode_t *findMinimumHashLeafRec(corax_unode_t *root,
 
 static corax_unode_t *findMinimumHashLeaf(corax_unode_t *root) {
   assert(root);
-  auto n1 = root;
-  auto n2 = root->back;
   size_t hash1 = 0;
   size_t hash2 = 0;
-  auto min1 = findMinimumHashLeafRec(n1, hash1);
-  auto min2 = findMinimumHashLeafRec(n2, hash2);
+  auto min1 = findMinimumHashLeafRec(root, hash1);
+  auto min2 = findMinimumHashLeafRec(root->back, hash2);
   if (hash1 < hash2) {
     return min1;
   } else {
@@ -766,61 +764,56 @@ size_t PLLUnrootedTree::getRootedTreeHash(corax_unode_t *root) const {
 }
 
 /**
- *  Recursively fill the vector orderedChildren, such that
- *  orderedChildren[node->node_index] is the list of the children
- *  of node ordered by the smallest leaf label under each child.1
+ *  Recursively fill the vector orderedChildren, that indicates
+ *  in which order we should traverse children of each node
+ *  when traversing the tree from node with an order based
+ *  on the tip labels (used in areIsomorphicAux)
  */
 static std::string
 orderChildren(corax_unode_t *node,
               std::vector<std::vector<corax_unode_t *>> &orderedChildren) {
   if (!node->next) {
-    return node->label;
+    return std::string(node->label);
   }
-  assert(orderedChildren.size() > node->node_index);
-  auto &myChildren = orderedChildren[node->node_index];
+  std::vector<ToSort> sortedChildren;
   auto temp = node->next;
-  std::vector<std::pair<std::string, corax_unode_t *>> toSort;
-  while (temp != node) {
-    auto firstLabel = orderChildren(temp->back, orderedChildren);
-    toSort.push_back({firstLabel, temp->back});
+  while (temp != node) { // iterate over all node's children
+    auto label = orderChildren(temp->back, orderedChildren);
+    sortedChildren.push_back(ToSort(temp->back, label, 0));
     temp = temp->next;
   }
-  std::sort(toSort.begin(), toSort.end());
-  for (const auto &pair : toSort) {
-    assert(pair.second);
-    myChildren.push_back(pair.second);
+  std::sort(sortedChildren.begin(), sortedChildren.end(), less_than_key());
+  auto &nodeChildren = orderedChildren.at(node->node_index);
+  for (const auto &s : sortedChildren) {
+    nodeChildren.push_back(s.node);
   }
-  return toSort[0].first;
+  return sortedChildren[0].label;
 }
 
 /**
- *  returns true if the nodes node1 and node2 are isomorphic
- *  leftFirst1 and leftFirst2 must have been filled with
- *  the orderChildren function
+ *  Return true if the nodes node1 and node2 are isomorphic
+ *  orderedChildren1 and orderedChildren1 must be filled in
+ *  advance with the orderChildren function
  */
 static bool areIsomorphicAux(
     corax_unode_t *node1, corax_unode_t *node2,
     const std::vector<std::vector<corax_unode_t *>> &orderedChildren1,
     const std::vector<std::vector<corax_unode_t *>> &orderedChildren2) {
-  assert(node1);
-  assert(node2);
+  // at least one is a leaf
   if (!node1->next || !node2->next) {
-    // at least one is a leaf
     if (node1->next || node2->next) {
-      // only one is a leaf
-      return false;
+      return false; // only one is a leaf
     }
-    return strcmp(node1->label, node2->label) == 0;
+    return std::strcmp(node1->label, node2->label) == 0;
   }
   // both are internal nodes
-  if (orderedChildren1.size() != orderedChildren2.size()) {
-    return false;
+  const auto &nodeChildren1 = orderedChildren1.at(node1->node_index);
+  const auto &nodeChildren2 = orderedChildren2.at(node2->node_index);
+  if (nodeChildren1.size() != nodeChildren2.size()) {
+    return false; // node1 and node2 have different polytomy ranks
   }
-  assert(orderedChildren1.size());
-  for (unsigned int i = 0; i < orderedChildren1[node1->node_index].size();
-       ++i) {
-    if (!areIsomorphicAux(orderedChildren1[node1->node_index][i],
-                          orderedChildren2[node2->node_index][i],
+  for (unsigned int i = 0; i < nodeChildren1.size(); ++i) {
+    if (!areIsomorphicAux(nodeChildren1.at(i), nodeChildren2.at(i),
                           orderedChildren1, orderedChildren2)) {
       return false;
     }
@@ -830,18 +823,22 @@ static bool areIsomorphicAux(
 
 bool PLLUnrootedTree::areIsomorphic(const PLLUnrootedTree &t1,
                                     const PLLUnrootedTree &t2) {
-  if (t1.getNodeNumber() != t2.getNodeNumber()) {
+  if (t1.getDirectedNodeNumber() != t2.getDirectedNodeNumber()) {
     return false;
   }
-  auto N = t1.getDirectedNodeNumber();
-  auto startingLeaf1 = findMinimumHashLeaf(t1.getAnyInnerNode())->back;
-  auto startingLeaf2 = findMinimumHashLeaf(t2.getAnyInnerNode())->back;
-  std::vector<std::vector<corax_unode_t *>> orderedChildren1(N);
-  std::vector<std::vector<corax_unode_t *>> orderedChildren2(N);
-  orderChildren(startingLeaf1, orderedChildren1);
-  orderChildren(startingLeaf2, orderedChildren2);
-  return areIsomorphicAux(startingLeaf1, startingLeaf2, orderedChildren1,
-                          orderedChildren2);
+  auto minHashLeaf1 = findMinimumHashLeaf(t1.getAnyInnerNode());
+  auto minHashLeaf2 = findMinimumHashLeaf(t2.getAnyInnerNode());
+  if (std::strcmp(minHashLeaf1->label, minHashLeaf2->label) != 0) {
+    return false;
+  }
+  std::vector<std::vector<corax_unode_t *>> orderedChildren1(
+      t1.getDirectedNodeNumber());
+  std::vector<std::vector<corax_unode_t *>> orderedChildren2(
+      t2.getDirectedNodeNumber());
+  orderChildren(minHashLeaf1->back, orderedChildren1);
+  orderChildren(minHashLeaf2->back, orderedChildren2);
+  return areIsomorphicAux(minHashLeaf1->back, minHashLeaf2->back,
+                          orderedChildren1, orderedChildren2);
 }
 
 bool PLLUnrootedTree::isBinary() const {

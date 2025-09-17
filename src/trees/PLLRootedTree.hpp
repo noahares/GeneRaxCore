@@ -75,6 +75,13 @@ public:
   PLLRootedTree(PLLRootedTree &&) = delete;
   PLLRootedTree &operator=(PLLRootedTree &&) = delete;
 
+  /**
+   *  Tree comparison
+   */
+  bool operator==(const PLLRootedTree &other) const {
+    return areIsomorphic(*this, other);
+  }
+
   /*
    * Tree dimension
    */
@@ -90,15 +97,6 @@ public:
   corax_rnode_t *getNode(unsigned int node_index) const;
   corax_rnode_t *getParent(unsigned int node_index) const;
   corax_rnode_t *getNeighbor(unsigned int node_index) const;
-
-  /**
-   *  Tree comparison
-   */
-  static bool areIsomorphic(const PLLRootedTree &t1, const PLLRootedTree &t2);
-
-  bool operator==(const PLLRootedTree &other) const {
-    return areIsomorphic(*this, other);
-  }
 
   /**
    * labels
@@ -239,4 +237,6 @@ private:
 
   static corax_rtree_t *
   buildRandomTree(const std::unordered_set<std::string> &leafLabels);
+
+  static bool areIsomorphic(const PLLRootedTree &t1, const PLLRootedTree &t2);
 };

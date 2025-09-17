@@ -103,47 +103,46 @@ static unsigned int utree_count_nodes_recursive(corax_unode_t *node,
  *  first when traversing the tree top down with an order based
  *  on the tip labels (used in areIsomorphicAux)
  */
-static const char *orderChildren(corax_rnode_t *node,
+static std::string orderChildren(corax_rnode_t *node,
                                  std::vector<bool> &leftFirst) {
   if (!node->left) {
-    return node->label;
+    return std::string(node->label);
   }
-  const char *label1 = orderChildren(node->left, leftFirst);
-  const char *label2 = orderChildren(node->right, leftFirst);
-  if (strcmp(label1, label2) < 0) {
-    leftFirst[node->node_index] = true;
-    return label1;
+  auto labelLeft = orderChildren(node->left, leftFirst);
+  auto labelRight = orderChildren(node->right, leftFirst);
+  if (labelLeft < labelRight) {
+    leftFirst.at(node->node_index) = true;
+    return labelLeft;
   } else {
-    leftFirst[node->node_index] = false;
-    return label2;
+    leftFirst.at(node->node_index) = false;
+    return labelRight;
   }
 }
 
 /**
- *  returns true if the nodes node1 and node2 are isomorphic
- *  leftFirst1 and leftFirst2 must have been filled with
+ *  Return true if the nodes node1 and node2 are isomorphic
+ *  leftFirst1 and leftFirst2 must be filled in advance with
  *  the orderChildren function
  */
 static bool areIsomorphicAux(corax_rnode_t *node1, corax_rnode_t *node2,
                              const std::vector<bool> &leftFirst1,
                              const std::vector<bool> &leftFirst2) {
+  // at least one is a leaf
   if (!node1->left || !node2->left) {
-    // at least one is a leaf
     if (node1->left || node2->left) {
-      // only one is a leaf
-      return false;
+      return false; // only one is a leaf
     }
-    return strcmp(node1->label, node2->label) == 0;
+    return std::strcmp(node1->label, node2->label) == 0;
   }
   // both are internal nodes
   auto l1 = node1->left;
   auto r1 = node1->right;
-  auto l2 = node2->left;
-  auto r2 = node2->right;
-  if (!leftFirst1[node1->node_index]) {
+  if (!leftFirst1.at(node1->node_index)) {
     std::swap(l1, r1);
   }
-  if (!leftFirst2[node2->node_index]) {
+  auto l2 = node2->left;
+  auto r2 = node2->right;
+  if (!leftFirst2.at(node2->node_index)) {
     std::swap(l2, r2);
   }
   return areIsomorphicAux(l1, l2, leftFirst1, leftFirst2) &&
@@ -155,9 +154,13 @@ bool PLLRootedTree::areIsomorphic(const PLLRootedTree &t1,
   if (t1.getNodeNumber() != t2.getNodeNumber()) {
     return false;
   }
+  auto root1 = t1.getRoot();
+  auto root2 = t2.getRoot();
   std::vector<bool> leftFirst1(t1.getNodeNumber(), false);
   std::vector<bool> leftFirst2(t2.getNodeNumber(), false);
-  return areIsomorphicAux(t1.getRoot(), t2.getRoot(), leftFirst1, leftFirst2);
+  orderChildren(root1, leftFirst1);
+  orderChildren(root2, leftFirst2);
+  return areIsomorphicAux(root1, root2, leftFirst1, leftFirst2);
 }
 
 void PLLRootedTree::setSon(corax_rnode_t *parent, corax_rnode_t *newSon,

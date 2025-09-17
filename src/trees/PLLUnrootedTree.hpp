@@ -89,6 +89,9 @@ public:
   PLLUnrootedTree(PLLUnrootedTree &&) = delete;
   PLLUnrootedTree &operator=(PLLUnrootedTree &&) = delete;
 
+  /**
+   *  Tree comparison
+   */
   bool operator==(const PLLUnrootedTree &other) const {
     return areIsomorphic(*this, other);
   }
@@ -230,9 +233,6 @@ public:
    */
   static std::unordered_set<unsigned int> getClade(corax_unode_t *node);
 
-  static bool areIsomorphic(const PLLUnrootedTree &t1,
-                            const PLLUnrootedTree &t2);
-
   bool isBinary() const;
 
   void ensureUniqueLabels();
@@ -246,7 +246,7 @@ public:
    *  Return the leaf node that has the label label,
    *  or null pointer if such leaf does not exist
    */
-  corax_unode_t *findLeaf(const std::string &labe);
+  corax_unode_t *findLeaf(const std::string &label);
 
   static corax_unode_t *getLeft(corax_unode_t *node) {
     return node->next->back;
@@ -257,4 +257,7 @@ public:
 
 private:
   std::unique_ptr<corax_utree_t, void (*)(corax_utree_t *)> _tree;
+
+  static bool areIsomorphic(const PLLUnrootedTree &t1,
+                            const PLLUnrootedTree &t2);
 };
