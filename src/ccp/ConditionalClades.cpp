@@ -20,7 +20,7 @@ struct TreeWraper {
     tree = std::make_shared<PLLUnrootedTree>(newickStr, false);
     if (rooted) {
       rtree = std::make_shared<PLLRootedTree>(newickStr, false);
-      root = tree->getVirtualRoot(*rtree);
+      root = tree->getRoot(*rtree, true);
       hash = tree->getRootedTreeHash(root);
     } else {
       hash = tree->getUnrootedTreeHash();
@@ -161,12 +161,12 @@ extractClades(const WeightedTrees &weightedTrees,
   orderedClades.insert(fullClade);
   // iterate over all trees of the tree distribution
   for (auto pair : weightedTrees) {
-    auto virtualRoot = pair.first.root;
+    auto root = pair.first.root;
     auto &tree = *(pair.first.tree);
     std::vector<CCPClade> nodeIndexToClade(tree.getDirectedNodeNumber(),
                                            emptyClade);
-    if (virtualRoot) {
-      postOrderNodes.emplace_back(tree.getPostOrderNodesRooted(virtualRoot));
+    if (root) {
+      postOrderNodes.emplace_back(tree.getPostOrderNodesRooted(root));
     } else {
       postOrderNodes.emplace_back(tree.getPostOrderNodes());
     }

@@ -100,8 +100,9 @@ ReconciliationEvaluation::buildRecModelObject(RecModel recModel,
   }
   corax_unode_t *forcedGeneRoot = nullptr;
   if (_forcedRootedGeneTree.size() > 0) {
-    auto rooted = PLLRootedTree::buildFromStrOrFile(_forcedRootedGeneTree);
-    forcedGeneRoot = _initialGeneTree.getVirtualRoot(*rooted);
+    auto rootedGeneTree =
+        PLLRootedTree::buildFromStrOrFile(_forcedRootedGeneTree);
+    forcedGeneRoot = _initialGeneTree.getRoot(*rootedGeneTree);
   }
   res->setInitialGeneTree(_initialGeneTree, forcedGeneRoot);
   return res;

@@ -328,17 +328,17 @@ std::vector<corax_unode_t *> PLLUnrootedTree::getBranchesDeterministic() const {
 
 static void fillPostOrder(corax_unode_t *node,
                           std::vector<corax_unode_t *> &nodes,
-                          std::vector<char> &markedNodes) {
+                          std::vector<bool> &visitedNodes) {
   // we already traversed this node
-  if (markedNodes[node->node_index]) {
+  if (visitedNodes.at(node->node_index)) {
     return;
   }
   // mark the node as traversed
-  markedNodes[node->node_index] = true;
+  visitedNodes[node->node_index] = true;
   // first process children
   if (node->next) {
-    fillPostOrder(node->next->back, nodes, markedNodes);
-    fillPostOrder(node->next->next->back, nodes, markedNodes);
+    fillPostOrder(node->next->back, nodes, visitedNodes);
+    fillPostOrder(node->next->next->back, nodes, visitedNodes);
   }
   nodes.push_back(node);
 }
@@ -346,32 +346,33 @@ static void fillPostOrder(corax_unode_t *node,
 std::vector<corax_unode_t *>
 PLLUnrootedTree::getPostOrderNodesFrom(corax_unode_t *node) const {
   std::vector<corax_unode_t *> nodes;
-  std::vector<char> markedNodes(getDirectedNodeNumber(), false);
-  fillPostOrder(node, nodes, markedNodes);
+  std::vector<bool> visitedNodes(getDirectedNodeNumber(), false);
+  fillPostOrder(node, nodes, visitedNodes);
   return nodes;
 }
 
 std::vector<corax_unode_t *>
-PLLUnrootedTree::getPostOrderNodesRooted(corax_unode_t *virtualRoot) const {
+PLLUnrootedTree::getPostOrderNodesRooted(corax_unode_t *root) const {
   std::vector<corax_unode_t *> nodes;
-  std::vector<char> markedNodes(getDirectedNodeNumber(), false);
-  fillPostOrder(virtualRoot, nodes, markedNodes);
-  fillPostOrder(virtualRoot->back, nodes, markedNodes);
+  std::vector<bool> visitedNodes(getDirectedNodeNumber(), false);
+  // consider only the direction implied by the root
+  fillPostOrder(root, nodes, visitedNodes);
+  fillPostOrder(root->back, nodes, visitedNodes);
   return nodes;
 }
 
 std::vector<corax_unode_t *>
 PLLUnrootedTree::getPostOrderNodes(bool innerOnly) const {
   std::vector<corax_unode_t *> nodes;
-  std::vector<char> markedNodes(getDirectedNodeNumber(), false);
+  std::vector<bool> visitedNodes(getDirectedNodeNumber(), false);
   if (innerOnly) {
     for (auto node : getLeaves()) {
-      markedNodes[node->node_index] = true;
+      visitedNodes[node->node_index] = true;
     }
   }
-  // do the post order traversal from all possible virtual roots
+  // consider all possible directions
   for (auto node : getLeaves()) {
-    fillPostOrder(node->back, nodes, markedNodes);
+    fillPostOrder(node->back, nodes, visitedNodes);
   }
   if (innerOnly) {
     assert(nodes.size() == getDirectedNodeNumber() - getLeafNumber());
@@ -383,11 +384,11 @@ PLLUnrootedTree::getPostOrderNodes(bool innerOnly) const {
 
 std::vector<corax_unode_t *> PLLUnrootedTree::getReverseDepthNodes() const {
   std::deque<corax_unode_t *> q;
-  std::vector<bool> marked(getDirectedNodeNumber(), false);
+  std::vector<bool> visitedNodes(getDirectedNodeNumber(), false);
   std::vector<corax_unode_t *> nodes;
   for (auto leaf : getLeaves()) {
-    marked[leaf->node_index] = true;
     q.push_back(leaf);
+    visitedNodes[leaf->node_index] = true;
   }
   while (!q.empty()) {
     auto node = q.front();
@@ -398,15 +399,14 @@ std::vector<corax_unode_t *> PLLUnrootedTree::getReverseDepthNodes() const {
       continue;
     }
     auto left = back->next;
-    ;
     auto right = back->next->next;
-    if (!marked[left->node_index]) {
+    if (!visitedNodes[left->node_index]) {
       q.push_back(left);
-      marked[left->node_index] = true;
+      visitedNodes[left->node_index] = true;
     }
-    if (!marked[right->node_index]) {
+    if (!visitedNodes[right->node_index]) {
       q.push_back(right);
-      marked[right->node_index] = true;
+      visitedNodes[right->node_index] = true;
     }
   }
   assert(nodes.size() == getDirectedNodeNumber());
@@ -627,9 +627,8 @@ std::string PLLUnrootedTree::getRootedNewickString(corax_unode_t *root,
   std::stringstream ss;
   auto rootLength = root->length;
   auto rootBackLength = root->back->length;
-  assert(rootLength == rootBackLength);
-  // temporarily divide the virtual root BL by two, to place
-  // the root at the middle of this branch in the rooted newick
+  // temporarily divide the root BL by two to place the root
+  // at the middle of this branch in the rooted newick
   root->length /= 2.0;
   root->back->length /= 2.0;
   ss << "(";
@@ -653,45 +652,56 @@ std::unordered_set<std::string> PLLUnrootedTree::getLabels() const {
 }
 
 static corax_unode_t *
-searchForSet(corax_unode_t *node,
-             std::unordered_set<std::string> &currentNodeSet,
-             const std::unordered_set<std::string> &set) {
+searchRoot(corax_unode_t *node, unsigned int &visited,
+           const std::unordered_set<std::string> &targetLeaves) {
   if (!node->next) {
-    if (node->label) {
-      currentNodeSet.insert(std::string(node->label));
+    if (targetLeaves.find(std::string(node->label)) != targetLeaves.end()) {
+      visited++;
     }
   } else {
-    auto left = node->next->back;
-    auto right = node->next->next->back;
-    std::unordered_set<std::string> rightNodeSet;
-    auto res1 = searchForSet(left, currentNodeSet, set);
-    if (res1) {
-      return res1;
-    }
-    auto res2 = searchForSet(right, rightNodeSet, set);
-    if (res2) {
-      return res2;
-    }
-    for (auto &elem : rightNodeSet) {
-      currentNodeSet.insert(elem);
+    auto temp = node->next;
+    while (temp != node) { // iterate over all node's children
+      unsigned int visitedByChild = 0;
+      auto root = searchRoot(temp->back, visitedByChild, targetLeaves);
+      visited += visitedByChild;
+      if (root) {
+        return root;
+      }
+      temp = temp->next;
     }
   }
-  return (currentNodeSet == set) ? node : nullptr;
+  return (visited == targetLeaves.size()) ? node : nullptr;
 }
 
-corax_unode_t *PLLUnrootedTree::getVirtualRoot(PLLRootedTree &referenceTree) {
-  std::unordered_set<std::string> leftRLeaves;
-  PLLRootedTree::getLeafLabelsUnder(referenceTree.getRoot()->left, leftRLeaves);
+corax_unode_t *PLLUnrootedTree::getRoot(PLLRootedTree &referenceTree,
+                                        bool useRootBLs) {
+  auto refRoot = referenceTree.getRoot();
+  // get all left leaves
+  std::unordered_set<std::string> leftLeaves;
+  PLLRootedTree::getLeafLabelsUnder(refRoot->left, leftLeaves);
   // find a leaf that is not in leftLeaves
-  corax_unode_t *virtualRoot = nullptr;
+  corax_unode_t *rightLeaf = nullptr;
   for (auto leaf : getLeaves()) {
-    if (leftRLeaves.find(std::string(leaf->label)) == leftRLeaves.end()) {
-      virtualRoot = leaf->back;
+    if (leftLeaves.find(std::string(leaf->label)) == leftLeaves.end()) {
+      rightLeaf = leaf;
       break;
     }
   }
-  std::unordered_set<std::string> temp;
-  return searchForSet(virtualRoot, temp, leftRLeaves);
+  // starting from the parent of rightLeaf, search for the
+  // minimal clade whose descendant leaves cover leftLeaves
+  unsigned int visited = 0;
+  auto root = searchRoot(rightLeaf->back, visited, leftLeaves);
+  assert(root);
+  if (useRootBLs) {
+    // Warning:
+    // Setting two different BLs for a single branch will
+    // likely cause an error on trying to change the tree
+    // topology, branch lengths or rooting
+    // Use for static trees only!
+    root->length = refRoot->left->length * 2.0; // we then divide back by 2.0
+    root->back->length = refRoot->right->length * 2.0;
+  }
+  return root;
 }
 
 static size_t leafHash(corax_unode_t *leaf) {
