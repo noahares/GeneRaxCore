@@ -290,53 +290,40 @@ static bool isFloat(const std::string &str) {
   return iss.eof() && !iss.fail();
 }
 
-static void getUniqueLabel(const std::unordered_set<std::string> &labels,
-                           std::string &prefix) {
-  while (prefix.back() == '_') {
-    prefix.pop_back();
-  }
-  if (!prefix.size()) {
-    prefix = "node";
-  }
-  size_t index = 0;
-  auto newLabel = prefix + "_" + std::to_string(index);
-  while (labels.end() != labels.find(newLabel)) {
-    index++;
-    newLabel = prefix + "_" + std::to_string(index);
-  }
-  prefix = newLabel;
-}
-
 void PLLRootedTree::ensureUniqueLabels(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
-  // start with the leaf labels
+  // add the leaf labels and the empty label to seenLabels
   auto seenLabels = getLabels(true);
   seenLabels.insert("");
-  // the most left leaf label for each node
+  // the leftmost leaf label for each node
   std::vector<std::string> anyLeafLabel(getNodeNumber());
-  // traverse the tree and rename nodes if needed
+  // traverse the tree and rename inner nodes if needed
   for (auto node : getPostOrderNodes()) {
     if (!node->left) {
-      anyLeafLabel[node->node_index] = node->label;
+      anyLeafLabel[node->node_index] = std::string(node->label);
       continue;
     }
     anyLeafLabel[node->node_index] = anyLeafLabel[node->left->node_index];
-    // check the node label
-    std::string label(node->label ? node->label : "");
+    // check the node and the node label
     bool isInvalid = nodesToInvalidate && (nodesToInvalidate->end() !=
                                            nodesToInvalidate->find(node));
-    bool isDuplicated = seenLabels.end() != seenLabels.find(label);
+    auto label = (node->label) ? std::string(node->label) : "";
+    bool isEmptyOrDuplicate = (seenLabels.end() != seenLabels.find(label));
     bool isNumeric = isFloat(label);
-    if (isInvalid || isDuplicated || isNumeric) {
+    if (isInvalid || isEmptyOrDuplicate || isNumeric) {
       // we need to assign a new label
-      std::string label = "Node_";
-      label += anyLeafLabel[node->left->node_index];
-      label += "_";
-      label += anyLeafLabel[node->right->node_index];
-      getUniqueLabel(seenLabels, label);
+      unsigned int index = 0; // against collisions with a similar user label
+      std::string prefix = "Node_";
+      prefix += anyLeafLabel[node->left->node_index];
+      prefix += "_";
+      prefix += anyLeafLabel[node->right->node_index];
+      do {
+        label = prefix + "_" + std::to_string(index);
+        index++;
+      } while (seenLabels.end() != seenLabels.find(label));
       setNodeLabel(node, label);
     }
-    // proceed by adding the current node label
+    // add the current node label to seenLabels
     seenLabels.insert(label);
   }
 }
