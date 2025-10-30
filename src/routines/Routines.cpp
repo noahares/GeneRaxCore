@@ -112,7 +112,7 @@ void Routines::exportPerSpeciesRates(const std::string &speciesTreeFile,
   Logger::info << "Exporting per-species rates into " << outputFile << std::endl;
   ParallelOfstream os(outputFile);
   PLLRootedTree speciesTree(speciesTreeFile);
-  auto freeParameters = recModelInfo.modelFreeParameters();
+  auto freeParameters = recModelInfo.modelParameters();
   auto speciesNodesNumber = speciesTree.getNodeNumber();
   assert(speciesNodesNumber * freeParameters == rates.dimensions());
   for (auto node: speciesTree.getNodes()) {

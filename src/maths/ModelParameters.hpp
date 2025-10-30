@@ -30,8 +30,8 @@ public:
 
   Parameters getRates(unsigned int familyIndex) const {
     if (info.perFamilyRates) {
-      return rates.getSubParameters(familyIndex * info.modelFreeParameters(),
-          info.modelFreeParameters());
+      return rates.getSubParameters(familyIndex * info.modelParameters(),
+          info.modelParameters());
     } else {
       return rates;
     }
@@ -40,7 +40,7 @@ public:
   void setRates(unsigned int familyIndex, const Parameters &newRates)
   {
     for (unsigned int i = 0; i < info.modelFreeParameters(); ++i) {
-      rates[info.modelFreeParameters() * familyIndex + i] = newRates[i];
+      rates[info.modelParameters() * familyIndex + i] = newRates[i];
     }
   }
 

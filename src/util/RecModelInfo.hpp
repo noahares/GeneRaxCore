@@ -17,7 +17,7 @@ struct RecModelInfo {
   // at which ancestral species do we consider that originations
   // are possible, and with which probability
   OriginationStrategy originationStrategy;
-  
+
   // if set to true,  for each family, we prune from the species
   // tree the taxa that are not covered in this family
   bool pruneSpeciesTree;
@@ -27,9 +27,9 @@ struct RecModelInfo {
   // if the reconciliaiton model accounts for polytomies, branches
   // with a lenghts <= branchLengthThreshold are be contracted
   double branchLengthThreshold;
- 
+
   TransferConstaint transferConstraint;
-  
+
   // disable duplications
   bool noDup;
 
@@ -37,7 +37,7 @@ struct RecModelInfo {
   bool noTL;
 
   std::string fractionMissingFile;
- 
+
   // use less memory (but likelihood evaluation might be slower)
   // some models do not implement this function
   bool memorySavings;
@@ -97,8 +97,8 @@ struct RecModelInfo {
 
   void readFromArgv(char** argv, int &i)
   {
-    model = RecModel(atoi(argv[i++]));  
-    recOpt = RecOpt(atoi(argv[i++]));  
+    model = RecModel(atoi(argv[i++]));
+    recOpt = RecOpt(atoi(argv[i++]));
     perFamilyRates = bool(atoi(argv[i++]));
     gammaCategories = atoi(argv[i++]);
     originationStrategy = Enums::strToOrigination(argv[i++]);
@@ -143,7 +143,7 @@ struct RecModelInfo {
     return argv;
   }
 
-  static int getArgc() 
+  static int getArgc()
   {
     return 15;
   }
@@ -154,18 +154,19 @@ struct RecModelInfo {
       assert(str.size() == 1);
       res.push_back(str[0]);
     }
-    if (originationStrategy == OriginationStrategy::OPTIMIZE) {
-      res.push_back('O');
-    }
+    res.push_back('O');
     return res;
   }
 
+  unsigned int modelParameters() const {
+    return Enums::freeParameters(model) + 1;
+  }
   unsigned int modelFreeParameters() const {
     return Enums::freeParameters(model) + (originationStrategy == OriginationStrategy::OPTIMIZE ? 1 : 0);
   }
- 
+
   /*
-   *  Return global parameters with the appropriate 
+   *  Return global parameters with the appropriate
    *  number of values (all set to 0.1)
    */
   Parameters getDefaultGlobalParameters() const {
