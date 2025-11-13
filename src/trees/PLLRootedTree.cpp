@@ -292,6 +292,17 @@ static bool isFloat(const std::string &str) {
 
 void PLLRootedTree::ensureUniqueLabels(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+  // the nodes affected by changes in the tree topology
+  std::unordered_set<corax_rnode_t *> invalidatedNodes;
+  if (nodesToInvalidate) {
+    assert(nodesToInvalidate->size());
+    for (auto node : *nodesToInvalidate) {
+      while (node) {
+        invalidatedNodes.insert(node);
+        node = node->parent;
+      }
+    }
+  }
   // add the leaf labels and the empty label to seenLabels
   auto seenLabels = getLabels(true);
   seenLabels.insert("");
@@ -305,12 +316,11 @@ void PLLRootedTree::ensureUniqueLabels(
     }
     anyLeafLabel[node->node_index] = anyLeafLabel[node->left->node_index];
     // check the node and the node label
-    bool isInvalid = nodesToInvalidate && (nodesToInvalidate->end() !=
-                                           nodesToInvalidate->find(node));
     auto label = (node->label) ? std::string(node->label) : "";
-    bool isEmptyOrDuplicate = (seenLabels.end() != seenLabels.find(label));
-    bool isNumeric = isFloat(label);
-    if (isInvalid || isEmptyOrDuplicate || isNumeric) {
+    bool isInvalid = (invalidatedNodes.end() != invalidatedNodes.find(node));
+    isInvalid |= (seenLabels.end() != seenLabels.find(label));
+    isInvalid |= isFloat(label);
+    if (isInvalid) {
       // we need to assign a new label
       unsigned int index = 0; // against collisions with a similar user label
       std::string prefix = "Node_";
