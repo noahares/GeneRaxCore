@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseReconciliationModel.hpp"
+#include <trees/PLLUnrootedTree.hpp>
 
 class GTBaseReconciliationInterface : public BaseReconciliationModel {
 public:
@@ -502,7 +503,7 @@ double GTBaseReconciliationModel<REAL>::getSumLikelihood() {
   }
   bool applyLog = !isParsimony();
   if (applyLog) {
-    return log(total) - log(this->getLikelihoodFactor());
+    return getLog(total) - getLog(this->getLikelihoodFactor());
   } else {
     return double(total);
   }

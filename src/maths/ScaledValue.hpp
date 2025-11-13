@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <climits>
+#include <cmath>
 #include <iostream>
 #include <limits>
 
@@ -12,6 +13,18 @@
 const int NULL_SCALER = INT_MAX / 2 - 1;
 
 /**
+ *  scale function for a general type
+ *  (do nothing)
+ */
+template <class REAL> void scale(REAL &) {}
+
+/**
+ *  getLog function for a general type
+ *  (apply std::log)
+ */
+template <class REAL> double getLog(const REAL &v) { return std::log(v); }
+
+/**
  *  Class representing a double value with a high precision.
  *  It stores a double and a scaling integer to represent very
  *  small double values
@@ -19,14 +32,6 @@ const int NULL_SCALER = INT_MAX / 2 - 1;
  *  When the value is null, the scaler is set to NULL_SCALER
  */
 class ScaledValue {
-private:
-  /**
-   *  General constructor
-   *  @param v value
-   *  @param s scaler
-   */
-  ScaledValue(double v, int s) : value(v), scaler(s) {}
-
 public:
   /**
    *  Null value constructor
@@ -52,16 +57,6 @@ public:
     } else { // the value is almost zero
       return 0.0;
     }
-  }
-
-  /**
-   *  Conversion to a log-double
-   */
-  double getLogValue() const {
-    if (scaler == NULL_SCALER) {
-      return -std::numeric_limits<double>::infinity();
-    }
-    return log(value) + scaler * log(JS_SCALE_THRESHOLD);
   }
 
   /**
@@ -206,12 +201,23 @@ public:
   inline bool operator>=(const ScaledValue &v) const { return !(*this < v); }
 
   /**
-   *  std::ofstream operator
+   *  std::ostream << operator
    */
   friend std::ostream &operator<<(std::ostream &os, const ScaledValue &v) {
     os << v.value << "s" << v.scaler;
     return os;
   }
+
+  friend void scale<ScaledValue>(ScaledValue &v);
+  friend double getLog<ScaledValue>(const ScaledValue &v);
+
+private:
+  /**
+   *  General constructor
+   *  @param v value
+   *  @param s scaler
+   */
+  ScaledValue(double v, int s) : value(v), scaler(s) {}
 
   void checkNull() {
     if (value == 0.0) {
@@ -232,12 +238,6 @@ public:
 };
 
 /**
- *  scale function for a general type
- *  (do nothing)
- */
-template <class REAL> void scale(REAL &) {}
-
-/**
  *  scale function for the ScaledValue type
  *  Should be applied every time when converting from a double
  *  or after a series of multiplication and/or division operations
@@ -245,6 +245,11 @@ template <class REAL> void scale(REAL &) {}
 template <> inline void scale<ScaledValue>(ScaledValue &v) { v.scale(); }
 
 /**
- *  log function for the ScaledValue type
+ *  getLog function for the ScaledValue type
  */
-inline double log(const ScaledValue &v) { return v.getLogValue(); }
+template <> inline double getLog<ScaledValue>(const ScaledValue &v) {
+  if (v.scaler == NULL_SCALER) {
+    return -std::numeric_limits<double>::infinity();
+  }
+  return std::log(v.value) + v.scaler * std::log(JS_SCALE_THRESHOLD);
+}
