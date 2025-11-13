@@ -1,13 +1,11 @@
 #include "BaseReconciliationModel.hpp"
 
-#include <functional>
-
 BaseReconciliationModel::BaseReconciliationModel(
     PLLRootedTree &speciesTree, const GeneSpeciesMapping &geneSpeciesMapping,
     const RecModelInfo &recModelInfo)
     : _info(recModelInfo), _speciesTree(speciesTree),
       _geneNameToSpeciesName(geneSpeciesMapping.getMap()),
-      _allSpeciesNodesInvalid(true) {
+      _numberOfCoveredSpecies(0), _allSpeciesNodesInvalid(true) {
   initSpeciesTree();
   setFractionMissingGenes(_info.fractionMissingFile);
 }
@@ -34,29 +32,34 @@ void BaseReconciliationModel::onSpeciesTreeChange(
     _speciesParent[e] = speciesNode->parent;
   }
   _prunedRoot = _speciesTree.getRoot();
-  if (prunedMode() && _speciesCoverage.size()) {
-    std::vector<corax_rnode_t *> pruned(getAllSpeciesNodeNumber(), nullptr);
+  if (_speciesCoverage.size()) {
+    std::fill(_speciesToPrunedNode.begin(), _speciesToPrunedNode.end(),
+              nullptr);
     for (auto speciesNode : getAllSpeciesNodes()) {
       auto e = speciesNode->node_index;
-      if (!speciesNode->left) {
-        pruned[e] = (_speciesCoverage[e] > 0) ? speciesNode : nullptr;
-      } else {
+      if (!speciesNode->left) { // leaf node
+        if (_speciesCoverage[e] > 0) {
+          _speciesToPrunedNode[e] = speciesNode;
+        }
+      } else { // internal node
         auto left = _speciesLeft[e];
         auto right = _speciesRight[e];
-        auto prunedLeft = pruned[left->node_index];
-        auto prunedRight = pruned[right->node_index];
-        if (prunedLeft && prunedRight) {
-          _speciesLeft[e] = prunedLeft;
-          _speciesRight[e] = prunedRight;
-          pruned[e] = speciesNode;
-          _speciesParent[prunedLeft->node_index] = speciesNode;
-          _speciesParent[prunedRight->node_index] = speciesNode;
-          _prunedRoot = speciesNode;
-        } else if (!prunedLeft && prunedRight) {
-          pruned[e] = prunedRight;
-        } else if (prunedLeft && !prunedRight) {
-          pruned[e] = prunedLeft;
-        }
+        auto prunedLeft = _speciesToPrunedNode[left->node_index];
+        auto prunedRight = _speciesToPrunedNode[right->node_index];
+        if (prunedLeft && prunedRight) { // the node belongs to pruned nodes
+          _speciesToPrunedNode[e] = speciesNode;
+          if (prunedMode()) {
+            _speciesLeft[e] = prunedLeft;
+            _speciesRight[e] = prunedRight;
+            _speciesParent[prunedLeft->node_index] = speciesNode;
+            _speciesParent[prunedRight->node_index] = speciesNode;
+            _prunedRoot = speciesNode;
+          }
+        } else if (prunedLeft) { // the node maps to its left pruned child
+          _speciesToPrunedNode[e] = prunedLeft;
+        } else if (prunedRight) { // the node maps to its right pruned child
+          _speciesToPrunedNode[e] = prunedRight;
+        } // else: the node maps to nullptr, do nothing
       }
     }
   }
@@ -72,12 +75,10 @@ void BaseReconciliationModel::initSpeciesTree() {
   fillNodesPostOrder(_speciesTree.getRoot(), _allSpeciesNodes);
   assert(getAllSpeciesNodeNumber());
   // build the species tree structure representation
-  _speciesLeft =
-      std::vector<corax_rnode_t *>(getAllSpeciesNodeNumber(), nullptr);
-  _speciesRight =
-      std::vector<corax_rnode_t *>(getAllSpeciesNodeNumber(), nullptr);
-  _speciesParent =
-      std::vector<corax_rnode_t *>(getAllSpeciesNodeNumber(), nullptr);
+  _speciesToPrunedNode.resize(getAllSpeciesNodeNumber(), nullptr);
+  _speciesLeft.resize(getAllSpeciesNodeNumber(), nullptr);
+  _speciesRight.resize(getAllSpeciesNodeNumber(), nullptr);
+  _speciesParent.resize(getAllSpeciesNodeNumber(), nullptr);
   onSpeciesTreeChange(nullptr);
   // fill _speciesNameToId
   _speciesNameToId.clear();

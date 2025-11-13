@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
+#include <functional>
 #include <memory>
-#include <unordered_set>
+#include <numeric>
 
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
@@ -51,8 +53,8 @@ public:
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
 
   /**
-   *  Make CLV components to be recomputed for all species nodes upon a CLV
-   * update
+   *  Mark CLV components to be recomputed for all species nodes upon
+   *  a CLV update
    */
   virtual void invalidateAllSpeciesNodes() { _allSpeciesNodesInvalid = true; }
 
@@ -118,6 +120,13 @@ protected:
   corax_rnode_t *getPrunedRoot() { return _prunedRoot; }
 
   /**
+   *  Return the LCA of all species covered by the gene family
+   */
+  corax_rnode_t *getCoveredSpeciesLCA() {
+    return _speciesToPrunedNode[getPrunedRoot()->node_index];
+  }
+
+  /**
    *  Callback to be always called at the start of recomputing CLVs
    */
   void beforeComputeCLVs() {
@@ -137,22 +146,24 @@ private:
   /**
    *  Fill the nodes vector with all the children of the given node based
    *  on the pointers of the node.
-   *  Nodes are filled in the postorder fashion
+   *  Nodes are filled in the postorder fashion.
+   *  Used to fill _allSpeciesNodes
    */
   void fillNodesPostOrder(corax_rnode_t *node,
                           std::vector<corax_rnode_t *> &nodes);
 
   /**
    *  Fill the nodes vector with all the children of the given node based
-   *  on the model's species tree representation. Use to fill
-   * _prunedSpeciesNodes. Nodes are filled in the postorder fashion
+   *  on the model's species tree representation.
+   *  Nodes are filled in the postorder fashion.
+   *  Used to fill _prunedSpeciesNodes
    */
   void fillPrunedNodesPostOrder(corax_rnode_t *node,
                                 std::vector<corax_rnode_t *> &nodes);
 
   /**
-   *  Set the path to a file containing information about the
-   *  proportions of missing genes for each extant species
+   *  Set the probability of a gene to be missing, instead of extinct when
+   *  it is not observed in the dataset, for each extant species
    */
   void setFractionMissingGenes(const std::string &fractionMissingFile);
 
@@ -160,7 +171,7 @@ private:
    *  Recompute probability values depending on the species tree only
    *  (not on the gene tree), such as the exctinction probability or
    *  the per-species event probabilities.
-   *  This function should be typically called after changing the DTL
+   *  This function should typically be called after changing the DTL
    *  rates or after updating the species tree
    */
   virtual void recomputeSpeciesProbabilities() = 0;
@@ -172,7 +183,7 @@ protected:
   RecModelInfo _info;
   // reference to the species tree
   PLLRootedTree &_speciesTree;
-  // list of all species nodes in postorder used for the likelihood computation
+  // list of all species nodes in postorder used for likelihood computation
   std::vector<corax_rnode_t *> _allSpeciesNodes;
   std::vector<corax_rnode_t *> _prunedSpeciesNodes;
   // map species leaf names to species leaf indices. Species leaf indices run
@@ -180,13 +191,14 @@ protected:
   std::map<std::string, unsigned int> _speciesNameToId;
   // map gene leaf names to species leaf names
   std::map<std::string, std::string> _geneNameToSpeciesName;
-  // map gene leaf indices to species leaf indices. Not computed by this class
+  // map gene leaf indices to species leaf indices
+  // Not computed by this class
   std::map<unsigned int, unsigned int> _geneToSpecies;
-  // number of gene copies covering each species leaf. Not computed by this
-  // class
+  // number of gene copies covering each species leaf
+  // Not computed by this class
   std::vector<unsigned int> _speciesCoverage;
-  // number of species leaves covered by this gene family. Not computed by this
-  // class
+  // number of species leaves covered by this gene family
+  // Not computed by this class
   unsigned int _numberOfCoveredSpecies;
   // fraction of missing genes, indexed by species leaf indices
   std::vector<double> _fm;
@@ -194,6 +206,9 @@ protected:
   bool _allSpeciesNodesInvalid;
   // species nodes for which values of a CLV will be recomputed on its update
   std::unordered_set<corax_rnode_t *> _invalidatedSpeciesNodes;
+  // map each species node not covered by the gene family to its closest
+  // covered child if any or nullptr, covered nodes are mapped to themselves
+  std::vector<corax_rnode_t *> _speciesToPrunedNode;
   // internal representation of the current species tree. Always use these
   // pointers to be compliant with the pruned species tree mode
   std::vector<corax_rnode_t *> _speciesLeft;

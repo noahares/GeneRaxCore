@@ -502,6 +502,14 @@ corax_rnode_t *PLLRootedTree::getLCA(unsigned int nodeIndex1,
   return _lcaCache->lcas[nodeIndex1][nodeIndex2];
 }
 
+bool PLLRootedTree::isAncestorOf(unsigned int nodeIndex1,
+                                 unsigned int nodeIndex2) {
+  if (!_lcaCache) {
+    buildLCACache();
+  }
+  return _lcaCache->ancestors[nodeIndex2][nodeIndex1];
+}
+
 bool PLLRootedTree::areParents(corax_rnode_t *n1, corax_rnode_t *n2) {
   if (!_lcaCache) {
     buildLCACache();

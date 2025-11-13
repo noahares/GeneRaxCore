@@ -175,6 +175,12 @@ public:
   corax_rnode_t *getLCA(unsigned int nodeIndex1, unsigned int nodeIndex2);
 
   /**
+   * Return true if n1 is an ancestor of n2
+   * First call is O(n^2), and all next calls O(1)
+   */
+  bool isAncestorOf(unsigned int nodeIndex1, unsigned int nodeIndex2);
+
+  /**
    * Return true if either one of n1 or n2 is parent of another
    * First call is O(n^2), and all next calls O(1)
    */
