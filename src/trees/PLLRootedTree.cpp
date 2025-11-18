@@ -103,47 +103,46 @@ static unsigned int utree_count_nodes_recursive(corax_unode_t *node,
  *  first when traversing the tree top down with an order based
  *  on the tip labels (used in areIsomorphicAux)
  */
-static const char *orderChildren(corax_rnode_t *node,
+static std::string orderChildren(corax_rnode_t *node,
                                  std::vector<bool> &leftFirst) {
   if (!node->left) {
-    return node->label;
+    return std::string(node->label);
   }
-  const char *label1 = orderChildren(node->left, leftFirst);
-  const char *label2 = orderChildren(node->right, leftFirst);
-  if (strcmp(label1, label2) < 0) {
-    leftFirst[node->node_index] = true;
-    return label1;
+  auto labelLeft = orderChildren(node->left, leftFirst);
+  auto labelRight = orderChildren(node->right, leftFirst);
+  if (labelLeft < labelRight) {
+    leftFirst.at(node->node_index) = true;
+    return labelLeft;
   } else {
-    leftFirst[node->node_index] = false;
-    return label2;
+    leftFirst.at(node->node_index) = false;
+    return labelRight;
   }
 }
 
 /**
- *  returns true if the nodes node1 and node2 are isomorphic
- *  leftFirst1 and leftFirst2 must have been filled with
+ *  Return true if the nodes node1 and node2 are isomorphic
+ *  leftFirst1 and leftFirst2 must be filled in advance with
  *  the orderChildren function
  */
 static bool areIsomorphicAux(corax_rnode_t *node1, corax_rnode_t *node2,
                              const std::vector<bool> &leftFirst1,
                              const std::vector<bool> &leftFirst2) {
+  // at least one is a leaf
   if (!node1->left || !node2->left) {
-    // at least one is a leaf
     if (node1->left || node2->left) {
-      // only one is a leaf
-      return false;
+      return false; // only one is a leaf
     }
-    return strcmp(node1->label, node2->label) == 0;
+    return std::strcmp(node1->label, node2->label) == 0;
   }
   // both are internal nodes
   auto l1 = node1->left;
   auto r1 = node1->right;
-  auto l2 = node2->left;
-  auto r2 = node2->right;
-  if (!leftFirst1[node1->node_index]) {
+  if (!leftFirst1.at(node1->node_index)) {
     std::swap(l1, r1);
   }
-  if (!leftFirst2[node2->node_index]) {
+  auto l2 = node2->left;
+  auto r2 = node2->right;
+  if (!leftFirst2.at(node2->node_index)) {
     std::swap(l2, r2);
   }
   return areIsomorphicAux(l1, l2, leftFirst1, leftFirst2) &&
@@ -155,9 +154,13 @@ bool PLLRootedTree::areIsomorphic(const PLLRootedTree &t1,
   if (t1.getNodeNumber() != t2.getNodeNumber()) {
     return false;
   }
+  auto root1 = t1.getRoot();
+  auto root2 = t2.getRoot();
   std::vector<bool> leftFirst1(t1.getNodeNumber(), false);
   std::vector<bool> leftFirst2(t2.getNodeNumber(), false);
-  return areIsomorphicAux(t1.getRoot(), t2.getRoot(), leftFirst1, leftFirst2);
+  orderChildren(root1, leftFirst1);
+  orderChildren(root2, leftFirst2);
+  return areIsomorphicAux(root1, root2, leftFirst1, leftFirst2);
 }
 
 void PLLRootedTree::setSon(corax_rnode_t *parent, corax_rnode_t *newSon,
@@ -287,53 +290,50 @@ static bool isFloat(const std::string &str) {
   return iss.eof() && !iss.fail();
 }
 
-static void getUniqueLabel(const std::unordered_set<std::string> &labels,
-                           std::string &prefix) {
-  while (prefix.back() == '_') {
-    prefix.pop_back();
-  }
-  if (!prefix.size()) {
-    prefix = "node";
-  }
-  size_t index = 0;
-  auto newLabel = prefix + "_" + std::to_string(index);
-  while (labels.end() != labels.find(newLabel)) {
-    index++;
-    newLabel = prefix + "_" + std::to_string(index);
-  }
-  prefix = newLabel;
-}
-
 void PLLRootedTree::ensureUniqueLabels(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
-  // start with the leaf labels
+  // the nodes affected by changes in the tree topology
+  std::unordered_set<corax_rnode_t *> invalidatedNodes;
+  if (nodesToInvalidate) {
+    assert(nodesToInvalidate->size());
+    for (auto node : *nodesToInvalidate) {
+      while (node) {
+        invalidatedNodes.insert(node);
+        node = node->parent;
+      }
+    }
+  }
+  // add the leaf labels and the empty label to seenLabels
   auto seenLabels = getLabels(true);
   seenLabels.insert("");
-  // the most left leaf label for each node
+  // the leftmost leaf label for each node
   std::vector<std::string> anyLeafLabel(getNodeNumber());
-  // traverse the tree and rename nodes if needed
+  // traverse the tree and rename inner nodes if needed
   for (auto node : getPostOrderNodes()) {
     if (!node->left) {
-      anyLeafLabel[node->node_index] = node->label;
+      anyLeafLabel[node->node_index] = std::string(node->label);
       continue;
     }
     anyLeafLabel[node->node_index] = anyLeafLabel[node->left->node_index];
-    // check the node label
-    std::string label(node->label ? node->label : "");
-    bool isInvalid = nodesToInvalidate && (nodesToInvalidate->end() !=
-                                           nodesToInvalidate->find(node));
-    bool isDuplicated = seenLabels.end() != seenLabels.find(label);
-    bool isNumeric = isFloat(label);
-    if (isInvalid || isDuplicated || isNumeric) {
+    // check the node and the node label
+    auto label = (node->label) ? std::string(node->label) : "";
+    bool isInvalid = (invalidatedNodes.end() != invalidatedNodes.find(node));
+    isInvalid |= (seenLabels.end() != seenLabels.find(label));
+    isInvalid |= isFloat(label);
+    if (isInvalid) {
       // we need to assign a new label
-      std::string label = "Node_";
-      label += anyLeafLabel[node->left->node_index];
-      label += "_";
-      label += anyLeafLabel[node->right->node_index];
-      getUniqueLabel(seenLabels, label);
+      unsigned int index = 0; // against collisions with a similar user label
+      std::string prefix = "Node_";
+      prefix += anyLeafLabel[node->left->node_index];
+      prefix += "_";
+      prefix += anyLeafLabel[node->right->node_index];
+      do {
+        label = prefix + "_" + std::to_string(index);
+        index++;
+      } while (seenLabels.end() != seenLabels.find(label));
       setNodeLabel(node, label);
     }
-    // proceed by adding the current node label
+    // add the current node label to seenLabels
     seenLabels.insert(label);
   }
 }
@@ -500,6 +500,14 @@ corax_rnode_t *PLLRootedTree::getLCA(unsigned int nodeIndex1,
     buildLCACache();
   }
   return _lcaCache->lcas[nodeIndex1][nodeIndex2];
+}
+
+bool PLLRootedTree::isAncestorOf(unsigned int nodeIndex1,
+                                 unsigned int nodeIndex2) {
+  if (!_lcaCache) {
+    buildLCACache();
+  }
+  return _lcaCache->ancestors[nodeIndex2][nodeIndex1];
 }
 
 bool PLLRootedTree::areParents(corax_rnode_t *n1, corax_rnode_t *n2) {

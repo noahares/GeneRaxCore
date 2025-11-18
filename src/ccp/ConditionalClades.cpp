@@ -1,24 +1,26 @@
-
 #include "ConditionalClades.hpp"
-#include <IO/Logger.hpp>
+
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+
+#include <IO/Logger.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/PLLUnrootedTree.hpp>
 
 struct TreeWraper {
   std::shared_ptr<PLLUnrootedTree> tree;
+  std::shared_ptr<PLLRootedTree> rtree;
   corax_unode_t *root;
   size_t hash;
   double ll;
   TreeWraper(const std::string newickStr, bool rooted)
-      : root(nullptr), ll(0.0) {
+      : rtree(nullptr), root(nullptr), ll(0.0) {
     tree = std::make_shared<PLLUnrootedTree>(newickStr, false);
     if (rooted) {
-      PLLRootedTree rootedTree(newickStr, false);
-      root = tree->getVirtualRoot(rootedTree);
+      rtree = std::make_shared<PLLRootedTree>(newickStr, false);
+      root = tree->getRoot(*rtree, true);
       hash = tree->getRootedTreeHash(root);
     } else {
       hash = tree->getUnrootedTreeHash();
@@ -26,8 +28,7 @@ struct TreeWraper {
   }
 
   bool operator==(const TreeWraper &other) const {
-    return root == other.root &&
-           PLLUnrootedTree::areIsomorphic(*tree, *(other.tree));
+    return (root && other.root) ? *rtree == *other.rtree : *tree == *other.tree;
   }
 };
 
@@ -160,12 +161,12 @@ extractClades(const WeightedTrees &weightedTrees,
   orderedClades.insert(fullClade);
   // iterate over all trees of the tree distribution
   for (auto pair : weightedTrees) {
-    auto virtualRoot = pair.first.root;
+    auto root = pair.first.root;
     auto &tree = *(pair.first.tree);
     std::vector<CCPClade> nodeIndexToClade(tree.getDirectedNodeNumber(),
                                            emptyClade);
-    if (virtualRoot) {
-      postOrderNodes.emplace_back(tree.getPostOrderNodesRooted(virtualRoot));
+    if (root) {
+      postOrderNodes.emplace_back(tree.getPostOrderNodesRooted(root));
     } else {
       postOrderNodes.emplace_back(tree.getPostOrderNodes());
     }
@@ -193,9 +194,9 @@ extractClades(const WeightedTrees &weightedTrees,
   // clade always comes after its child clades in the CID ordering
   for (auto it = orderedClades.begin(); it != orderedClades.end(); ++it) {
     auto &clade = *it;
-    unsigned int CID = cidToClade.size();
+    unsigned int cid = cidToClade.size();
     cidToClade.push_back(clade);
-    cladeToCID[clade] = CID;
+    cladeToCID[clade] = cid;
   }
   // so far we have only added the non-trivial clades. Now we add
   // the trivial clades
@@ -525,7 +526,7 @@ void ConditionalClades::_fillCCP(
   _allCladeSplits.resize(cladesNumber);
   auto rootCID = cladesNumber - 1;
   CCPClade fullClade(_CIDToClade[0].size(), true);
-  assert(rootCID = _cladeToCID[fullClade]);
+  assert(rootCID == _cladeToCID[fullClade]);
   for (unsigned int cid = 0; cid < cladesNumber; ++cid) {
     auto &clade = _CIDToClade[cid];
     auto &cladeSplits = _allCladeSplits[cid];

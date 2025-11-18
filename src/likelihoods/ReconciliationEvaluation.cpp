@@ -1,15 +1,9 @@
-
 #include "ReconciliationEvaluation.hpp"
-#include <IO/FileSystem.hpp>
-#include <IO/Logger.hpp>
-#include <cmath>
-#include <likelihoods/reconciliation_models/BaseReconciliationModel.hpp>
+
 #include <likelihoods/reconciliation_models/ParsimonyDModel.hpp>
 #include <likelihoods/reconciliation_models/SimpleDSModel.hpp>
 #include <likelihoods/reconciliation_models/UndatedDLModel.hpp>
 #include <likelihoods/reconciliation_models/UndatedDTLModel.hpp>
-
-double log(ScaledValue v) { return v.getLogValue(); }
 
 ReconciliationEvaluation::ReconciliationEvaluation(
     PLLRootedTree &speciesTree, PLLUnrootedTree &initialGeneTree,
@@ -106,8 +100,9 @@ ReconciliationEvaluation::buildRecModelObject(RecModel recModel,
   }
   corax_unode_t *forcedGeneRoot = nullptr;
   if (_forcedRootedGeneTree.size() > 0) {
-    auto rooted = PLLRootedTree::buildFromStrOrFile(_forcedRootedGeneTree);
-    forcedGeneRoot = _initialGeneTree.getVirtualRoot(*rooted);
+    auto rootedGeneTree =
+        PLLRootedTree::buildFromStrOrFile(_forcedRootedGeneTree);
+    forcedGeneRoot = _initialGeneTree.getRoot(*rootedGeneTree);
   }
   res->setInitialGeneTree(_initialGeneTree, forcedGeneRoot);
   return res;

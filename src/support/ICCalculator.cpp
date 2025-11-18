@@ -18,7 +18,7 @@ ICCalculator::ICCalculator(const std::string &referenceTreePath,
                            bool paralogy)
     : _rootedReferenceTree(referenceTreePath),
       _referenceTree(_rootedReferenceTree),
-      _referenceRoot(_referenceTree.getVirtualRoot(_rootedReferenceTree)),
+      _referenceRoot(_referenceTree.getRoot(_rootedReferenceTree)),
       _perCoreGeneTrees(families), _taxaNumber(0), _paralogy(paralogy),
       _eqpicRadius(eqpicRadius) {}
 

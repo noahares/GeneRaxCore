@@ -1,7 +1,8 @@
 #pragma once
 
-#include <trees/PLLRootedTree.hpp>
 #include <vector>
+
+#include "PLLRootedTree.hpp"
 
 class DatedTree {
 public:
@@ -39,14 +40,12 @@ public:
   }
   void restore(const Backup &backup);
 
-  bool canTransferUnderRelDated(unsigned int nodeIndexFrom,
-                                unsigned int nodeIndexTo) const;
+  bool canTransferUnderRelDated(unsigned int e, unsigned int d) const;
 
   void randomize();
 
   /**
-   *  hash value that characterizes the current order of the speciation events
-   *
+   *  Hash value that characterizes the current order of the speciation events
    */
   size_t getOrderingHash(size_t startingHash = 42) const;
 
@@ -54,7 +53,6 @@ private:
   void updateRanksFromSpeciationOrders();
 
   PLLRootedTree &_rootedTree;
-
   // internal nodes, from the root to the most recent speciation
   std::vector<corax_rnode_s *> _orderedSpeciations;
   // parents have always a lower rank than their children

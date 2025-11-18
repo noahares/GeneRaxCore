@@ -89,6 +89,9 @@ public:
   PLLUnrootedTree(PLLUnrootedTree &&) = delete;
   PLLUnrootedTree &operator=(PLLUnrootedTree &&) = delete;
 
+  /**
+   *  Tree comparison
+   */
   bool operator==(const PLLUnrootedTree &other) const {
     return areIsomorphic(*this, other);
   }
@@ -163,21 +166,21 @@ public:
   CArrayRange<corax_unode_t *> getNodes() const;
 
   /**
-   *  Create a vector of all nodes (including all three pll
-   *  internal elements per internal node), such that a node
-   *  always comes after its (virtual) children.
-   *  - getPostOrderNodes returns all direct nodes (and skip the leaves
-   *  if innerOnly is set)
-   *  - getPostOrderNodesFrom returns all the nodes under node (including node
-   * itself)
-   *  - getPostOrderNodesRooted virtually roots the tree at virtualRoot
-   *  and returns all nodes that are directed from virtualRoot to the tips
-   *  virtualRoot and virtualRoot->back are also included
+   *  Create a vector of directed nodes (one of the three pll internal
+   *  elements per internal node), such that a node always comes after
+   *  its (virtual) children:
+   *  - getPostOrderNodes returns all directed nodes (and skip the
+   *  the leaves if innerOnly is set)
+   *  - getPostOrderNodesFrom returns all the nodes that are directed
+   *  from node to the tips (including node itself)
+   *  - getPostOrderNodesRooted returns all the nodes that are directed
+   *  from root to the tips and from root->back to the tips (root and
+   *  root->back are also included)
    */
   std::vector<corax_unode_t *> getPostOrderNodes(bool innerOnly = false) const;
   std::vector<corax_unode_t *> getPostOrderNodesFrom(corax_unode_t *node) const;
   std::vector<corax_unode_t *>
-  getPostOrderNodesRooted(corax_unode_t *virtualRoot) const;
+  getPostOrderNodesRooted(corax_unode_t *root) const;
   std::vector<corax_unode_t *> getReverseDepthNodes() const;
 
   /**
@@ -215,12 +218,12 @@ public:
   static void orientTowardEachOther(corax_unode_t **pu, corax_unode_t **pv,
                                     std::vector<corax_unode_t *> &branchesPath);
 
-  /*
-   *  Return the virtual root in the unrooted tree corresponding to
-   *  the root in the input rooted tree. Both trees should have the
-   *  same (unrooted) topology and leaf set.
+  /**
+   *  Return the node in the unrooted tree corresponding to the root
+   *  in the input rooted tree. Both trees should have the same
+   *  (unrooted) topology and leaf set
    */
-  corax_unode_t *getVirtualRoot(PLLRootedTree &referenceTree);
+  corax_unode_t *getRoot(PLLRootedTree &referenceTree, bool useRootBLs = false);
 
   // TODO: DOCUMENT
   std::vector<double> getMADRelativeDeviations();
@@ -229,9 +232,6 @@ public:
    *  Return the set of leaves under the input directed node
    */
   static std::unordered_set<unsigned int> getClade(corax_unode_t *node);
-
-  static bool areIsomorphic(const PLLUnrootedTree &t1,
-                            const PLLUnrootedTree &t2);
 
   bool isBinary() const;
 
@@ -246,7 +246,7 @@ public:
    *  Return the leaf node that has the label label,
    *  or null pointer if such leaf does not exist
    */
-  corax_unode_t *findLeaf(const std::string &labe);
+  corax_unode_t *findLeaf(const std::string &label);
 
   static corax_unode_t *getLeft(corax_unode_t *node) {
     return node->next->back;
@@ -257,4 +257,7 @@ public:
 
 private:
   std::unique_ptr<corax_utree_t, void (*)(corax_utree_t *)> _tree;
+
+  static bool areIsomorphic(const PLLUnrootedTree &t1,
+                            const PLLUnrootedTree &t2);
 };

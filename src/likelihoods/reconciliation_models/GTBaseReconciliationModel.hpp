@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseReconciliationModel.hpp"
+#include <trees/PLLUnrootedTree.hpp>
 
 class GTBaseReconciliationInterface : public BaseReconciliationModel {
 public:
@@ -17,6 +18,8 @@ public:
   virtual bool isParsimony() const = 0;
   virtual void setRoot(corax_unode_t *root) = 0;
   virtual corax_unode_t *getRoot() = 0;
+  virtual void setPartialLikelihoodMode(PartialLikelihoodMode mode) = 0;
+  virtual void invalidateAllSpeciesCLVs() = 0;
   virtual void invalidateAllCLVs() = 0;
   virtual void invalidateCLV(unsigned int geneNodeIndex) = 0;
   virtual void enableMADRooting(bool enable) = 0;
@@ -42,6 +45,13 @@ public:
   virtual bool isParsimony() const { return false; }
   virtual void setRoot(corax_unode_t *root) { _geneRoot = root; }
   virtual corax_unode_t *getRoot() { return _geneRoot; }
+  /**
+   *  Set the mode used to compute the incremental likelihood function
+   */
+  virtual void setPartialLikelihoodMode(PartialLikelihoodMode mode) {
+    _likelihoodMode = mode;
+  }
+  virtual void invalidateAllSpeciesCLVs() { this->invalidateAllSpeciesNodes(); }
   virtual void invalidateAllCLVs();
   virtual void invalidateCLV(unsigned int geneNodeIndex);
 
@@ -107,6 +117,9 @@ protected:
   // the root(s) need to be recomputed
   std::unordered_set<unsigned int> _invalidatedNodes;
   std::vector<bool> _isCLVUpdated;
+  // defines at which level (species/genes/none) we do incremental
+  // recomputations
+  PartialLikelihoodMode _likelihoodMode;
   std::vector<corax_unode_t *> _allNodes;
   PLLUnrootedTree *_pllUnrootedTree;
   bool _madRootingEnabled;
@@ -176,7 +189,7 @@ void GTBaseReconciliationModel<REAL>::initFromUtree(corax_utree_t *tree) {
 
 template <class REAL>
 void GTBaseReconciliationModel<REAL>::mapGenesToSpecies() {
-  this->_geneToSpecies.resize(_allNodes.size());
+  this->_geneToSpecies.clear();
   for (auto node : _allNodes) {
     if (!node->next) {
       std::string speciesName =
@@ -246,7 +259,7 @@ void GTBaseReconciliationModel<REAL>::getRoots(
 
 template <class REAL>
 double GTBaseReconciliationModel<REAL>::computeLogLikelihood() {
-  this->beforeComputeLogLikelihood();
+  this->beforeComputeCLVs();
   auto root = getRoot();
   updateCLVs();
   computeLikelihoods();
@@ -490,7 +503,7 @@ double GTBaseReconciliationModel<REAL>::getSumLikelihood() {
   }
   bool applyLog = !isParsimony();
   if (applyLog) {
-    return log(total) - log(this->getLikelihoodFactor());
+    return getLog(total) - getLog(this->getLikelihoodFactor());
   } else {
     return double(total);
   }

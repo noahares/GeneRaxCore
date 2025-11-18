@@ -1,65 +1,13 @@
 #include "BaseReconciliationModel.hpp"
-#include <functional>
-
-static bool fillNodesPostOrder(corax_rnode_t *node,
-                               std::vector<corax_rnode_t *> &nodes) {
-  if (node->left) {
-    assert(node->right);
-    fillNodesPostOrder(node->left, nodes);
-    fillNodesPostOrder(node->right, nodes);
-  }
-  nodes.push_back(node);
-  return true;
-}
 
 BaseReconciliationModel::BaseReconciliationModel(
     PLLRootedTree &speciesTree, const GeneSpeciesMapping &geneSpeciesMapping,
     const RecModelInfo &recModelInfo)
     : _info(recModelInfo), _speciesTree(speciesTree),
-      _likelihoodMode(PartialLikelihoodMode::PartialGenes),
       _geneNameToSpeciesName(geneSpeciesMapping.getMap()),
-      _allSpeciesNodesInvalid(true) {
+      _numberOfCoveredSpecies(0), _allSpeciesNodesInvalid(true) {
   initSpeciesTree();
   setFractionMissingGenes(_info.fractionMissingFile);
-}
-
-bool BaseReconciliationModel::fillPrunedNodesPostOrder(
-    corax_rnode_t *node, std::vector<corax_rnode_t *> &nodes,
-    std::unordered_set<corax_rnode_t *> *nodesToAdd) {
-  bool addMyself = true;
-  if (nodesToAdd) {
-    addMyself = (nodesToAdd->find(node) != nodesToAdd->end());
-  }
-  if (getSpeciesLeft(node)) {
-    assert(getSpeciesRight(node));
-    addMyself |=
-        fillPrunedNodesPostOrder(getSpeciesLeft(node), nodes, nodesToAdd);
-    addMyself |=
-        fillPrunedNodesPostOrder(getSpeciesRight(node), nodes, nodesToAdd);
-  }
-  if (addMyself) {
-    nodes.push_back(node);
-  }
-  return addMyself;
-}
-
-void BaseReconciliationModel::initSpeciesTree() {
-  _allSpeciesNodes.clear();
-  fillNodesPostOrder(_speciesTree.getRoot(), _allSpeciesNodes);
-  assert(getAllSpeciesNodeNumber());
-  _speciesLeft =
-      std::vector<corax_rnode_t *>(getAllSpeciesNodeNumber(), nullptr);
-  _speciesRight =
-      std::vector<corax_rnode_t *>(getAllSpeciesNodeNumber(), nullptr);
-  _speciesParent =
-      std::vector<corax_rnode_t *>(getAllSpeciesNodeNumber(), nullptr);
-  _speciesNameToId.clear();
-  onSpeciesTreeChange(nullptr);
-  for (auto node : getAllSpeciesNodes()) {
-    if (!node->left) {
-      _speciesNameToId[node->label] = node->node_index;
-    }
-  }
 }
 
 void BaseReconciliationModel::onSpeciesTreeChange(
@@ -68,14 +16,12 @@ void BaseReconciliationModel::onSpeciesTreeChange(
     _allSpeciesNodesInvalid = true;
   } else {
     assert(nodesToInvalidate->size());
-    for (auto node : *nodesToInvalidate) {
-      while (node) {
-        _invalidatedSpeciesNodes.insert(node);
-        node = node->parent;
+    for (auto speciesNode : *nodesToInvalidate) {
+      while (speciesNode) {
+        _invalidatedSpeciesNodes.insert(speciesNode);
+        speciesNode = speciesNode->parent;
       }
     }
-    _invalidatedSpeciesNodes.insert(nodesToInvalidate->begin(),
-                                    nodesToInvalidate->end());
   }
   _allSpeciesNodes.clear();
   fillNodesPostOrder(_speciesTree.getRoot(), _allSpeciesNodes);
@@ -86,39 +32,117 @@ void BaseReconciliationModel::onSpeciesTreeChange(
     _speciesParent[e] = speciesNode->parent;
   }
   _prunedRoot = _speciesTree.getRoot();
-  if (prunedMode() && _speciesCoverage.size()) {
-    std::vector<corax_rnode_t *> pruned(getAllSpeciesNodeNumber(), nullptr);
+  if (_speciesCoverage.size()) {
+    std::fill(_speciesToPrunedNode.begin(), _speciesToPrunedNode.end(),
+              nullptr);
     for (auto speciesNode : getAllSpeciesNodes()) {
       auto e = speciesNode->node_index;
-      if (!speciesNode->left) {
-        pruned[e] = (_speciesCoverage[e] ? speciesNode : nullptr);
-      } else {
+      if (!speciesNode->left) { // leaf node
+        if (_speciesCoverage[e] > 0) {
+          _speciesToPrunedNode[e] = speciesNode;
+        }
+      } else { // internal node
         auto left = _speciesLeft[e];
         auto right = _speciesRight[e];
-        auto prunedLeft = pruned[left->node_index];
-        auto prunedRight = pruned[right->node_index];
-        if (prunedLeft && prunedRight) {
-          _speciesLeft[e] = prunedLeft;
-          _speciesRight[e] = prunedRight;
-          pruned[e] = speciesNode;
-          _speciesParent[prunedLeft->node_index] = speciesNode;
-          _speciesParent[prunedRight->node_index] = speciesNode;
-          _prunedRoot = speciesNode;
-        } else if (!prunedLeft && prunedRight) {
-          pruned[e] = prunedRight;
-        } else if (prunedLeft && !prunedRight) {
-          pruned[e] = prunedLeft;
-        }
+        auto prunedLeft = _speciesToPrunedNode[left->node_index];
+        auto prunedRight = _speciesToPrunedNode[right->node_index];
+        if (prunedLeft && prunedRight) { // the node belongs to pruned nodes
+          _speciesToPrunedNode[e] = speciesNode;
+          if (prunedMode()) {
+            _speciesLeft[e] = prunedLeft;
+            _speciesRight[e] = prunedRight;
+            _speciesParent[prunedLeft->node_index] = speciesNode;
+            _speciesParent[prunedRight->node_index] = speciesNode;
+            _prunedRoot = speciesNode;
+          }
+        } else if (prunedLeft) { // the node maps to its left pruned child
+          _speciesToPrunedNode[e] = prunedLeft;
+        } else if (prunedRight) { // the node maps to its right pruned child
+          _speciesToPrunedNode[e] = prunedRight;
+        } // else: the node maps to nullptr, do nothing
       }
     }
-    _prunedSpeciesNodes.clear();
-    fillPrunedNodesPostOrder(getPrunedRoot(), _prunedSpeciesNodes);
-  } else {
-    _prunedSpeciesNodes.clear();
-    fillNodesPostOrder(_speciesTree.getRoot(), _prunedSpeciesNodes);
   }
+  _prunedSpeciesNodes.clear();
+  fillPrunedNodesPostOrder(getPrunedRoot(), _prunedSpeciesNodes);
   assert(getAllSpeciesNodeNumber());
   assert(getPrunedSpeciesNodeNumber());
+}
+
+void BaseReconciliationModel::initSpeciesTree() {
+  // fill the list of the species nodes
+  _allSpeciesNodes.clear();
+  fillNodesPostOrder(_speciesTree.getRoot(), _allSpeciesNodes);
+  assert(getAllSpeciesNodeNumber());
+  // build the species tree structure representation
+  _speciesToPrunedNode.resize(getAllSpeciesNodeNumber(), nullptr);
+  _speciesLeft.resize(getAllSpeciesNodeNumber(), nullptr);
+  _speciesRight.resize(getAllSpeciesNodeNumber(), nullptr);
+  _speciesParent.resize(getAllSpeciesNodeNumber(), nullptr);
+  onSpeciesTreeChange(nullptr);
+  // fill _speciesNameToId
+  _speciesNameToId.clear();
+  for (auto speciesNode : getAllSpeciesNodes()) {
+    if (!speciesNode->left) {
+      _speciesNameToId[speciesNode->label] = speciesNode->node_index;
+    }
+  }
+}
+
+void BaseReconciliationModel::fillNodesPostOrder(
+    corax_rnode_t *node, std::vector<corax_rnode_t *> &nodes) {
+  if (node->left) {
+    assert(node->right);
+    fillNodesPostOrder(node->left, nodes);
+    fillNodesPostOrder(node->right, nodes);
+  }
+  nodes.push_back(node);
+}
+
+void BaseReconciliationModel::fillPrunedNodesPostOrder(
+    corax_rnode_t *node, std::vector<corax_rnode_t *> &nodes) {
+  if (getSpeciesLeft(node)) {
+    assert(getSpeciesRight(node));
+    fillPrunedNodesPostOrder(getSpeciesLeft(node), nodes);
+    fillPrunedNodesPostOrder(getSpeciesRight(node), nodes);
+  }
+  nodes.push_back(node);
+}
+
+void BaseReconciliationModel::setFractionMissingGenes(
+    const std::string &fractionMissingFile) {
+  if (!fractionMissingFile.size()) {
+    _fm = std::vector<double>(_speciesTree.getLeafNumber(), 0.0);
+    return;
+  }
+  _fm = std::vector<double>(_speciesTree.getLeafNumber(), -1.0);
+  std::ifstream is(fractionMissingFile);
+  std::string species;
+  double fm;
+  while (is >> species >> fm) {
+    if (_speciesNameToId.find(species) == _speciesNameToId.end()) {
+      Logger::error << "Error: species " << species
+                    << " from the fraction missing file " << fractionMissingFile
+                    << " is not in the species tree" << std::endl;
+      assert(false);
+    }
+    _fm[_speciesNameToId[species]] = fm;
+  }
+  for (unsigned int i = 0; i < _speciesTree.getLeafNumber(); ++i) {
+    if (_fm[i] == -1.0) {
+      Logger::error << "Error: the fraction missing file "
+                    << fractionMissingFile << " does not cover species "
+                    << _speciesTree.getNode(i)->label << std::endl;
+      assert(false);
+    }
+  }
+}
+
+size_t BaseReconciliationModel::getSpeciesTreeHash() const {
+  if (!_prunedRoot) {
+    return 0;
+  }
+  return getTreeHashRec(_prunedRoot, 0);
 }
 
 size_t BaseReconciliationModel::getTreeHashRec(const corax_rnode_t *node,
@@ -138,44 +162,4 @@ size_t BaseReconciliationModel::getTreeHashRec(const corax_rnode_t *node,
   auto res = hash_fn(m * i + M);
   res = hash_fn(res * i + node->node_index);
   return res;
-}
-
-size_t BaseReconciliationModel::getSpeciesTreeHash() const {
-  if (!_prunedRoot) {
-    return 0;
-  }
-  return getTreeHashRec(_prunedRoot, 0);
-}
-
-void BaseReconciliationModel::beforeComputeLogLikelihood() {
-  // currently, we are not really using the fact that
-  // some species nodes should not be re-evaluated
-  _allSpeciesNodesInvalid = false;
-  _invalidatedSpeciesNodes.clear();
-  recomputeSpeciesProbabilities();
-}
-
-void BaseReconciliationModel::setFractionMissingGenes(
-    const std::string &fractionMissingFile) {
-  if (!fractionMissingFile.size()) {
-    _fm = std::vector<double>(getPrunedSpeciesNodeNumber(), 0.0);
-    return;
-  }
-  _fm = std::vector<double>(getPrunedSpeciesNodeNumber(), -1.0);
-  std::ifstream is(fractionMissingFile);
-  std::string species;
-  double fm;
-  while (is >> species >> fm) {
-    if (_speciesNameToId.find(species) != _speciesNameToId.end()) {
-      _fm[_speciesNameToId[species]] = fm;
-    }
-  }
-  for (unsigned int i = 0; i < _speciesNameToId.size(); ++i) {
-    if (_fm[i] == -1.0) {
-      std::cerr << "Error, the fraction of missing file " << fractionMissingFile
-                << " does not cover the species "
-                << _speciesTree.getNode(i)->label << std::endl;
-      assert(false);
-    }
-  }
 }

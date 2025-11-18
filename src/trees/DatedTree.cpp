@@ -1,6 +1,8 @@
 #include "DatedTree.hpp"
-#include <IO/Logger.hpp>
+
 #include <iostream>
+
+#include <IO/Logger.hpp>
 #include <maths/Random.hpp>
 
 DatedTree::DatedTree(PLLRootedTree *rootedTree, bool fromBL)
@@ -39,7 +41,6 @@ void DatedTree::rescaleBranchLengths() {
   assert(isConsistent());
   std::vector<double> heights(_rootedTree.getNodeNumber(), 0.0);
   double height = 0.0;
-
   for (auto node : _orderedSpeciations) {
     auto e = node->node_index;
     if (!node->parent) {
@@ -138,15 +139,18 @@ size_t DatedTree::getOrderingHash(size_t startingHash) const {
   return hash;
 }
 
-bool DatedTree::canTransferUnderRelDated(unsigned int nodeIndexFrom,
-                                         unsigned int nodeIndexTo) const {
-  // father of from is before to
-  auto from = _rootedTree.getNode(nodeIndexFrom);
-  if (!from->parent) {
+bool DatedTree::canTransferUnderRelDated(unsigned int e, unsigned int d) const {
+  // the destination species (d) should be younger than
+  // the parent of the source species (e)
+  if (d == e) {
+    return false;
+  }
+  auto srcSpeciesNode = _rootedTree.getNode(e);
+  if (!srcSpeciesNode->parent) {
     return true;
   }
-  auto parentFromIndex = from->parent->node_index;
-  return _ranks[parentFromIndex] <= _ranks[nodeIndexTo];
+  auto p = srcSpeciesNode->parent->node_index;
+  return _ranks[d] > _ranks[p];
 }
 
 void DatedTree::randomize() {
