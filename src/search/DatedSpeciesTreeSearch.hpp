@@ -1,34 +1,36 @@
 #pragma once
 
-#include <trees/DatedTree.hpp>
+#include <util/types.hpp>
 
 class SpeciesTree;
 class SpeciesTreeLikelihoodEvaluatorInterface;
 class SpeciesSearchState;
 
 struct ScoredBackup {
-  DatedTree::Backup backup;
+  DatedBackup backup;
   double score;
   ScoredBackup() : score(0.0) {}
-  ScoredBackup(DatedTree &datedTree, double score)
-      : backup(datedTree.getBackup()), score(score) {}
+  ScoredBackup(const DatedBackup &backup, double score)
+      : backup(backup), score(score) {}
   bool operator<(const ScoredBackup &other) const {
     return score < other.score;
   }
 };
-
 using ScoredBackups = std::vector<ScoredBackup>;
 
 class DatedSpeciesTreeSearch {
 public:
   /**
-   *  Search of the speciation order (dating) that optimizes
-   *  the score returned by the evaluator. If the score gets higher
-   *  than searchState.bestLL and if searchState.pathToBestSpeciesTree
-   *  is set, save the new best tree and update bestLL.
+   *  Optimize the speciation order (dating) of the current species
+   *  tree. Save the tree and update searchState.bestLL on finding
+   *  a dating with likelihood higher than searchState.bestLL
    *
-   *  If thorough is not set, we only apply one naive round.
-   *  Otherwise, we conduct a more thorough search
+   *  If the current species tree is not the current best tree, then
+   *  the optimization may result in a tree having likelihood lower
+   *  than searchState.bestLL (desired in SpeciesRootSearch class)
+   *
+   *  If thorough is not set, only apply one naive round. Otherwise,
+   *  additionally conduct search with random dating perturbations
    */
   static double
   optimizeDates(SpeciesTree &speciesTree,
@@ -36,10 +38,15 @@ public:
                 SpeciesSearchState &searchState, bool thorough);
 
   /**
+   *  Generate and test random datings based on their transfer scores
+   *  and return the best of them with computed LLs
+   *  @param toTest The number of random datings to test
+   *  @param toTake The number of best datings to return
    *
+   *  The input species tree remains unchanged
    */
-  static ScoredBackups optimizeDatesFromReconciliation(
+  static ScoredBackups getBestDatingsFromReconciliation(
       SpeciesTree &speciesTree,
-      SpeciesTreeLikelihoodEvaluatorInterface &evaluator, unsigned int searches,
-      unsigned int toEvaluate = 10);
+      SpeciesTreeLikelihoodEvaluatorInterface &evaluator, unsigned int toTest,
+      unsigned int toTake);
 };

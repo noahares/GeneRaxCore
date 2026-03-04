@@ -1,14 +1,13 @@
 #pragma once
 
-#include <cstddef>
 #include <iostream>
-#include <set>
-#include <unordered_map>
-#include <util/enums.hpp>
 
-class PLLUnrootedTree;
-class PLLRootedTree;
+#include <util/types.hpp>
+
 class GeneSpeciesMapping;
+class PLLRootedTree;
+class PLLUnrootedTree;
+
 using CladeSet = std::set<size_t>;
 
 class Clade {
@@ -17,6 +16,7 @@ public:
 
   void mergeWith(const Clade &clade);
   void addId(unsigned int id);
+
   size_t getHash() const { return _hash; }
   friend std::ostream &operator<<(std::ostream &os, const Clade &c) {
     os << "[(";
@@ -35,7 +35,7 @@ public:
 
   static CladeSet buildCladeSet(PLLUnrootedTree &tree,
                                 const GeneSpeciesMapping &geneSpeciesMapping,
-                                const StringToUintMap &speciesLabelToInt);
+                                const StringToUint &speciesLabelToInt);
 
 private:
   void _recomputeHash();
@@ -43,19 +43,3 @@ private:
   std::set<unsigned int> _ids;
   size_t _hash;
 };
-
-struct Counter {
-  struct value_type {
-    template <typename T> value_type(const T &) {}
-  };
-  void push_back(const value_type &) { ++count; }
-  size_t count = 0;
-};
-
-template <typename T1, typename T2>
-size_t intersection_size(const T1 &s1, const T2 &s2) {
-  Counter c;
-  set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
-                   std::back_inserter(c));
-  return c.count;
-}

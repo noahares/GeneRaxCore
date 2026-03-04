@@ -260,8 +260,10 @@ std::string PLLRootedTree::getNewickString() const {
 }
 
 void PLLRootedTree::setMissingBranchLengths(double minBL) {
+  if (minBL < 0.0)
+    return;
   for (auto node : getNodes()) {
-    if (0.0 == node->length) {
+    if (node->length <= 0.0) {
       node->length = minBL;
     }
   }
@@ -453,8 +455,8 @@ corax_rtree_t *PLLRootedTree::buildRandomTree(
   return res;
 }
 
-StringToUintMap PLLRootedTree::getLabelToIntMap() {
-  StringToUintMap map;
+StringToUint PLLRootedTree::getLeafLabelToId() const {
+  StringToUint map;
   for (auto node : getLeaves()) {
     map.insert({std::string(node->label), node->node_index});
   }
@@ -738,30 +740,33 @@ bool PLLRootedTree::areNodeIndicesParallelConsistent() const {
 }
 
 struct DatedNode {
+  corax_rnode_t *node;
   double date;
-  corax_rnode_s *node;
-  DatedNode(double date, corax_rnode_s *node) : date(date), node(node) {}
-
-  bool operator<(const DatedNode &dn) const {
-    if (date != dn.date) {
-      return date < dn.date;
-    } else {
-      std::string label1(node->label);
-      std::string label2(dn.node->label);
-      return label1 < label2;
+  DatedNode() : node(nullptr), date(0.0) {}
+  DatedNode(corax_rnode_t *node) : node(node), date(0.0) {} // for leaves
+  DatedNode(corax_rnode_t *node, double date) : node(node), date(date) {
+    assert(date > 0.0); // negative dates not allowed, zero dates go to leaves
+  }
+  bool operator<(const DatedNode &other) const {
+    if (date == other.date) {
+      assert(node->label && other.node->label);
+      return strcmp(node->label, other.node->label) < 0;
     }
+    return (date && date < other.date) || !other.date;
   }
 };
 
 static void fillDatedNodesRec(corax_rnode_t *node, double depth,
                               std::vector<DatedNode> &datedNodes) {
+  assert(node->length > 0.0);
   if (!node->left) {
-    return;
+    datedNodes.push_back(DatedNode(node));
+  } else {
+    depth += node->length;
+    datedNodes.push_back(DatedNode(node, depth));
+    fillDatedNodesRec(node->left, depth, datedNodes);
+    fillDatedNodesRec(node->right, depth, datedNodes);
   }
-  depth += node->length;
-  datedNodes.push_back(DatedNode(depth, node));
-  fillDatedNodesRec(node->left, depth, datedNodes);
-  fillDatedNodesRec(node->right, depth, datedNodes);
 }
 
 std::vector<corax_rnode_t *> PLLRootedTree::getOrderedSpeciations() const {

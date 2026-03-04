@@ -1,23 +1,18 @@
 #pragma once
 
-#include <IO/Families.hpp>
-#include <IO/LibpllParsers.hpp>
-#include <likelihoods/ReconciliationEvaluation.hpp>
 #include <memory>
-#include <string>
-#include <trees/DatedTree.hpp>
-#include <trees/PLLRootedTree.hpp>
-#include <unordered_map>
-#include <unordered_set>
-#include <util/enums.hpp>
 
-class PerCoreGeneTrees;
+#include "DatedTree.hpp"
+#include "PLLRootedTree.hpp"
+#include <IO/Families.hpp>
+#include <util/types.hpp>
 
 class SpeciesTree {
 public:
-  SpeciesTree(const std::string &newick, bool isFile = true);
-  SpeciesTree(const std::unordered_set<std::string> &leafLabels);
+  SpeciesTree(const std::string &str, bool isFile, bool useBLs);
+  SpeciesTree(const std::unordered_set<std::string> &labels);
   SpeciesTree(const Families &families);
+
   // forbid copy
   SpeciesTree(const SpeciesTree &) = delete;
   SpeciesTree &operator=(const SpeciesTree &) = delete;
@@ -26,50 +21,51 @@ public:
 
   std::unique_ptr<SpeciesTree> buildRandomTree() const;
 
-  // set rates and gene trees before calling this
+  void saveToFile(const std::string &fileName, bool masterRankOnly) const;
+  std::string toString() const { return _speciesTree.getNewickString(); }
 
-  corax_rnode_t *getRandomNode();
-  corax_rnode_t *getNode(unsigned int nodeIndex) {
+  corax_rnode_t *getRoot() const { return _speciesTree.getRoot(); }
+  corax_rnode_t *getNode(unsigned int nodeIndex) const {
     return _speciesTree.getNode(nodeIndex);
   }
-  corax_rnode_t *getRoot() { return getTree().getRawPtr()->root; }
 
   const PLLRootedTree &getTree() const { return _speciesTree; }
+  const DatedTree &getDatedTree() const { return _datedTree; }
   PLLRootedTree &getTree() { return _speciesTree; }
   DatedTree &getDatedTree() { return _datedTree; }
 
-  void saveToFile(const std::string &newick, bool masterRankOnly);
+  void getLabelToId(StringToUint &labelToId) const;
+
   size_t getHash() const;
   size_t getNodeIndexHash() const;
-  void getLabelsToId(std::unordered_map<std::string, unsigned int> &map) const;
-  std::string toString();
 
   class Listener {
   public:
     virtual ~Listener() {}
+    virtual void onSpeciesDatesChange() = 0;
     virtual void onSpeciesTreeChange(
         const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) = 0;
   };
   void addListener(Listener *listener);
   void removeListener(Listener *listener);
+
+  // should be called every time after changing the tree node dates
+  void onSpeciesDatesChange();
+  // should be called every time after changing the tree topology
   void onSpeciesTreeChange(
-      const std::unordered_set<corax_rnode_t *> *
-          nodesToInvalidate); // should be called when changing the species tree
+      const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
 
 private:
   PLLRootedTree _speciesTree;
   DatedTree _datedTree;
   std::vector<Listener *> _listeners;
-  void buildFromLabels(const std::unordered_set<std::string> &leafLabels);
-  static std::unordered_set<std::string>
-  getLabelsFromFamilies(const Families &families);
 };
 
 class SpeciesTreeOperator {
 public:
+  static void restoreDates(SpeciesTree &speciesTree, const DatedBackup &backup);
   static bool canChangeRoot(const SpeciesTree &speciesTree,
                             unsigned int direction);
-
   /**
    * Change the root to the neighboring branch described by direction where
    * direction is in [0:4[

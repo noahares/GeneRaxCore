@@ -1,28 +1,20 @@
 #include "PerCoreGeneTrees.hpp"
+
+#include <cassert>
+#include <sstream>
+
 #include <IO/FileSystem.hpp>
 #include <IO/LibpllParsers.hpp>
 #include <IO/Logger.hpp>
-#include <algorithm>
 #include <ccp/ConditionalClades.hpp>
-#include <iostream>
-#include <numeric>
 #include <parallelization/ParallelContext.hpp>
-#include <sstream>
 #include <trees/PLLRootedTree.hpp>
-
-template <typename T>
-std::vector<size_t> sort_indexes_descending(const std::vector<T> &v) {
-  std::vector<size_t> idx(v.size());
-  iota(idx.begin(), idx.end(), 0);
-  sort(idx.begin(), idx.end(),
-       [&v](size_t i1, size_t i2) { return v[i1] > v[i2]; });
-  return idx;
-}
+#include <util/utils.hpp>
 
 static std::vector<size_t>
 getMyIndices(const std::vector<unsigned int> &treeSizes) {
   std::vector<size_t> sortedIndices =
-      sort_indexes_descending<unsigned int>(treeSizes);
+      sort_indices_descending<unsigned int>(treeSizes);
   std::vector<size_t> myIndices;
   std::vector<unsigned int> perRankLoad(ParallelContext::getSize(), 0);
   unsigned int averageLoad = 0;
@@ -62,7 +54,7 @@ std::vector<unsigned int> getCCPSizes(const Families &families) {
   for (auto i = ParallelContext::getBegin(treesNumber);
        i < ParallelContext::getEnd(treesNumber); i++) {
     ConditionalClades cc;
-    cc.unserialize(families[i].ccp);
+    cc.unserialize(families[i].ccpFile);
     localTreeSizes[i - ParallelContext::getBegin(treesNumber)] =
         cc.getCladesNumber();
   }

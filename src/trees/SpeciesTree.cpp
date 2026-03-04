@@ -1,36 +1,53 @@
 #include "SpeciesTree.hpp"
+
+#include <algorithm>
 #include <cassert>
-
-#include <IO/FileSystem.hpp>
 #include <functional>
-#include <likelihoods/LibpllEvaluation.hpp>
-#include <likelihoods/ReconciliationEvaluation.hpp>
+
+#include <IO/GeneSpeciesMapping.hpp>
 #include <parallelization/ParallelContext.hpp>
-#include <parallelization/PerCoreGeneTrees.hpp>
-#include <set>
 
-SpeciesTree::SpeciesTree(const std::string &newick, bool fromFile)
-    : _speciesTree(newick, fromFile), _datedTree(&_speciesTree) {}
+static std::unordered_set<std::string>
+getLabelsFromFamilies(const Families &families) {
+  std::unordered_set<std::string> leafLabels;
+  for (const auto &family : families) {
+    GeneSpeciesMapping mapping;
+    mapping.fill(family.mappingFile, family.startingGeneTree);
+    for (const auto &p : mapping.getMap()) {
+      leafLabels.insert(p.second);
+    }
+  }
+  return leafLabels;
+}
 
-SpeciesTree::SpeciesTree(const std::unordered_set<std::string> &leafLabels)
-    : _speciesTree(leafLabels), _datedTree(&_speciesTree) {}
+SpeciesTree::SpeciesTree(const std::string &str, bool isFile, bool useBLs)
+    : _speciesTree(str, isFile), _datedTree(_speciesTree, useBLs) {}
+
+SpeciesTree::SpeciesTree(const std::unordered_set<std::string> &labels)
+    : _speciesTree(labels), _datedTree(_speciesTree, false) {}
+
+SpeciesTree::SpeciesTree(const Families &families)
+    : _speciesTree(getLabelsFromFamilies(families)),
+      _datedTree(_speciesTree, false) {}
 
 std::unique_ptr<SpeciesTree> SpeciesTree::buildRandomTree() const {
   return std::make_unique<SpeciesTree>(_speciesTree.getLabels(true));
 }
 
-SpeciesTree::SpeciesTree(const Families &families)
-    : _speciesTree(getLabelsFromFamilies(families)), _datedTree(&_speciesTree) {
-}
-
-void SpeciesTree::saveToFile(const std::string &newick, bool masterRankOnly) {
+void SpeciesTree::saveToFile(const std::string &fileName,
+                             bool masterRankOnly) const {
   if (masterRankOnly && ParallelContext::getRank()) {
     return;
   }
-  _speciesTree.save(newick);
+  _speciesTree.save(fileName);
 }
 
-std::string SpeciesTree::toString() { return _speciesTree.getNewickString(); }
+void SpeciesTree::getLabelToId(StringToUint &labelToId) const {
+  labelToId.clear();
+  for (auto node : getTree().getNodes()) {
+    labelToId[std::string(node->label)] = node->node_index;
+  }
+}
 
 void SpeciesTree::addListener(Listener *listener) {
   _listeners.push_back(listener);
@@ -41,13 +58,26 @@ void SpeciesTree::removeListener(Listener *listener) {
                    _listeners.end());
 }
 
+void SpeciesTree::onSpeciesDatesChange() {
+  _datedTree.rescaleBranchLengths(); // update branch lengths
+  for (auto listener : _listeners) {
+    listener->onSpeciesDatesChange();
+  }
+}
+
 void SpeciesTree::onSpeciesTreeChange(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+  _datedTree.rescaleBranchLengths();                   // update branch lengths
+  _speciesTree.onSpeciesTreeChange(nodesToInvalidate); // update labels and lcas
   for (auto listener : _listeners) {
     listener->onSpeciesTreeChange(nodesToInvalidate);
   }
-  _speciesTree.onSpeciesTreeChange(nodesToInvalidate);
-  _datedTree.reorderFromBranchLengths(); // make sure the dates still make sense
+}
+
+void SpeciesTreeOperator::restoreDates(SpeciesTree &speciesTree,
+                                       const DatedBackup &backup) {
+  speciesTree.getDatedTree().restore(backup);
+  speciesTree.onSpeciesDatesChange();
 }
 
 static void setRootAux(SpeciesTree &speciesTree, corax_rnode_t *root) {
@@ -64,14 +94,6 @@ bool SpeciesTreeOperator::canChangeRoot(const SpeciesTree &speciesTree,
   return newRoot->left && newRoot->right;
 }
 
-std::string sideString(bool left) {
-  if (left) {
-    return std::string("left");
-  } else {
-    return std::string("right");
-  }
-}
-
 void SpeciesTreeOperator::changeRoot(SpeciesTree &speciesTree,
                                      unsigned int direction) {
   bool left1 = direction % 2;
@@ -86,30 +108,32 @@ void SpeciesTreeOperator::changeRoot(SpeciesTree &speciesTree,
   auto D = rootRight->right;
   std::unordered_set<corax_rnode_t *> nodesToInvalidate;
   nodesToInvalidate.insert(root);
-  auto &datedTree = speciesTree.getDatedTree();
   setRootAux(speciesTree, left1 ? rootLeft : rootRight);
   if (left1 && left2) {
     PLLRootedTree::setSon(rootLeft, root, false);
     PLLRootedTree::setSon(root, B, true);
     PLLRootedTree::setSon(root, rootRight, false);
-    datedTree.moveNodeToRoot(rootLeft);
   } else if (!left1 && !left2) {
     PLLRootedTree::setSon(rootRight, root, true);
     PLLRootedTree::setSon(root, C, false);
     PLLRootedTree::setSon(root, rootLeft, true);
-    datedTree.moveNodeToRoot(rootRight);
   } else if (left1 && !left2) {
     PLLRootedTree::setSon(rootLeft, rootLeft->right, true);
     PLLRootedTree::setSon(rootLeft, root, false);
     PLLRootedTree::setSon(root, A, false);
     PLLRootedTree::setSon(root, rootRight, true);
-    datedTree.moveNodeToRoot(rootLeft);
   } else { // !left1 && left2
     PLLRootedTree::setSon(rootRight, root, true);
     PLLRootedTree::setSon(rootRight, C, false);
     PLLRootedTree::setSon(root, D, true);
     PLLRootedTree::setSon(root, rootLeft, false);
-    datedTree.moveNodeToRoot(rootRight);
+  }
+  auto newRoot = root->parent;
+  auto &datedTree = speciesTree.getDatedTree();
+  if (datedTree.isDated()) {
+    while (datedTree.moveUp(datedTree.getRank(newRoot))); // move newRoot rank
+  } else {
+    datedTree.updateSpeciationOrderAndRanks(); // get ranks from topology
   }
   speciesTree.onSpeciesTreeChange(&nodesToInvalidate);
 }
@@ -179,6 +203,9 @@ unsigned int SpeciesTreeOperator::applySPRMove(SpeciesTree &speciesTree,
                           pruneFatherNode->left != pruneNode);
     nodesToInvalidate.insert(regraftParentNode);
   }
+  auto &datedTree = speciesTree.getDatedTree();
+  assert(!datedTree.isDated());
+  datedTree.updateSpeciationOrderAndRanks(); // get ranks from topology
   speciesTree.onSpeciesTreeChange(&nodesToInvalidate);
   return res;
 }
@@ -327,28 +354,4 @@ size_t SpeciesTree::getHash() const {
 size_t SpeciesTree::getNodeIndexHash() const {
   auto res = getTreeHashRec(getTree().getRoot(), 0, false);
   return res % 100000;
-}
-
-void SpeciesTree::getLabelsToId(
-    std::unordered_map<std::string, unsigned int> &map) const {
-  map.clear();
-  for (auto node : getTree().getNodes()) {
-    map.insert(
-        std::pair<std::string, unsigned int>(node->label, node->node_index));
-  }
-}
-
-std::unordered_set<std::string>
-SpeciesTree::getLabelsFromFamilies(const Families &families) {
-  GeneSpeciesMapping mappings;
-  for (const auto &family : families) {
-    std::string geneTreeStr;
-    // FileSystem::getFileContent(family.startingGeneTree, geneTreeStr);
-    mappings.fill(family.mappingFile, family.startingGeneTree);
-  }
-  std::unordered_set<std::string> leaves;
-  for (auto &mapping : mappings.getMap()) {
-    leaves.insert(mapping.second);
-  }
-  return leaves;
 }

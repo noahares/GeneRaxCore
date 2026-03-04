@@ -227,12 +227,14 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename,
       break;
     case ReconciliationEventType::EVENT_T:
       eventCount[3]++;
-      speciesToEventCount[_speciesTree->nodes[event.destSpeciesNode]->label][8]++;
+      speciesToEventCount[_speciesTree->nodes[event.destSpeciesNode]->label]
+                         [8]++;
       break;
     case ReconciliationEventType::EVENT_TL:
       eventCount[2]++;
       eventCount[3]++;
-      speciesToEventCount[_speciesTree->nodes[event.destSpeciesNode]->label][8]++;
+      speciesToEventCount[_speciesTree->nodes[event.destSpeciesNode]->label]
+                         [8]++;
       break;
     case ReconciliationEventType::EVENT_L:
     case ReconciliationEventType::EVENT_Invalid:

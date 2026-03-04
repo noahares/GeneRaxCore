@@ -10,14 +10,15 @@
 #include <search/SpeciesTransferSearch.hpp>
 #include <support/ICCalculator.hpp>
 #include <util/Paths.hpp>
+#include <util/utils.hpp>
 
 static std::unique_ptr<SpeciesTree>
 makeSpeciesTree(const std::string &speciesTreeFile,
-                const Families &initialFamilies) {
+                const Families &initialFamilies, bool isDated) {
   if (speciesTreeFile == "random") {
     return std::make_unique<SpeciesTree>(initialFamilies);
   } else {
-    return std::make_unique<SpeciesTree>(speciesTreeFile);
+    return std::make_unique<SpeciesTree>(speciesTreeFile, true, isDated);
   }
 }
 
@@ -26,7 +27,8 @@ SpeciesTreeOptimizer::SpeciesTreeOptimizer(
     const RecModelInfo &recModelInfo, const Parameters &startingRates,
     bool userDTLRates, const std::string &outputDir,
     const SpeciesTreeSearchParams &searchParams)
-    : _speciesTree(makeSpeciesTree(speciesTreeFile, initialFamilies)),
+    : _speciesTree(makeSpeciesTree(speciesTreeFile, initialFamilies,
+                                   recModelInfo.isDated())),
       _geneTrees(std::make_unique<PerCoreGeneTrees>(initialFamilies, true)),
       _initialFamilies(initialFamilies), _outputDir(outputDir),
       _firstOptimizeRatesCall(true), _userDTLRates(userDTLRates),
@@ -216,6 +218,12 @@ void SpeciesTreeOptimizer::updateEvaluations() {
                   _modelRates.info.pruneSpeciesTree, _userDTLRates);
 }
 
+void SpeciesTreeOptimizer::onSpeciesDatesChange() {
+  for (auto &evaluation : _evaluations) {
+    evaluation->onSpeciesDatesChange();
+  }
+}
+
 void SpeciesTreeOptimizer::onSpeciesTreeChange(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
   for (auto &evaluation : _evaluations) {
@@ -231,7 +239,7 @@ std::string getCladesSetPath(const std::string &outputDir, int rank) {
 void SpeciesTreeOptimizer::_computeAllGeneClades() {
   ParallelContext::barrier();
   // Compute local clades
-  auto speciesLabelToInt = _speciesTree->getTree().getLabelToIntMap();
+  auto speciesLabelToInt = _speciesTree->getTree().getLeafLabelToId();
   CladeSet allClades;
   for (auto &tree : _geneTrees->getTrees()) {
     auto cladesSet =
