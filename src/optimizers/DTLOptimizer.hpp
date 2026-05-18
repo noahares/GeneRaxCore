@@ -21,9 +21,9 @@ public:
 };
 
 enum class LBFGSBPrecision : int64_t {
-  HIGH = 1,
+  HIGH = (int64_t)1e1,
   MEDIUM = (int64_t)1e7,
-  LOW = (int64_t)1e12,
+  LOW = (int64_t)1e9,
 };
 
 struct OptimizationSettings {
@@ -32,7 +32,7 @@ struct OptimizationSettings {
         optimizationMinImprovement(3.0), minAlpha(0.0000001),
         startingAlpha(0.1), epsilon(0.0000001), verbose(false),
         individualParamOpt(false), individualParamOptMinImprovement(10.0),
-        individualParamOptMaxIt(3), factr(LBFGSBPrecision::HIGH) {}
+        individualParamOptMaxIt(3), factr(LBFGSBPrecision::MEDIUM) {}
 
   RecOpt strategy;
   double lineSearchMinImprovement;
