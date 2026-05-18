@@ -63,16 +63,10 @@ void SpeciesTransferSearch::getSortedTransferList(
         continue;
       }
       TransferMove move(prune, regraft, count);
-      double factor = 1.0;
-      if (false) { // evaluation.pruneSpeciesTree()) {
-        factor /= (1.0 + sqrt(speciesFrequencies[prune]));
-        factor /= (1.0 + sqrt(speciesFrequencies[regraft]));
-      }
-      if (true) {
-        factor = 1.0 / double(potentialTransfers.getPotentialTransfers(regraft,
-                                                                       prune));
-      }
-      if (!blacklist.isBlackListed(move)) {
+      auto potentialTransferCount = potentialTransfers.getPotentialTransfers(regraft,
+                                                                       prune);
+      if (!blacklist.isBlackListed(move) && potentialTransferCount > 0) {
+        double factor = 1.0 / double(potentialTransferCount);
         transferMoves.push_back(TransferMove(prune, regraft, factor * count));
       }
     }
