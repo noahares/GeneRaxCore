@@ -148,7 +148,7 @@ public:
    *  double division operator
    */
   inline ScaledValue operator/(ScaledValueType v) const {
-    ScaledValue res{v};
+    ScaledValue res{*this};
     res /= v;
     return res;
   }
