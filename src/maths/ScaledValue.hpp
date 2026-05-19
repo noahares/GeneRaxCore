@@ -6,14 +6,9 @@
 #include <iostream>
 #include <limits>
 
-using ScaledValueType = double;
-constexpr unsigned SCALE_THRESHOLD =
-    std::numeric_limits<ScaledValueType>::digits - 1;
-constexpr ScaledValueType JS_SCALE_FACTOR =
-    ScaledValueType(1ull << SCALE_THRESHOLD);
-constexpr ScaledValueType JS_SCALE_THRESHOLD  = 1.0/JS_SCALE_FACTOR;
-constexpr ScaledValueType LOG_2 =
-    static_cast<ScaledValueType>(0.693147180559945309417232121458176568);
+#define JS_SCALE_FACTOR                                                        \
+  115792089237316195423570985008687907853269984665640564039457584007913129639936.0 /*  2**256 (exactly)  */
+#define JS_SCALE_THRESHOLD (1.0 / JS_SCALE_FACTOR)
 
 const int NULL_SCALER = INT_MAX / 2 - 1;
 
@@ -47,54 +42,46 @@ public:
    *  Conversion constructor
    *  @param v value
    */
-  explicit ScaledValue(ScaledValueType v) : value(v), scaler(0) {
+  explicit ScaledValue(double v) : value(v), scaler(0) {
     assert(value >= 0.0); // negative values not allowed
-    scale();
-  }
-
-  explicit ScaledValue(double v, int s):value(v), scaler(s)  {
-    assert(value >= 0.0); // negative values not allowed
-    scale();
   }
 
   /**
    *  Conversion to a double
    */
-  operator ScaledValueType() const {
+  operator double() const {
     if (scaler == NULL_SCALER) {
       return 0.0;
+    } else if (scaler == 0) {
+      return value;
+    } else { // the value is almost zero
+      return 0.0;
     }
-    return std::ldexp(value, -scaler);
   }
 
   /**
    *  ScaledValue sum operator
    */
   inline ScaledValue operator+(const ScaledValue &v) const {
-    ScaledValue result{*this};
-    result += v;
-    return result;
+    if (v.scaler == scaler) {
+      return ScaledValue(v.value + value, scaler);
+    } else if (v.scaler < scaler) {
+      return v;
+    } else {
+      return *this;
+    }
   }
 
   /**
    *  ScaledValue sum operator
    */
   inline ScaledValue &operator+=(const ScaledValue &v) {
-    if (v.isNull()) {
-      return *this;
-    }
-    if (isNull()) {
+    if (v.scaler == scaler) {
+      value += v.value;
+    } else if (v.scaler < scaler) {
       value = v.value;
       scaler = v.scaler;
-      return *this;
     }
-
-    const int common_scaler = std::min(scaler, v.scaler);
-    const double lhs = std::ldexp(value, common_scaler - scaler);
-    const double rhs = std::ldexp(v.value, common_scaler - v.scaler);
-    value = lhs + rhs;
-    scaler = common_scaler;
-    scale();
     return *this;
   }
 
@@ -102,17 +89,32 @@ public:
    *  ScaledValue minus operator
    */
   inline ScaledValue operator-(const ScaledValue &v) const {
-    ScaledValue result{*this};
-    result += ScaledValue{-v.value, v.scaler};
-    return result;
+    if (v.scaler == scaler) {
+      if (value - v.value < 0.0) {
+        if (fabs(value - v.value) < 0.0000000001) {
+          return ScaledValue();
+        }
+        std::cerr.precision(17);
+        std::cerr << *this << " - " << v << std::endl;
+      }
+      assert(value - v.value >= 0);
+      auto res = ScaledValue(value - v.value, scaler);
+      res.scale();
+      return res;
+    } else if (v.scaler < scaler) {
+      std::cerr << *this << " - " << v << std::endl;
+      assert(false); // negative values not allowed
+      return v;
+    } else {
+      return *this;
+    }
   }
 
   /**
    *  ScaledValue multiplication operator
    */
   inline ScaledValue operator*(const ScaledValue &v) const {
-    ScaledValue res{*this};
-    res *= v;
+    auto res = ScaledValue(v.value * value, v.scaler + scaler);
     return res;
   }
 
@@ -120,50 +122,40 @@ public:
    *  ScaledValue multiplication operator
    */
   inline ScaledValue &operator*=(const ScaledValue &v) {
-    if (isNull() || v.isNull()) {
-      setNull();
-      return *this;
-    }
     value *= v.value;
     scaler += v.scaler;
-    scale();
     return *this;
   }
 
   /**
    *  double multiplication operator
    */
-  inline ScaledValue operator*(ScaledValueType v) const {
-    return *this * ScaledValue{v};
+  inline ScaledValue operator*(double v) const {
+    auto res = ScaledValue(v * value, scaler);
+    return res;
   }
 
   /**
    *  double multiplication operator
    */
-  inline ScaledValue &operator*=(ScaledValueType v) {
-    return *this *= ScaledValue{v};
+  inline ScaledValue &operator*=(double v) {
+    value *= v;
+    return *this;
   }
 
   /**
    *  double division operator
    */
-  inline ScaledValue operator/(ScaledValueType v) const {
-    ScaledValue res{v};
-    res /= v;
+  inline ScaledValue operator/(double v) const {
+    auto res = ScaledValue(value / v, scaler);
     return res;
   }
 
   /**
    *  double division operator
    */
-  inline ScaledValue &operator/=(ScaledValueType v) {
-    assert(v != 0.0);
-    if (isNull()) {
-      *this = ScaledValue{};
-      return *this;
-    }
+  inline ScaledValue &operator/=(double v) {
     value /= v;
-    scale();
     return *this;
   }
 
@@ -176,18 +168,9 @@ public:
    *  Comparison with ScaledValue operators
    */
   inline bool operator<(const ScaledValue &v) const {
-    if (isNull() && v.isNull()) {
-      return false;
-    }
     if (isNull()) {
-      return v.value > 0.0;
+      return !v.isNull();
     }
-    if (v.isNull()) {
-      return value < 0.0;
-    }
-
-    assert(value >= 0.0);
-    assert(v.value >= 0.0);
     if (scaler != v.scaler) {
       return scaler > v.scaler;
     }
@@ -197,19 +180,22 @@ public:
   inline bool operator>(const ScaledValue &v) const { return !(*this <= v); }
 
   inline bool operator==(const ScaledValue &v) const {
-    if (isNull() || v.isNull()) {
-      return isNull() && v.isNull();
+    if (isNull()) {
+      return v.isNull();
     }
-    return scaler == v.scaler &&
-      (std::fabs(v.value - value) <=
-       std::numeric_limits<double>::epsilon() *
-       std::max({1.0, std::fabs(value), std::fabs(v.value)}));
+    return (scaler == v.scaler) && (value == v.value);
   }
 
   inline bool operator!=(const ScaledValue &v) const { return !(*this == v); }
 
   inline bool operator<=(const ScaledValue &v) const {
-    return *this < v || *this == v;
+    if (isNull()) {
+      return true;
+    }
+    if (scaler != v.scaler) {
+      return scaler > v.scaler;
+    }
+    return value <= v.value;
   }
 
   inline bool operator>=(const ScaledValue &v) const { return !(*this < v); }
@@ -226,6 +212,12 @@ public:
   friend double getLog<ScaledValue>(const ScaledValue &v);
 
 private:
+  /**
+   *  General constructor
+   *  @param v value
+   *  @param s scaler
+   */
+  ScaledValue(double v, int s) : value(v), scaler(s) {}
 
   void checkNull() {
     if (value == 0.0) {
@@ -233,24 +225,15 @@ private:
     }
   }
 
-  void setNull() {
-    value = 0.0;
-    scaler = NULL_SCALER;
-  }
-
   void scale() {
-    if (value == 0.0) {
-      setNull();
-      return;
+    if (value < JS_SCALE_THRESHOLD) {
+      scaler += 1;
+      value *= JS_SCALE_FACTOR;
+      checkNull();
     }
-
-    int exponent = 0;
-    value = std::frexp(value, &exponent);
-    scaler -= exponent;
-    checkNull();
   }
 
-  ScaledValueType value;
+  double value;
   int scaler;
 };
 
@@ -265,11 +248,8 @@ template <> inline void scale<ScaledValue>(ScaledValue &v) { v.scale(); }
  *  getLog function for the ScaledValue type
  */
 template <> inline double getLog<ScaledValue>(const ScaledValue &v) {
-    if (v.isNull()) {
-      return -std::numeric_limits<double>::infinity();
-    }
-    if (v.value < 0.0) {
-      return std::numeric_limits<double>::quiet_NaN();
-    }
-    return std::log(v.value) - static_cast<double>(v.scaler) * LOG_2;
+  if (v.scaler == NULL_SCALER) {
+    return -std::numeric_limits<double>::infinity();
+  }
+  return std::log(v.value) + v.scaler * std::log(JS_SCALE_THRESHOLD);
 }
