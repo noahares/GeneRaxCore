@@ -272,8 +272,9 @@ void Family::printStats(Families &families, const std::string &speciesTreeFile,
     coverageVector.push_back({d, species});
   }
   std::sort(coverageVector.begin(), coverageVector.end());
+  covOs << "species\tcoverage" << std::endl;
   for (auto &coverage : coverageVector) {
-    covOs << coverage.second << " " << coverage.first << std::endl;
+    covOs << coverage.second << "\t" << coverage.first << std::endl;
   }
   covOs.close();
   // fraction missing file
@@ -282,10 +283,11 @@ void Family::printStats(Families &families, const std::string &speciesTreeFile,
     maxGenes = std::max(maxGenes, perSpeciesGenes[species]);
   }
   ParallelOfstream fmOs(fractionMissingFile, true);
+  fmOs << "species\tmissing" << std::endl;
   for (auto &species : speciesLabels) {
     unsigned int genes = perSpeciesGenes[species];
     double fm = double(maxGenes - genes) / double(maxGenes);
-    fmOs << species << " " << fm << std::endl;
+    fmOs << species << "\t" << fm << std::endl;
   }
   fmOs.close();
   // print logs

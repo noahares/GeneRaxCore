@@ -124,7 +124,7 @@ static std::string getSpeciesEventCountFile(const std::string &outputDir,
                                             const std::string &familyName) {
   return FileSystem::joinPaths(
       outputDir, FileSystem::joinPaths("reconciliations",
-                                       familyName + "_speciesEventCounts.txt"));
+                                       familyName + "_speciesEventCounts.tsv"));
 }
 
 static std::string getTransfersFile(const std::string &outputDir,
@@ -135,7 +135,7 @@ static std::string getTransfersFile(const std::string &outputDir,
   if (sample >= 0) {
     res += std::string("_") + std::to_string(sample);
   }
-  res += std::string("_transfers.txt");
+  res += std::string("_transfers.tsv");
   return res;
 }
 void Routines::inferAndGetReconciliationScenarios(
@@ -206,7 +206,7 @@ void Routines::inferReconciliation(const std::string &speciesTreeFile,
     for (unsigned int i = 0; i < geneTrees.getTrees().size(); ++i) {
       auto &tree = geneTrees.getTrees()[i];
       std::string eventCountsFile = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_eventCounts.txt");
+          reconciliationsDir, tree.name + "_eventCounts.tsv");
       std::string speciesEventCountsFile =
           getSpeciesEventCountFile(outputDir, tree.name);
       std::string transfersFile = getTransfersFile(outputDir, tree.name);
@@ -221,8 +221,12 @@ void Routines::inferReconciliation(const std::string &speciesTreeFile,
       std::string treeWithEventsFileNewickEvents = FileSystem::joinPaths(
           reconciliationsDir, tree.name + "_events.newick");
       auto &scenario = *scenarios[i];
-      scenario.saveEventsCounts(eventCountsFile, false);
-      scenario.savePerSpeciesEventsCounts(speciesEventCountsFile, false);
+      ParallelOfstream eventCountsOs(eventCountsFile, false);
+      Scenario::saveEventsHeader(eventCountsOs);
+      scenario.saveEventsCounts(eventCountsOs, reconciliationSamples);
+      ParallelOfstream perSpeciesEventCountsOs(speciesEventCountsFile, false);
+      Scenario::dumpSpeciesToEventCountHeader(perSpeciesEventCountsOs);
+      scenario.savePerSpeciesEventsCounts(perSpeciesEventCountsOs, reconciliationSamples);
       scenario.saveReconciliation(treeWithEventsFileRecPhyloXML,
                                   ReconciliationFormat::RecPhyloXML, false);
       scenario.saveReconciliation(treeWithEventsFileNHX,
@@ -233,7 +237,8 @@ void Routines::inferReconciliation(const std::string &speciesTreeFile,
                                   ReconciliationFormat::NewickEvents, false);
       scenario.saveReconciliation(treeWithEventsFileNHX,
                                   ReconciliationFormat::NHX, false);
-      scenario.saveTransfers(transfersFile, false);
+      ParallelOfstream transferOs(transfersFile, false);
+      scenario.saveTransfers(transferOs, reconciliationSamples);
     }
     std::string transferPairGlobalFile(
         FileSystem::joinPaths(outputDir, "per_species_pair_transfers.txt"));
@@ -258,7 +263,8 @@ void Routines::inferReconciliation(const std::string &speciesTreeFile,
         std::string transfersFile =
             getTransfersFile(outputDir, tree.name, sample);
         scenario.saveReconciliation(nhxOs, ReconciliationFormat::NHX);
-        scenario.saveTransfers(transfersFile, false);
+        ParallelOfstream transferOs(transfersFile, false);
+        scenario.saveTransfers(transferOs, reconciliationSamples);
         scenario.resetBlackList();
         nhxOs << "\n";
       }
