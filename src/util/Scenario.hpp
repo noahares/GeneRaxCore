@@ -153,7 +153,9 @@ public:
 
   static void
   saveOriginsGlobal(PLLRootedTree &speciesTree,
-                    std::vector<std::shared_ptr<Scenario>> &scenarios,
+                    std::vector<unsigned int> &fromS,
+                    std::vector<unsigned int> &fromSButL,
+                    MatrixUint &countMatrix,
                     unsigned int samples, const std::string &filename);
 
   void saveLargestOrthoGroup(std::string &filename,

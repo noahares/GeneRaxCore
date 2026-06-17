@@ -549,18 +549,14 @@ void Scenario::saveTransferPairCountGlobal(
 
 void Scenario::saveOriginsGlobal(
     PLLRootedTree &speciesTree,
-    std::vector<std::shared_ptr<Scenario>> &scenarios, unsigned int samples,
+    std::vector<unsigned int> &fromS,
+    std::vector<unsigned int> &fromSButL,
+    MatrixUint &countMatrix,
+    unsigned int samples,
     const std::string &outputDir) {
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
   const unsigned int N = labelToId.size();
-  const VectorUint zeros(N, 0);
-  auto countMatrix = MatrixUint(N, zeros);
-  std::vector<unsigned int> fromS(N, 0);
-  std::vector<unsigned int> fromSButL(N, 0);
-  for (auto &scenario : scenarios) {
-    scenario->countOrigins(labelToId, fromS, fromSButL, countMatrix);
-  }
   // iterate over all dest species, and compute their origins
   for (unsigned int j = 0; j < N; ++j) {
     // will stor the origins
