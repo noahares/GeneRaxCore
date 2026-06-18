@@ -71,14 +71,26 @@ void Scenario::addEvent(const Event &event) {
   _geneIdToEvents[event.geneNode].push_back(event);
 }
 
-void Scenario::saveEventsCounts(const std::string &filename,
-                                bool masterRankOnly) {
-  ParallelOfstream os(filename, masterRankOnly);
+void Scenario::saveEventsCounts(ParallelOfstream &os, unsigned int sample) {
   for (unsigned int i = 0;
        i < static_cast<unsigned int>(ReconciliationEventType::EVENT_Invalid);
        ++i) {
-    os << eventNames[i] << ":" << _eventsCount[i] << std::endl;
+    os << "\t" << _eventsCount[i];
   }
+  os << std::endl;
+}
+
+void Scenario::saveEventsHeader(ParallelOfstream &os) {
+  for (unsigned int i = 0;
+       i < static_cast<unsigned int>(ReconciliationEventType::EVENT_Invalid);
+       ++i) {
+    os << "\t" << eventNames[i];
+  }
+  os << std::endl;
+}
+
+void Scenario::saveTransferHeader(ParallelOfstream &os) {
+  os << "donor\trecipient\ttransfers" << std::endl;
 }
 
 std::vector<unsigned int> Scenario::getPerSpeciesCopies() const {
@@ -130,8 +142,8 @@ static void
 dumpSpeciesEventCountVector(ParallelOfstream &os,
                             const std::vector<double> &eventCounts,
                             const std::vector<std::string> &indexToLabel) {
-  os << "species_label, speciations, duplications, losses, transfers, "
-        "presence, origination, copies, singletons, transfers_to"
+  os << "species_label\tspeciations\tduplications\tlosses\ttransfers\t"
+        "presence\torigination\tcopies\tsingletons\ttransfers_to"
      << std::endl;
   auto N = indexToLabel.size();
   assert(Scenario::EVENT_TYPE_NUMBER * N == eventCounts.size());
@@ -143,39 +155,22 @@ dumpSpeciesEventCountVector(ParallelOfstream &os,
     if (print) {
       os << indexToLabel[i];
       for (unsigned int e = 0; e < Scenario::EVENT_TYPE_NUMBER; ++e) {
-        os << ", " << eventCounts[i * Scenario::EVENT_TYPE_NUMBER + e];
+        os << "\t" << eventCounts[i * Scenario::EVENT_TYPE_NUMBER + e];
       }
       os << "\n";
     }
   }
 }
 
-static void dumpSpeciesToEventCount(
-    ParallelOfstream &os,
-    const std::unordered_map<std::string, std::vector<double>>
-        &speciesToEventCount) {
-  os << "species_label, speciations, duplications, losses, transfers, "
-        "presence, origination, copies, singletons, transfers_to"
+void Scenario::dumpSpeciesToEventCountHeader(ParallelOfstream &os) {
+  os << "sample\tspecies_label\tspeciations\tduplications\tlosses\ttransfers\t"
+        "presence\torigination\tcopies\tsingletons\ttransfers_to"
      << std::endl;
-  std::vector<double> defaultCount(Scenario::EVENT_TYPE_NUMBER, 0.0);
-  for (auto &it : speciesToEventCount) {
-    if (defaultCount == it.second) {
-      // do not write species without any event
-      continue;
-    }
-    assert(it.second.size() == Scenario::EVENT_TYPE_NUMBER);
-    os << it.first;
-    for (auto v : it.second) {
-      os << ", " << v;
-    }
-    os << "\n";
-  }
 }
 
-void Scenario::savePerSpeciesEventsCounts(const std::string &filename,
-                                          bool masterRankOnly) {
+void Scenario::savePerSpeciesEventsCounts(ParallelOfstream &os,
+                                  unsigned int sample) {
 
-  ParallelOfstream os(filename, masterRankOnly);
   std::unordered_map<std::string, std::vector<double>> speciesToEventCount;
   std::vector<double> defaultCount(EVENT_TYPE_NUMBER, 0);
   for (unsigned int e = 0;
@@ -244,7 +239,20 @@ void Scenario::savePerSpeciesEventsCounts(const std::string &filename,
   auto origin = getOriginationSpecies();
   assert(origin && origin->label);
   speciesToEventCount[origin->label][5] = 1.0;
-  dumpSpeciesToEventCount(os, speciesToEventCount);
+
+  for (auto &it : speciesToEventCount) {
+    if (defaultCount == it.second) {
+      // do not write species without any event
+      continue;
+    }
+    assert(it.second.size() == Scenario::EVENT_TYPE_NUMBER);
+    os << sample << "\t";
+    os << it.first;
+    for (auto v : it.second) {
+      os << "\t" << v;
+    }
+    os << "\n";
+  }
 }
 
 corax_rnode_t *Scenario::getOriginationSpecies() const {
@@ -256,7 +264,9 @@ corax_rnode_t *Scenario::getOriginationSpecies() const {
 void Scenario::mergeTransfers(const PLLRootedTree &speciesTree,
                               const std::string &filename,
                               const std::vector<std::string> &filenames,
-                              bool parallel, bool normalize) {
+                              unsigned int samples,
+                              bool parallel, bool normalize,
+                              bool contains_sample_id) {
   ParallelOfstream os(filename, parallel);
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
@@ -266,11 +276,17 @@ void Scenario::mergeTransfers(const PLLRootedTree &speciesTree,
   for (const auto &f : filenames) {
     std::ifstream is(f);
     std::string line;
+    // ignore header
+    std::getline(is, line);
     while (std::getline(is, line)) {
       if (line[0] == '#') {
         continue;
       }
       std::istringstream iss(line);
+      if (contains_sample_id || samples > 1) {
+        std::string sample;
+        iss >> sample;
+      }
       std::string sp1;
       std::string sp2;
       double count = 0.0;
@@ -293,21 +309,22 @@ void Scenario::mergeTransfers(const PLLRootedTree &speciesTree,
       }
       double transferCount = countMatrix[i][j];
       if (normalize) {
-        transferCount /= static_cast<double>(subfileCount);
+        transferCount /= static_cast<double>(subfileCount * samples);
       }
       transfers.push_back(TransferPair(transferCount, i, j));
     }
   }
   std::sort(transfers.rbegin(), transfers.rend());
+  saveTransferHeader(os);
   for (const auto &t : transfers) {
-    os << idToLabel[t.id1] << " " << idToLabel[t.id2] << " " << t.count
+    os << idToLabel[t.id1] << "\t" << idToLabel[t.id2] << "\t" << t.count
        << std::endl;
   }
 }
 
 void Scenario::mergePerSpeciesEventCounts(
     const PLLRootedTree &speciesTree, const std::string &filename,
-    const std::vector<std::string> &filenames, bool parallel, bool normalize) {
+    const std::vector<std::string> &filenames, unsigned int samples, bool parallel, bool normalize, bool contains_sample_id) {
   ParallelOfstream os(filename, parallel);
   auto speciesLabelToIndex = speciesTree.getDeterministicLabelToId();
   auto speciesIndexToLabel = speciesTree.getDeterministicIdToLabel();
@@ -323,15 +340,17 @@ void Scenario::mergePerSpeciesEventCounts(
       }
       std::istringstream iss(line);
       std::string species;
+      // This is ugly but we have different header layouts depending on whether it's a combined sample file or a summary file
+      if (contains_sample_id || samples > 1) {
+        std::string sample;
+        iss >> sample;
+      }
       iss >> species;
-      species.pop_back(); // remove comma
       auto speciesIndex = speciesLabelToIndex[species];
       auto begin = speciesIndex * EVENT_TYPE_NUMBER;
       for (unsigned int i = begin; i < begin + EVENT_TYPE_NUMBER; ++i) {
         double temp;
         iss >> temp;
-        std::string comma;
-        iss >> comma;
         eventCounts[i] += temp;
       }
     }
@@ -345,7 +364,7 @@ void Scenario::mergePerSpeciesEventCounts(
   }
   if (normalize) {
     for (auto &count : eventCounts) {
-      count /= static_cast<double>(subfileCount);
+      count /= static_cast<double>(subfileCount * samples);
     }
   }
   dumpSpeciesEventCountVector(os, eventCounts, speciesIndexToLabel);
@@ -443,13 +462,12 @@ void Scenario::countOrigins(const StringToUint &labelToId,
   }
 }
 
-void Scenario::saveTransfers(const std::string &filename, bool masterRankOnly) {
-  ParallelOfstream os(filename, masterRankOnly);
+void Scenario::saveTransfers(ParallelOfstream &os, unsigned int sample) {
   for (auto &event : _events) {
     if (event.type == ReconciliationEventType::EVENT_T ||
         event.type == ReconciliationEventType::EVENT_TL) {
-      os << _speciesTree->nodes[event.speciesNode]->label << " "
-         << _speciesTree->nodes[event.destSpeciesNode]->label << " " << 1
+      os << sample << "\t" << _speciesTree->nodes[event.speciesNode]->label << "\t"
+         << _speciesTree->nodes[event.destSpeciesNode]->label << "\t" << 1
          << std::endl;
     }
   }
@@ -549,24 +567,20 @@ void Scenario::saveTransferPairCountGlobal(
 
 void Scenario::saveOriginsGlobal(
     PLLRootedTree &speciesTree,
-    std::vector<std::shared_ptr<Scenario>> &scenarios, unsigned int samples,
+    std::vector<unsigned int> &fromS,
+    std::vector<unsigned int> &fromSButL,
+    MatrixUint &countMatrix,
+    unsigned int samples,
     const std::string &outputDir) {
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
   const unsigned int N = labelToId.size();
-  const VectorUint zeros(N, 0);
-  auto countMatrix = MatrixUint(N, zeros);
-  std::vector<unsigned int> fromS(N, 0);
-  std::vector<unsigned int> fromSButL(N, 0);
-  for (auto &scenario : scenarios) {
-    scenario->countOrigins(labelToId, fromS, fromSButL, countMatrix);
-  }
   // iterate over all dest species, and compute their origins
   for (unsigned int j = 0; j < N; ++j) {
     // will stor the origins
     std::vector<TransferPair> transferPairs;
     auto label = idToLabel[j];
-    auto output = FileSystem::joinPaths(outputDir, label + ".txt");
+    auto output = FileSystem::joinPaths(outputDir, label + ".tsv");
     ParallelContext::sumUInt(fromS[j]);
     ParallelContext::sumUInt(fromSButL[j]);
     // iterate over all origins
@@ -579,10 +593,11 @@ void Scenario::saveOriginsGlobal(
     }
     std::sort(transferPairs.rbegin(), transferPairs.rend());
     ParallelOfstream os(output);
-    os << "vertical: " << double(fromS[j] + fromSButL[j]) / double(samples)
+    os << "species_label\toriginations" << std::endl;
+    os << "vertical\t" << double(fromS[j] + fromSButL[j]) / double(samples)
        << std::endl;
     for (auto p : transferPairs) {
-      os << idToLabel[p.id1] << ", " << double(p.count) / double(samples)
+      os << idToLabel[p.id1] << "\t" << double(p.count) / double(samples)
          << std::endl;
     }
   }

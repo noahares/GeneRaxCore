@@ -132,14 +132,17 @@ public:
   /**
    * Various methods to save information from the Scenario
    */
-  void saveEventsCounts(const std::string &filename,
-                        bool masterRankOnly = true);
-  void saveTransfers(const std::string &filename, bool masterRankOnly = true);
+  void saveEventsCounts(ParallelOfstream &os, unsigned int sample);
+  static void saveEventsHeader(ParallelOfstream &os);
+  void saveTransfers(ParallelOfstream &os, unsigned int sample);
+  static void saveTransferHeader(ParallelOfstream &os);
   double countTransfer(const std::string &from, const std::string &to);
   static void mergeTransfers(const PLLRootedTree &speciesTree,
                              const std::string &filename,
                              const std::vector<std::string> &filenames,
-                             bool parallel, bool normalize);
+                             unsigned int samples,
+                             bool parallel, bool normalize,
+                             bool contains_sample_id = false);
 
   void saveReconciliation(const std::string &filename,
                           ReconciliationFormat format,
@@ -153,18 +156,21 @@ public:
 
   static void
   saveOriginsGlobal(PLLRootedTree &speciesTree,
-                    std::vector<std::shared_ptr<Scenario>> &scenarios,
+                    std::vector<unsigned int> &fromS,
+                    std::vector<unsigned int> &fromSButL,
+                    MatrixUint &countMatrix,
                     unsigned int samples, const std::string &filename);
 
   void saveLargestOrthoGroup(std::string &filename,
                              bool masterRankOnly = true) const;
   void saveAllOrthoGroups(std::string &filename,
                           bool masterRankOnly = true) const;
-  void savePerSpeciesEventsCounts(const std::string &filename,
-                                  bool masterRankOnl = true);
+  static void dumpSpeciesToEventCountHeader(ParallelOfstream &os);
+  void savePerSpeciesEventsCounts(ParallelOfstream &os,
+                                  unsigned int sample);
   static void mergePerSpeciesEventCounts(
       const PLLRootedTree &tree, const std::string &filename,
-      const std::vector<std::string> &filenames, bool parallel, bool normalize);
+      const std::vector<std::string> &filenames, unsigned int samples, bool parallel, bool normalize, bool contains_sample_id = false);
   void gatherReconciliationStatistics(PerSpeciesEvents &perSpeciesEvents) const;
   void countTransfers(const StringToUint &labelToId, MatrixUint &count);
   void countOrigins(const StringToUint &labelToId,
