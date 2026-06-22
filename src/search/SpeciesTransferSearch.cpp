@@ -1,10 +1,13 @@
 #include "SpeciesTransferSearch.hpp"
 
-#include "SpeciesSearchCommon.hpp"
-#include <IO/FileSystem.hpp>
 #include <algorithm>
-#include <trees/PLLRootedTree.hpp>
+#include <cassert>
+
+#include "SpeciesSearchCommon.hpp"
+#include <IO/Logger.hpp>
+#include <parallelization/ParallelContext.hpp>
 #include <trees/SpeciesTree.hpp>
+#include <util/Scenario.hpp>
 
 void PerCorePotentialTransfers::addScenario(const Scenario &scenario) {
   auto famCopies = scenario.getPerSpeciesCopies();
@@ -51,12 +54,12 @@ void SpeciesTransferSearch::getSortedTransferList(
   }
   unsigned int transfers = 0;
   ParallelContext::barrier();
-  std::unordered_map<std::string, unsigned int> labelsToIds;
-  speciesTree.getLabelsToId(labelsToIds);
+  StringToUint labelToId;
+  speciesTree.getLabelToId(labelToId);
   for (unsigned int from = 0; from < frequencies.count.size(); ++from) {
     for (unsigned int to = 0; to < frequencies.count.size(); ++to) {
-      auto regraft = labelsToIds[frequencies.idToLabel[from]];
-      auto prune = labelsToIds[frequencies.idToLabel[to]];
+      auto regraft = labelToId[frequencies.idToLabel[from]];
+      auto prune = labelToId[frequencies.idToLabel[to]];
       auto count = frequencies.count[from][to];
       transfers += count;
       if (count < minTransfers) {

@@ -12,6 +12,7 @@ BaseReconciliationModel::BaseReconciliationModel(
 
 void BaseReconciliationModel::onSpeciesTreeChange(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
+  // invalidated species nodes
   if (!nodesToInvalidate) {
     _allSpeciesNodesInvalid = true;
   } else {
@@ -23,6 +24,7 @@ void BaseReconciliationModel::onSpeciesTreeChange(
       }
     }
   }
+  // full species tree representation
   _allSpeciesNodes.clear();
   fillNodesPostOrder(_speciesTree.getRoot(), _allSpeciesNodes);
   for (auto speciesNode : getAllSpeciesNodes()) {
@@ -32,20 +34,22 @@ void BaseReconciliationModel::onSpeciesTreeChange(
     _speciesParent[e] = speciesNode->parent;
   }
   _prunedRoot = _speciesTree.getRoot();
+  // pruned species tree representation
   if (_speciesCoverage.size()) {
     std::fill(_speciesToPrunedNode.begin(), _speciesToPrunedNode.end(),
               nullptr);
     for (auto speciesNode : getAllSpeciesNodes()) {
       auto e = speciesNode->node_index;
+      if (prunedMode()) {
+        _speciesLeft[e] = _speciesRight[e] = _speciesParent[e] = nullptr;
+      }
       if (!speciesNode->left) { // leaf node
         if (_speciesCoverage[e] > 0) {
           _speciesToPrunedNode[e] = speciesNode;
         }
       } else { // internal node
-        auto left = _speciesLeft[e];
-        auto right = _speciesRight[e];
-        auto prunedLeft = _speciesToPrunedNode[left->node_index];
-        auto prunedRight = _speciesToPrunedNode[right->node_index];
+        auto prunedLeft = _speciesToPrunedNode[speciesNode->left->node_index];
+        auto prunedRight = _speciesToPrunedNode[speciesNode->right->node_index];
         if (prunedLeft && prunedRight) { // the node belongs to pruned nodes
           _speciesToPrunedNode[e] = speciesNode;
           if (prunedMode()) {

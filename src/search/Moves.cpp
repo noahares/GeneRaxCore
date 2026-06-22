@@ -1,5 +1,7 @@
+#include "Moves.hpp"
+
 #include <IO/Logger.hpp>
-#include <search/Moves.hpp>
+#include <parallelization/ParallelContext.hpp>
 #include <trees/JointTree.hpp>
 
 // constants taken from RAXML
@@ -150,10 +152,10 @@ void SPRMove::synchronizeOptimizedBL(JointTree &tree) {
   }
   std::vector<unsigned int> globalIndices;
   std::vector<double> globalLengths;
-  ParallelContext::concatenateHetherogeneousUIntVectors(branchIndices,
-                                                        globalIndices);
-  ParallelContext::concatenateHetherogeneousDoubleVectors(branchLengths,
-                                                          globalLengths);
+  ParallelContext::concatenateHeterogeneousUIntVectors(branchIndices,
+                                                       globalIndices);
+  ParallelContext::concatenateHeterogeneousDoubleVectors(branchLengths,
+                                                         globalLengths);
   _optimizedBranches.clear();
   _optimizedBackBranches.clear();
   assert(globalIndices.size() == globalLengths.size());

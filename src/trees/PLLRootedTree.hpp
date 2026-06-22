@@ -107,9 +107,9 @@ public:
                                  std::unordered_set<std::string> &labels);
 
   /**
-   *  Get a mapping from label to integer
+   *  Get a mapping from a leaf label to the leaf node index
    */
-  StringToUintMap getLabelToIntMap();
+  StringToUint getLeafLabelToId() const;
 
   /*
    * Save the tree in newick format in filename

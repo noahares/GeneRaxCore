@@ -1,9 +1,9 @@
 #include "Clade.hpp"
+
 #include <IO/GeneSpeciesMapping.hpp>
-#include <algorithm>
-#include <functional>
 #include <trees/PLLRootedTree.hpp>
 #include <trees/PLLUnrootedTree.hpp>
+#include <util/utils.hpp>
 
 static unsigned int hashTwoValues(unsigned int a, unsigned int b) {
   /*
@@ -49,7 +49,7 @@ Clade Clade::getComplement(Clade &allTaxa) {
 
 Clade Clade::getMaximumClade(PLLRootedTree &tree) {
   Clade clade;
-  for (auto &p : tree.getLabelToIntMap()) {
+  for (auto &p : tree.getLeafLabelToId()) {
     clade._ids.insert(p.second);
   }
   clade._recomputeHash();
@@ -85,7 +85,7 @@ CladeSet Clade::buildCladeSet(PLLRootedTree &tree) {
 
 CladeSet Clade::buildCladeSet(PLLUnrootedTree &tree,
                               const GeneSpeciesMapping &geneSpeciesMapping,
-                              const StringToUintMap &speciesLabelToInt) {
+                              const StringToUint &speciesLabelToInt) {
   auto postOrderNodes = tree.getPostOrderNodes();
   std::vector<Clade> clades(postOrderNodes.size());
   for (auto node : postOrderNodes) {

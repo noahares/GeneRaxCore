@@ -62,9 +62,10 @@ public:
     return Enums::accountsForTransfers(_recModelInfo.model);
   }
 
-  /*
-   *  Call this everytime that the species tree changes
+  /**
+   *  Update node information after modifying the species tree
    */
+  void onSpeciesDatesChange();
   void onSpeciesTreeChange(
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate);
 

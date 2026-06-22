@@ -1,12 +1,10 @@
+#include "SPRSearch.hpp"
+
+#include "Moves.hpp"
+#include "SearchUtils.hpp"
 #include <IO/Logger.hpp>
-#include <array>
 #include <parallelization/ParallelContext.hpp>
-#include <search/Moves.hpp>
-#include <search/SPRSearch.hpp>
-#include <search/SearchUtils.hpp>
 #include <trees/JointTree.hpp>
-#include <unordered_map>
-#include <unordered_set>
 
 struct SPRMoveDesc {
   SPRMoveDesc(unsigned int prune, unsigned int regraft,
@@ -249,8 +247,8 @@ static void synchronizeMoves(JointTree &jointTree,
   }
   std::vector<unsigned int> prune;
   std::vector<unsigned int> regraft;
-  ParallelContext::concatenateHetherogeneousUIntVectors(localPrune, prune);
-  ParallelContext::concatenateHetherogeneousUIntVectors(localRegraft, regraft);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localPrune, prune);
+  ParallelContext::concatenateHeterogeneousUIntVectors(localRegraft, regraft);
   auto temp = moves;
   moves.clear();
   assert(prune.size() == regraft.size());

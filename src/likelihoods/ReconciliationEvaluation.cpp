@@ -150,6 +150,11 @@ corax_unode_t *ReconciliationEvaluation::inferMLRoot() {
   return res;
 }
 
+void ReconciliationEvaluation::onSpeciesDatesChange() {
+  assert(_evaluators);
+  _evaluators->onSpeciesDatesChange();
+}
+
 void ReconciliationEvaluation::onSpeciesTreeChange(
     const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) {
   assert(_evaluators);

@@ -1,8 +1,11 @@
-#include "parallelization/ParallelContext.hpp"
-#include <IO/Logger.hpp>
+#include "ParallelContext.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <numeric>
+
+#include <IO/Logger.hpp>
 #include <maths/Random.hpp>
 
 std::ofstream ParallelContext::sink("/dev/null");
@@ -232,6 +235,7 @@ void ParallelContext::allGatherInt(int localValue,
   assert(false);
 #endif
 }
+
 void ParallelContext::allGatherUInt(unsigned int localValue,
                                     std::vector<unsigned int> &allValues) {
   if (!_mpiEnabled) {
@@ -254,7 +258,6 @@ void ParallelContext::concatenateIntVectors(const std::vector<int> &localVector,
     globalVector = localVector;
     return;
   }
-
 #ifdef WITH_MPI
   globalVector.resize(getSize() * localVector.size(), 0);
   MPI_Allgather(&localVector[0], static_cast<int>(localVector.size()), MPI_INT,
@@ -272,7 +275,6 @@ void ParallelContext::concatenateUIntVectors(
     globalVector = localVector;
     return;
   }
-
 #ifdef WITH_MPI
   globalVector.resize(getSize() * localVector.size(), 0);
   MPI_Allgather(&localVector[0], static_cast<int>(localVector.size()),
@@ -283,7 +285,7 @@ void ParallelContext::concatenateUIntVectors(
 #endif
 }
 
-void ParallelContext::concatenateHetherogeneousDoubleVectors(
+void ParallelContext::concatenateHeterogeneousDoubleVectors(
     const std::vector<double> &localVector, std::vector<double> &globalVector) {
   if (!_mpiEnabled) {
     globalVector = localVector;
@@ -311,8 +313,8 @@ void ParallelContext::concatenateHetherogeneousDoubleVectors(
 #endif
 }
 
-void ParallelContext::concatenateHetherogeneousUIntVectors(
-    std::vector<unsigned int> localVector,
+void ParallelContext::concatenateHeterogeneousUIntVectors(
+    const std::vector<unsigned int> &localVector,
     std::vector<unsigned int> &globalVector) {
   if (!_mpiEnabled) {
     globalVector = localVector;
@@ -459,7 +461,7 @@ bool ParallelContext::isDoubleEqual(double value) {
   std::vector<double> rands(getSize());
   allGatherDouble(value, rands);
   for (auto v : rands) {
-    if (fabs(v - rands[0]) > 0.00000001) {
+    if (std::fabs(v - rands[0]) > 0.00000001) {
       std::cout << "KO " << v << " " << rands[0] << std::endl;
       std::cerr << "KO " << v << " " << rands[0] << std::endl;
       return false;

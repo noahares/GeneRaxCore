@@ -1,8 +1,11 @@
 #pragma once
 
+#include <exception>
 #include <fstream>
 #include <stack>
+#include <string>
 #include <vector>
+
 #ifdef WITH_MPI
 #include <mpi.h>
 #else
@@ -10,22 +13,22 @@ typedef int MPI_Comm;
 #endif
 
 /**
- * Singleton class that handles parallelization routines
+ *  Singleton class that handles parallelization routines
  */
 class ParallelContext {
 public:
   ParallelContext() = delete;
 
   /**
-   *  Initialize the parallel context. Must always be called at the start of the
-   * programm
-   *  @param commPtr a pointer to the MPI communicator used by this programm
+   *  Initialize the parallel context. Must always be called at the start of
+   *  the program
+   *  @param commPtr a pointer to the MPI communicator used by this program
    */
   static void init(void *commPtr);
 
   /**
-   *  Terminates the parallel context. Must always be called at the end of the
-   * programm
+   *  Terminate the parallel context. Must always be called at the end of
+   *  the program
    */
   static void finalize();
 
@@ -40,7 +43,7 @@ public:
   static unsigned int getSize();
 
   /**
-   * Gather the values of each rank into a global std::vector
+   *  Gather the values of each rank into a global std::vector
    *  @param localValue input value for this rank
    *  @param allValues output values for all rank (indexed with the rank index)
    */
@@ -56,7 +59,7 @@ public:
   static bool isDoubleEqual(double value);
 
   /**
-   * Concatenates vectors of same sizes
+   *  Concatenate vectors of same sizes
    */
   static void concatenateIntVectors(const std::vector<int> &localVector,
                                     std::vector<int> &globalVector);
@@ -65,14 +68,14 @@ public:
                          std::vector<unsigned int> &globalVector);
 
   /**
-   * Concatenates vectors of different sizes
+   *  Concatenate vectors of different sizes
    */
+  static void concatenateHeterogeneousUIntVectors(
+      const std::vector<unsigned int> &localVector,
+      std::vector<unsigned int> &globalVector);
   static void
-  concatenateHetherogeneousUIntVectors(std::vector<unsigned int> localVector,
-                                       std::vector<unsigned int> &globalVector);
-  static void
-  concatenateHetherogeneousDoubleVectors(const std::vector<double> &localVector,
-                                         std::vector<double> &globalVector);
+  concatenateHeterogeneousDoubleVectors(const std::vector<double> &localVector,
+                                        std::vector<double> &globalVector);
 
   static void sumDouble(double &value);
   static void sumUInt(unsigned int &value);
@@ -83,7 +86,7 @@ public:
   static void parallelAnd(bool &value);
 
   /**
-   *  broadcast a value from a given rank
+   *  Broadcast a value from a given rank
    *  @param fromRank rank from which we want the value
    *  @param value input value for this rank, output value for the other ranks
    */
@@ -94,7 +97,7 @@ public:
   /**
    *  Get the highest value from all ranks
    *  @param value as input, the value for the current rank. As output,
-   *    the highest value among the ranks
+   *               the highest value among the ranks
    *  @param bestRank the rank that has the highest value
    */
   static unsigned int getMax(double &value, unsigned int &bestRank);
@@ -129,14 +132,13 @@ private:
   static std::stack<MPI_Comm> _commStack;
   static std::stack<bool> _ownsMPIContextStack;
   static bool _mpiEnabled;
+
   class ParallelException : public std::exception {
   public:
     ParallelException(int errorCode) {
       msg_ = "Program failed with error " + std::to_string(errorCode);
     }
-
     virtual ~ParallelException() {}
-
     virtual const char *what() const noexcept { return msg_.c_str(); }
 
   private:
