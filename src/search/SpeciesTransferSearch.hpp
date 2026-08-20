@@ -1,76 +1,90 @@
 #pragma once
 
-#include <string>
-#include <unordered_set>
+#include <functional>
+
 #include <util/types.hpp>
-#include <vector>
 
 class SpeciesTree;
 class SpeciesTreeLikelihoodEvaluatorInterface;
-class AverageStream;
 class SpeciesSearchState;
 class Scenario;
-static unsigned int hashints(unsigned int a, unsigned int b) {
-  return (a + b) * (a + b + 1) / 2 + b;
-}
 
 struct TransferMove {
   unsigned int prune;
   unsigned int regraft;
-  double transfers;
-  TransferMove() : prune(0), regraft(0), transfers(0.0) {}
-  TransferMove(unsigned int p, unsigned int r, double t)
-      : prune(p), regraft(r), transfers(t) {}
-  bool operator<(const TransferMove &tm) const {
-    if (transfers != tm.transfers) {
-      return transfers > tm.transfers;
-    } else if (regraft != tm.regraft) {
-      return regraft > tm.regraft;
+  unsigned int transfers;
+  double support;
+  TransferMove() : prune(0), regraft(0), transfers(0), support(0.0) {}
+  TransferMove(unsigned int p, unsigned int r, unsigned int t)
+      : prune(p), regraft(r), transfers(t), support(0.0) {}
+  // used for sorting
+  bool operator<(const TransferMove &other) const {
+    if (support != other.support) {
+      return support < other.support;
+    } else if (regraft != other.regraft) {
+      return regraft < other.regraft;
     } else {
-      return prune > tm.prune;
+      return prune < other.prune;
     }
   }
-  bool operator==(const TransferMove &obj) const {
-    return (obj.prune == prune) && (obj.regraft == regraft) &&
-           (obj.transfers == transfers);
+  // used for blacklisting
+  bool operator==(const TransferMove &other) const {
+    return (prune == other.prune) && (regraft == other.regraft) &&
+           (transfers == other.transfers);
   }
 };
 
 namespace std {
 template <> struct hash<TransferMove> {
-  size_t operator()(const TransferMove &obj) const {
+  size_t operator()(const TransferMove &move) const {
+    auto hashints = [](unsigned int a, unsigned int b) {
+      return (a + b) * (a + b + 1) / 2 + b;
+    };
     return hash<int>()(static_cast<int>(
-        hashints(hashints(obj.prune, obj.regraft), obj.transfers)));
+        hashints(hashints(move.prune, move.regraft), move.transfers)));
   }
 };
 } // namespace std
 
 struct MovesBlackList {
   std::unordered_set<TransferMove> _blacklist;
-  bool isBlackListed(const TransferMove &move) {
+  bool isBlackListed(const TransferMove &move) const {
     return _blacklist.find(move) != _blacklist.end();
   }
-  void blacklist(const TransferMove &move) { _blacklist.insert(move); }
+  void blackList(const TransferMove &move) { _blacklist.insert(move); }
 };
 
 struct PerCorePotentialTransfers {
-
-  PerCorePotentialTransfers() {}
-  void addScenario(const Scenario &scenario);
-  unsigned int getPotentialTransfers(unsigned int src, unsigned int dest);
   MatrixUint copies; // copies[species][family]
+  void addScenario(const Scenario &scenario);
+  unsigned int countPotentialTransfers(unsigned int src,
+                                       unsigned int dest) const;
 };
 
 class SpeciesTransferSearch {
 public:
-  static bool
-  transferSearch(SpeciesTree &speciesTree,
-                 SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-                 SpeciesSearchState &searchState);
+  SpeciesTransferSearch() = delete;
 
+  /**
+   *  Return HGT directions sorted in the descending order by
+   *  the number of transfer events across all gene families
+   *  @param minTransfers The min number of transfers to include a move
+   *  @param blacklist The moves that should not be included in any case
+   *
+   *  Note: in TransferMove, regraft is the HGT src and prune is the HGT dest
+   */
   static void
   getSortedTransferList(SpeciesTree &speciesTree,
-                        SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-                        unsigned int minTransfers, MovesBlackList &blacklist,
+                        SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+                        unsigned int minTransfers,
+                        const MovesBlackList &blacklist,
                         std::vector<TransferMove> &transferMoves);
+
+  /**
+   *  Search for the ML topology of the current species tree
+   *  with SPR moves along the most frequent HGT directions
+   */
+  static bool transferSearch(SpeciesTree &speciesTree,
+                             SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+                             SpeciesSearchState &searchState);
 };

@@ -1,6 +1,10 @@
 #include "SpeciesSearchCommon.hpp"
 
-#include <trees/PLLRootedTree.hpp>
+#include <algorithm>
+#include <cassert>
+#include <limits>
+
+#include <IO/Logger.hpp>
 #include <trees/SpeciesTree.hpp>
 
 static std::string getSubtreeNewick(const corax_rnode_t *subtree) {
@@ -93,7 +97,6 @@ void RootLikelihoods::fillTreeBootstraps(PLLRootedTree &tree) {
   }
   auto postOrderNodes = tree.getPostOrderNodes();
   for (auto it = postOrderNodes.rbegin(); it != postOrderNodes.rend(); ++it) {
-
     auto node = *it;
     if (!hasSubtreeId(node)) {
       continue;
@@ -105,16 +108,11 @@ void RootLikelihoods::fillTreeBootstraps(PLLRootedTree &tree) {
     std::string label;
     auto value = idToSupport[id];
     if (!node->left && node->label) {
-
       label = std::string(node->label);
-      free(node->label);
-      node->label = nullptr;
       label += "_";
     }
     label += std::to_string(value);
-    node->label = (char *)malloc(label.size() + 1);
-    memcpy(node->label, label.c_str(), label.size());
-    node->label[label.size()] = 0;
+    tree.setLabel(node->node_index, label);
   }
 }
 
@@ -136,70 +134,67 @@ void SpeciesSearchState::betterLikelihoodCallback(double ll,
 
 bool SpeciesSearchCommon::testSPR(
     SpeciesTree &speciesTree,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+    SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
     SpeciesSearchState &searchState, unsigned int prune, unsigned int regraft) {
-  evaluation.pushRollback();
-  // Apply the move
   std::vector<unsigned int> affectedBranches;
   SpeciesTreeOperator::getAffectedBranches(speciesTree, prune, regraft,
                                            affectedBranches);
+  // apply the move
+  evaluator.pushRollback();
   auto rollback =
       SpeciesTreeOperator::applySPRMove(speciesTree, prune, regraft);
   bool runExactTest = true;
   double approxLL = 0.0;
-  if (evaluation.providesFastLikelihoodImpl()) {
-    // first test with approximative likelihood
-    approxLL = evaluation.computeLikelihoodFast();
+  if (evaluator.providesFastLikelihoodImpl()) {
+    // first test the move with approximate likelihood
+    approxLL = evaluator.computeLikelihoodFast();
     if (searchState.averageApproxError.isSignificant()) {
-      //  Decide whether we can already
-      // discard the move
+      // discard the move if the likelihood improvement can be
+      // explained by approximation error or no improvement observed
       auto epsilon = 2.0 * searchState.averageApproxError.getAverage();
       runExactTest &= (approxLL + epsilon > searchState.bestLL);
     }
   }
   if (runExactTest) {
-    // we test the move with exact likelihood
+    // now test the move with exact likelihood
     PerFamLL perFamLL;
-    auto testedTreeLL = evaluation.computeLikelihood(&perFamLL);
+    auto ll = evaluator.computeLikelihood(&perFamLL);
     for (auto &bs : searchState.sprBoots) {
       bs.test(perFamLL, affectedBranches, false);
     }
-    if (evaluation.providesFastLikelihoodImpl()) {
-      searchState.averageApproxError.addValue(testedTreeLL - approxLL);
+    if (evaluator.providesFastLikelihoodImpl()) {
+      searchState.averageApproxError.addValue(ll - approxLL);
     }
-    if (testedTreeLL > searchState.bestLL + 0.00000001) {
-      searchState.betterTreeCallback(testedTreeLL, perFamLL);
-      // Better tree found! Do not rollback, and return
+    if (ll > searchState.bestLL + 0.00000001) {
+      // better tree found
+      // do not rollback the move and return true
+      searchState.betterTreeCallback(ll, perFamLL);
       return true;
     } else {
       searchState.khBoots.test(perFamLL, affectedBranches);
     }
   }
-  // the tree is not better, rollback the move
+  // the tree is not better
+  // rollback the move and return false
   SpeciesTreeOperator::reverseSPRMove(speciesTree, prune, rollback);
-  evaluation.popAndApplyRollback();
+  evaluator.popAndApplyRollback();
   return false;
 }
 
 bool SpeciesSearchCommon::veryLocalSearch(
     SpeciesTree &speciesTree,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-    SpeciesSearchState &searchState, unsigned int spid) {
-
+    SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+    SpeciesSearchState &searchState, unsigned int prune) {
   const unsigned int radius = 2;
-  std::vector<unsigned int> prunes;
-  prunes.push_back(spid);
-  for (auto prune : prunes) {
-    std::vector<unsigned int> regrafts;
-    SpeciesTreeOperator::getPossibleRegrafts(speciesTree, prune, radius,
-                                             regrafts);
-    for (auto regraft : regrafts) {
-      if (testSPR(speciesTree, evaluation, searchState, prune, regraft)) {
-        Logger::timed << "\tfound better* (LL=" << searchState.bestLL
-                      << ", hash=" << speciesTree.getHash() << ")" << std::endl;
-        veryLocalSearch(speciesTree, evaluation, searchState, prune);
-        return true;
-      }
+  std::vector<unsigned int> regrafts;
+  SpeciesTreeOperator::getPossibleRegrafts(speciesTree, prune, radius,
+                                           regrafts);
+  for (auto regraft : regrafts) {
+    if (testSPR(speciesTree, evaluator, searchState, prune, regraft)) {
+      Logger::timed << "\tfound better* (LL=" << searchState.bestLL
+                    << ", hash=" << speciesTree.getHash() << ")" << std::endl;
+      veryLocalSearch(speciesTree, evaluator, searchState, prune);
+      return true;
     }
   }
   return false;

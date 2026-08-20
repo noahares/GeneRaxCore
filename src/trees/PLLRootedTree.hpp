@@ -226,6 +226,8 @@ public:
 
   std::vector<corax_rnode_t *> getOrderedSpeciations() const;
 
+  size_t getTreeHash(bool useLeafHash = true) const;
+
 private:
   std::unique_ptr<corax_rtree_t, void (*)(corax_rtree_t *)> _tree;
 

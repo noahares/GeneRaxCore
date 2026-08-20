@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <functional>
 
 #include <IO/GeneSpeciesMapping.hpp>
 #include <parallelization/ParallelContext.hpp>
@@ -82,53 +81,62 @@ void SpeciesTreeOperator::restoreDates(SpeciesTree &speciesTree,
 
 static void setRootAux(SpeciesTree &speciesTree, corax_rnode_t *root) {
   speciesTree.getTree().getRawPtr()->root = root;
-  root->parent = 0;
+  root->parent = nullptr;
 }
 
+// direction: 0 == RR, 1 == LR, 2 == RL, 3 == LL
 bool SpeciesTreeOperator::canChangeRoot(const SpeciesTree &speciesTree,
                                         unsigned int direction) {
-  bool left1 = direction % 2;
-  auto root = speciesTree.getTree().getRoot();
-  assert(root);
-  auto newRoot = left1 ? root->left : root->right;
+  assert(direction < 4);
+  auto root = speciesTree.getRoot();
+  auto newRoot = (direction % 2) ? root->left : root->right;
   return newRoot->left && newRoot->right;
 }
 
 void SpeciesTreeOperator::changeRoot(SpeciesTree &speciesTree,
                                      unsigned int direction) {
-  bool left1 = direction % 2;
-  bool left2 = direction / 2;
-  assert(canChangeRoot(speciesTree, left1));
-  auto root = speciesTree.getTree().getRoot();
+  assert(canChangeRoot(speciesTree, direction));
+  std::unordered_set<corax_rnode_t *> nodesToInvalidate;
+  // reroot
+  auto root = speciesTree.getRoot();
   auto rootLeft = root->left;
   auto rootRight = root->right;
   auto A = rootLeft->left;
   auto B = rootLeft->right;
   auto C = rootRight->left;
   auto D = rootRight->right;
-  std::unordered_set<corax_rnode_t *> nodesToInvalidate;
+  auto newRoot = (direction % 2) ? rootLeft : rootRight;
   nodesToInvalidate.insert(root);
-  setRootAux(speciesTree, left1 ? rootLeft : rootRight);
-  if (left1 && left2) {
-    PLLRootedTree::setSon(rootLeft, root, false);
-    PLLRootedTree::setSon(root, B, true);
-    PLLRootedTree::setSon(root, rootRight, false);
-  } else if (!left1 && !left2) {
+  setRootAux(speciesTree, newRoot);
+  switch (direction) {
+  case 0: // RR
     PLLRootedTree::setSon(rootRight, root, true);
-    PLLRootedTree::setSon(root, C, false);
+    PLLRootedTree::setSon(rootRight, D, false);
     PLLRootedTree::setSon(root, rootLeft, true);
-  } else if (left1 && !left2) {
-    PLLRootedTree::setSon(rootLeft, rootLeft->right, true);
+    PLLRootedTree::setSon(root, C, false);
+    break;
+  case 1: // LR
+    PLLRootedTree::setSon(rootLeft, B, true);
     PLLRootedTree::setSon(rootLeft, root, false);
-    PLLRootedTree::setSon(root, A, false);
     PLLRootedTree::setSon(root, rootRight, true);
-  } else { // !left1 && left2
+    PLLRootedTree::setSon(root, A, false);
+    break;
+  case 2: // RL
     PLLRootedTree::setSon(rootRight, root, true);
     PLLRootedTree::setSon(rootRight, C, false);
     PLLRootedTree::setSon(root, D, true);
     PLLRootedTree::setSon(root, rootLeft, false);
+    break;
+  case 3: // LL
+    PLLRootedTree::setSon(rootLeft, A, true);
+    PLLRootedTree::setSon(rootLeft, root, false);
+    PLLRootedTree::setSon(root, B, true);
+    PLLRootedTree::setSon(root, rootRight, false);
+    break;
+  default:
+    assert(false);
   }
-  auto newRoot = root->parent;
+  // update ranks, branches, and labels
   auto &datedTree = speciesTree.getDatedTree();
   if (datedTree.isDated()) {
     while (datedTree.moveUp(datedTree.getRank(newRoot))); // move newRoot rank
@@ -143,28 +151,33 @@ void SpeciesTreeOperator::revertChangeRoot(SpeciesTree &speciesTree,
   changeRoot(speciesTree, 3 - direction);
 }
 
-corax_rnode_t *getBrother(corax_rnode_t *node) {
+static corax_rnode_t *getBrother(corax_rnode_t *node) {
   auto father = node->parent;
-  assert(father);
-  return father->left == node ? father->right : father->left;
+  if (father) {
+    return (father->left == node) ? father->right : father->left;
+  }
+  return nullptr;
 }
 
 bool SpeciesTreeOperator::canApplySPRMove(SpeciesTree &speciesTree,
                                           unsigned int prune,
                                           unsigned int regraft) {
   auto pruneNode = speciesTree.getNode(prune);
+  auto pruneFatherNode = pruneNode->parent;
+  auto pruneBrotherNode = getBrother(pruneNode);
   auto regraftNode = speciesTree.getNode(regraft);
-  if (pruneNode->parent == regraftNode) {
+  // check prune is not the root
+  if (!pruneFatherNode) {
     return false;
   }
-  if (!pruneNode->parent || regraftNode == getBrother(pruneNode)) {
+  // check regraft is not adjacent to prune
+  if (regraftNode == pruneFatherNode || regraftNode == pruneBrotherNode) {
     return false;
   }
-  while (regraftNode != speciesTree.getRoot()) {
-    if (pruneNode == regraftNode) {
-      return false;
-    }
-    regraftNode = regraftNode->parent;
+  // check regraft is not a prune's descendant (or prune itself)
+  // this should be fast, as the ancestors are cached
+  if (speciesTree.getTree().isAncestorOf(prune, regraft)) {
+    return false;
   }
   return true;
 }
@@ -172,42 +185,43 @@ bool SpeciesTreeOperator::canApplySPRMove(SpeciesTree &speciesTree,
 unsigned int SpeciesTreeOperator::applySPRMove(SpeciesTree &speciesTree,
                                                unsigned int prune,
                                                unsigned int regraft) {
+  assert(canApplySPRMove(speciesTree, prune, regraft));
+  std::unordered_set<corax_rnode_t *> nodesToInvalidate;
+  // prune
   auto pruneNode = speciesTree.getNode(prune);
   auto pruneFatherNode = pruneNode->parent;
   assert(pruneFatherNode);
   auto pruneGrandFatherNode = pruneFatherNode->parent;
   auto pruneBrotherNode = getBrother(pruneNode);
-  unsigned int res = pruneBrotherNode->node_index;
-  std::unordered_set<corax_rnode_t *> nodesToInvalidate;
-  // prune
   nodesToInvalidate.insert(pruneFatherNode);
-  if (pruneGrandFatherNode) {
+  if (!pruneGrandFatherNode) { // prune is at the root
+    setRootAux(speciesTree, pruneBrotherNode);
+  } else {
     nodesToInvalidate.insert(pruneGrandFatherNode);
     PLLRootedTree::setSon(pruneGrandFatherNode, pruneBrotherNode,
                           pruneGrandFatherNode->left == pruneFatherNode);
-  } else {
-    setRootAux(speciesTree, pruneBrotherNode);
   }
   // regraft
   auto regraftNode = speciesTree.getNode(regraft);
   auto regraftParentNode = regraftNode->parent;
-  if (!regraftParentNode) {
-    // regraft is the root
+  if (!regraftParentNode) { // regraft is the root
     setRootAux(speciesTree, pruneFatherNode);
     PLLRootedTree::setSon(pruneFatherNode, regraftNode,
                           pruneFatherNode->left != pruneNode);
   } else {
+    nodesToInvalidate.insert(regraftParentNode);
     PLLRootedTree::setSon(regraftParentNode, pruneFatherNode,
                           regraftParentNode->left == regraftNode);
     PLLRootedTree::setSon(pruneFatherNode, regraftNode,
                           pruneFatherNode->left != pruneNode);
-    nodesToInvalidate.insert(regraftParentNode);
   }
+  // update ranks, branches, and labels
   auto &datedTree = speciesTree.getDatedTree();
   assert(!datedTree.isDated());
   datedTree.updateSpeciationOrderAndRanks(); // get ranks from topology
   speciesTree.onSpeciesTreeChange(&nodesToInvalidate);
-  return res;
+  // return info for a rollback
+  return pruneBrotherNode->node_index;
 }
 
 void SpeciesTreeOperator::reverseSPRMove(SpeciesTree &speciesTree,
@@ -216,92 +230,100 @@ void SpeciesTreeOperator::reverseSPRMove(SpeciesTree &speciesTree,
   applySPRMove(speciesTree, prune, applySPRMoveReturnValue);
 }
 
+void SpeciesTreeOperator::getPossiblePrunes(
+    const SpeciesTree &speciesTree, const std::vector<double> &supportValues,
+    double maxSupport, std::vector<unsigned int> &prunes) {
+  // we can take potentially all nodes (even the root), as the root
+  // may be changed during a SPR search round
+  for (auto node : speciesTree.getTree().getNodes()) {
+    auto parentNode = node->parent;
+    if (supportValues.size() && parentNode) {
+      double parentSupport = supportValues[parentNode->node_index];
+      if (parentSupport > maxSupport) {
+        continue; // but we do not want to break well-supported clades
+      }
+    }
+    prunes.push_back(node->node_index);
+  }
+}
+
 // direction: 0 == from parent, 1 == from left, 2 == from right
 static void recursiveGetNodes(corax_rnode_t *node, unsigned int direction,
                               unsigned int radius,
-                              std::vector<unsigned int> &nodes,
-                              bool addNode = true) {
-  if (radius == 0 || node == 0) {
+                              std::vector<unsigned int> &nodes, bool addNode) {
+  if (!node) {
     return;
   }
   if (addNode) {
     nodes.push_back(node->node_index);
   }
-  switch (direction) {
-  case 0:
-    recursiveGetNodes(node->left, 0, radius - 1, nodes);
-    recursiveGetNodes(node->right, 0, radius - 1, nodes);
-    break;
-  case 1:
-  case 2:
-    recursiveGetNodes((direction == 1 ? node->right : node->left), 0,
-                      radius - 1, nodes);
-    if (node->parent) {
-      recursiveGetNodes(node->parent, node->parent->left == node ? 1 : 2,
-                        radius - 1, nodes);
-    }
-    break;
-  default:
-    assert(false);
-  };
-}
-
-void SpeciesTreeOperator::getPossiblePrunes(SpeciesTree &speciesTree,
-                                            std::vector<unsigned int> &prunes,
-                                            std::vector<double> supportValues,
-                                            double maxSupport) {
-  for (auto pruneNode : speciesTree.getTree().getNodes()) {
-    if (pruneNode == speciesTree.getTree().getRoot()) {
-      continue;
-    }
-    bool ok = true;
-    if (supportValues.size() && pruneNode->parent) {
-      double parentSupport = supportValues[pruneNode->parent->node_index];
-      ok &= (parentSupport <= maxSupport);
-    }
-    ok = true;
-    if (ok) {
-      prunes.push_back(pruneNode->node_index);
+  if (radius) {
+    radius--;
+    switch (direction) {
+    case 0:
+      recursiveGetNodes(node->left, 0, radius, nodes, true);
+      recursiveGetNodes(node->right, 0, radius, nodes, true);
+      break;
+    case 1:
+    case 2:
+      recursiveGetNodes((direction == 1) ? node->right : node->left, 0, radius,
+                        nodes, true);
+      if (node->parent) {
+        recursiveGetNodes(node->parent, (node->parent->left == node) ? 1 : 2,
+                          radius, nodes, true);
+      }
+      break;
+    default:
+      assert(false);
     }
   }
 }
 
+// Warning:
+// This function performs a modified regraft-sampling algorithm, optimized
+// for the exhaustive SPR search that uses all possible prunes; compare:
+// - standard radius-1 SPR:
+// Takes as possible regrafts prune's
+// GrandFather, Uncle, and Brother's children (4 nodes in total).
+// - modified radius-1 SPR:
+// Takes as possible regrafts prune's
+// GreatGrandFather, Uncle, and Brother's grandchildren (6 nodes in total).
+// Of the standard radius-1 regrafts, only prune's Uncle is taken, while the
+// other regrafts are omitted to ensure that moves are not repeated, as the
+// same topologies can be obtained from different prunes, namely:
+// prune -> Brother's child1 = Brother's child1 -> prune (which is his uncle)
+// prune -> Brother's child2 = Brother's child2 -> prune (which is his uncle)
+// prune -> GrandFather = Brother -> Uncle (which is his uncle too)
 void SpeciesTreeOperator::getPossibleRegrafts(
-    SpeciesTree &speciesTree, unsigned int prune, unsigned int radius,
+    const SpeciesTree &speciesTree, unsigned int prune, unsigned int radius,
     std::vector<unsigned int> &regrafts) {
-  /**
-   *  Hack: we do not add the nodes at the first radius, because they are
-   * equivalent to moves from the second radius
-   */
-  radius += 1;
   auto pruneNode = speciesTree.getNode(prune);
-  auto pruneParentNode = pruneNode->parent;
-  if (!pruneParentNode) {
+  auto pruneFatherNode = pruneNode->parent;
+  if (!pruneFatherNode) {
     return;
   }
-  if (pruneParentNode->parent) {
-    auto parentDirection = static_cast<unsigned int>(
-        pruneParentNode->parent->left == pruneParentNode ? 1 : 2);
-    recursiveGetNodes(pruneParentNode->parent, parentDirection, radius,
-                      regrafts, false);
+  auto pruneGrandFatherNode = pruneFatherNode->parent;
+  if (pruneGrandFatherNode) {
+    recursiveGetNodes(pruneGrandFatherNode,
+                      (pruneGrandFatherNode->left == pruneFatherNode) ? 1 : 2,
+                      radius, regrafts, false);
   }
-  recursiveGetNodes(getBrother(pruneNode)->left, 0, radius, regrafts, false);
-  recursiveGetNodes(getBrother(pruneNode)->right, 0, radius, regrafts, false);
+  auto pruneBrotherNode = getBrother(pruneNode);
+  recursiveGetNodes(pruneBrotherNode->left, 0, radius, regrafts, false);
+  recursiveGetNodes(pruneBrotherNode->right, 0, radius, regrafts, false);
 }
 
 void SpeciesTreeOperator::getAffectedBranches(
     SpeciesTree &speciesTree, unsigned int prune, unsigned int regraft,
     std::vector<unsigned int> &affectedBranches) {
-  // we return the nodes between p and r (not including p and r) and their LCA
-  auto &tree = speciesTree.getTree();
-  // this should be fast, the LCAs are cached
-  auto lca = tree.getLCA(prune, regraft);
-  auto p = tree.getNode(prune);
-  auto r = tree.getNode(regraft);
+  // we return the nodes between p and r (excluding p, r, and their LCA)
+  // this should be fast, as the LCAs are cached
+  auto lca = speciesTree.getTree().getLCA(prune, regraft);
+  auto p = speciesTree.getNode(prune);
+  auto r = speciesTree.getNode(regraft);
   if (p != lca) {
     p = p->parent; // skip the prune node
   }
-
   if (r != lca) {
     r = r->parent; // skip the regraft node
   }
@@ -313,45 +335,4 @@ void SpeciesTreeOperator::getAffectedBranches(
     affectedBranches.push_back(r->node_index);
     r = r->parent;
   }
-}
-
-static size_t leafHash(const corax_rnode_t *leaf) {
-  assert(leaf);
-  std::hash<std::string> hash_fn;
-  return hash_fn(std::string(leaf->label));
-}
-
-static size_t getTreeHashRec(const corax_rnode_t *node, size_t i,
-                             bool useLeafHash) {
-  assert(node);
-  std::hash<size_t> hash_fn;
-  if (i == 0)
-    i = 1;
-  if (!node->left) {
-    if (useLeafHash) {
-      return leafHash(node);
-    } else {
-      return hash_fn(node->node_index);
-    }
-  }
-  auto hash1 = getTreeHashRec(node->left, i + 1, useLeafHash);
-  auto hash2 = getTreeHashRec(node->right, i + 1, useLeafHash);
-  // Logger::info << "(" << hash1 << "," << hash2 << ") ";
-  auto m = std::min(hash1, hash2);
-  auto M = std::max(hash1, hash2);
-  auto res = hash_fn(m * i + M);
-  if (!useLeafHash) {
-    res = hash_fn(res * i + node->node_index);
-  }
-  return res;
-}
-
-size_t SpeciesTree::getHash() const {
-  auto res = getTreeHashRec(getTree().getRoot(), 0, true);
-  return res % 100000;
-}
-
-size_t SpeciesTree::getNodeIndexHash() const {
-  auto res = getTreeHashRec(getTree().getRoot(), 0, false);
-  return res % 100000;
 }

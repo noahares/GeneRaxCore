@@ -2,6 +2,7 @@
 
 #include <IO/Logger.hpp>
 #include <cstring>
+#include <functional>
 #include <maths/Random.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <set>
@@ -812,4 +813,38 @@ PLLRootedTree::buildConsensusTree(const std::vector<std::string> &strOrFiles,
       consensus.findLeaf(OUTGROUP_LABEL));
 
   return rootedStr;
+}
+
+static size_t leafHash(corax_rnode_t *leaf) {
+  assert(leaf);
+  std::hash<std::string> hash_fn;
+  return hash_fn(std::string(leaf->label));
+}
+
+static size_t getTreeHashRec(corax_rnode_t *node, size_t i, bool useLeafHash) {
+  assert(node);
+  std::hash<size_t> hash_fn;
+  if (i == 0)
+    i = 1;
+  if (!node->left) {
+    if (useLeafHash) {
+      return leafHash(node);
+    } else {
+      return hash_fn(node->node_index);
+    }
+  }
+  auto hash1 = getTreeHashRec(node->left, i + 1, useLeafHash);
+  auto hash2 = getTreeHashRec(node->right, i + 1, useLeafHash);
+  auto m = std::min(hash1, hash2);
+  auto M = std::max(hash1, hash2);
+  auto res = hash_fn(m * i + M);
+  if (!useLeafHash) {
+    res = hash_fn(res * i + node->node_index);
+  }
+  return res;
+}
+
+size_t PLLRootedTree::getTreeHash(bool useLeafHash) const {
+  auto res = getTreeHashRec(getRoot(), 0, useLeafHash);
+  return res % 100000;
 }
