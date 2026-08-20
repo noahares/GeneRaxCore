@@ -186,6 +186,10 @@ bool SpeciesTransferSearch::transferSearch(
     tryAgain = transferRound(speciesTree, evaluator, searchState, blacklist);
     better |= tryAgain;
   } while (tryAgain);
+  // update bestLL due to possible precision changes
+  PerFamLL perFamLL;
+  double ll = evaluator.computeLikelihood(&perFamLL);
+  searchState.betterLikelihoodCallback(ll, perFamLL);
   Logger::timed << "[Species search] After transfer-guided search: LL="
                 << searchState.bestLL << std::endl;
   return better;

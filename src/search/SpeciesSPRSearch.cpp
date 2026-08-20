@@ -73,6 +73,10 @@ bool SpeciesSPRSearch::SPRSearch(
     tryAgain = SPRRound(speciesTree, evaluator, searchState, radius);
     better |= tryAgain;
   } while (tryAgain);
+  // update bestLL due to possible precision changes
+  PerFamLL perFamLL;
+  double ll = evaluator.computeLikelihood(&perFamLL);
+  searchState.betterLikelihoodCallback(ll, perFamLL);
   Logger::timed << "[Species search] After local SPR search: LL="
                 << searchState.bestLL << std::endl;
   return better;
