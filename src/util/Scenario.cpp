@@ -75,7 +75,9 @@ void Scenario::saveEventsCounts(ParallelOfstream &os, unsigned int sample) {
   for (unsigned int i = 0;
        i < static_cast<unsigned int>(ReconciliationEventType::EVENT_Invalid);
        ++i) {
-    os << "\t" << _eventsCount[i];
+    if (i != 0)
+      os << "\t";
+    os << _eventsCount[i];
   }
   os << std::endl;
 }
@@ -84,7 +86,9 @@ void Scenario::saveEventsHeader(ParallelOfstream &os) {
   for (unsigned int i = 0;
        i < static_cast<unsigned int>(ReconciliationEventType::EVENT_Invalid);
        ++i) {
-    os << "\t" << eventNames[i];
+    if (i != 0)
+      os << "\t";
+    os << eventNames[i];
   }
   os << std::endl;
 }
