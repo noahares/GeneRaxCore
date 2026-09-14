@@ -1,22 +1,17 @@
 #pragma once
 
-#include <search/SpeciesSearchCommon.hpp>
-
-class SpeciesSearchState;
+#include "SpeciesSearchCommon.hpp"
 
 class SpeciesRootSearch {
 public:
+  SpeciesRootSearch() = delete;
+
   /**
-   *  Search for the ML root for the current
-   *  species tree topology
-   *
-   *  rootLikelihoods and treePerFamLLVec
-   *  will only be filled if not NULL
+   *  Search for the ML root of the current species tree
    */
-  static double rootSearch(SpeciesTree &speciesTree,
-                           SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-                           SpeciesSearchState &searchState,
-                           unsigned int maxDepth,
-                           RootLikelihoods *rootLikelihoods = nullptr,
-                           TreePerFamLLVec *treePerFamLLVec = nullptr);
+  static bool rootSearch(SpeciesTree &speciesTree,
+                         SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+                         SpeciesSearchState &searchState, unsigned int maxDepth,
+                         RootLikelihoods *rootLikelihoods = nullptr,
+                         TreePerFamLLVec *treePerFamLLVec = nullptr);
 };

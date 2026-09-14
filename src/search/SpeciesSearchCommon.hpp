@@ -1,8 +1,5 @@
 #pragma once
 
-#include <vector>
-
-#include <likelihoods/ReconciliationEvaluation.hpp>
 #include <maths/AverageStream.hpp>
 #include <search/UFBoot.hpp>
 #include <trees/SpeciesTree.hpp>
@@ -10,6 +7,7 @@
 #include <util/types.hpp>
 
 class PerCorePotentialTransfers;
+
 using TreePerFamLL = std::pair<std::string, PerFamLL>;
 using TreePerFamLLVec = std::vector<TreePerFamLL>;
 
@@ -79,7 +77,19 @@ private:
  */
 class SpeciesTreeLikelihoodEvaluatorInterface {
 public:
-  virtual ~SpeciesTreeLikelihoodEvaluatorInterface() {}
+  SpeciesTreeLikelihoodEvaluatorInterface() = default;
+
+  virtual ~SpeciesTreeLikelihoodEvaluatorInterface() = default;
+
+  // forbid copy and move
+  SpeciesTreeLikelihoodEvaluatorInterface(
+      const SpeciesTreeLikelihoodEvaluatorInterface &) = delete;
+  SpeciesTreeLikelihoodEvaluatorInterface &
+  operator=(const SpeciesTreeLikelihoodEvaluatorInterface &) = delete;
+  SpeciesTreeLikelihoodEvaluatorInterface(
+      SpeciesTreeLikelihoodEvaluatorInterface &&) = delete;
+  SpeciesTreeLikelihoodEvaluatorInterface &
+  operator=(SpeciesTreeLikelihoodEvaluatorInterface &&) = delete;
 
   /**
    *  Compute and return the likelihood
@@ -237,6 +247,7 @@ public:
 
   class Listener {
   public:
+    virtual ~Listener() = default;
     /**
      *  If the object is attached to a SpeciesSearchState,
      *  this callback will be called when a better tree is found
@@ -252,25 +263,26 @@ private:
 
 class SpeciesSearchCommon {
 public:
+  SpeciesSearchCommon() = delete;
+
   /**
-   *  Test a SPR move.
+   *  Test the SPR move of prune to regraft.
    *  If it improves the likelihood, keep it and return true.
-   *  Else, rollback it and return false.
+   *  Otherwise, rollback it and return false
    */
   static bool testSPR(SpeciesTree &speciesTree,
-                      SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+                      SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
                       SpeciesSearchState &searchState, unsigned int prune,
                       unsigned int regraft);
 
   /**
-   *  Try SPR moves with a small radius around the species
-   *  node with id spid. If a move improves the likelihood,
-   *  apply it, and recursively search further. Otherwise,
-   *  rollback the tested moves.
-   *  Returns true if one better tree has been found
+   *  Try SPR moves within a small radius around prune.
+   *  If a move improves the likelihood, keep it and recursively
+   *  search further. Otherwise, rollback it.
+   *  Return true if at least one better tree has been found
    */
   static bool
   veryLocalSearch(SpeciesTree &speciesTree,
-                  SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-                  SpeciesSearchState &searchState, unsigned int spid);
+                  SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+                  SpeciesSearchState &searchState, unsigned int prune);
 };

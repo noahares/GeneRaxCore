@@ -2,16 +2,17 @@
 
 class SpeciesTree;
 class SpeciesTreeLikelihoodEvaluatorInterface;
-class AverageStream;
 class SpeciesSearchState;
 
 class SpeciesSPRSearch {
 public:
-  static bool SPRRound(SpeciesTree &speciesTree,
-                       SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-                       SpeciesSearchState &searchState, unsigned int radius);
+  SpeciesSPRSearch() = delete;
 
+  /**
+   *  Search for the ML topology of the current species tree
+   *  with local SPR moves
+   */
   static bool SPRSearch(SpeciesTree &speciesTree,
-                        SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+                        SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
                         SpeciesSearchState &searchState, unsigned int radius);
 };

@@ -21,8 +21,8 @@ void PerCorePotentialTransfers::addScenario(const Scenario &scenario) {
 }
 
 unsigned int
-PerCorePotentialTransfers::getPotentialTransfers(unsigned int src,
-                                                 unsigned int dest) {
+PerCorePotentialTransfers::countPotentialTransfers(unsigned int src,
+                                                   unsigned int dest) const {
   unsigned int res = 0;
   if (copies.size()) {
     assert(copies[src].size() == copies[dest].size());
@@ -38,26 +38,20 @@ PerCorePotentialTransfers::getPotentialTransfers(unsigned int src,
 
 void SpeciesTransferSearch::getSortedTransferList(
     SpeciesTree &speciesTree,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
-    unsigned int minTransfers, MovesBlackList &blacklist,
+    SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
+    unsigned int minTransfers, const MovesBlackList &blacklist,
     std::vector<TransferMove> &transferMoves) {
   TransferFrequencies frequencies;
   PerSpeciesEvents perSpeciesEvents;
   PerCorePotentialTransfers potentialTransfers;
-  evaluation.getTransferInformation(speciesTree, frequencies, perSpeciesEvents,
-                                    potentialTransfers);
-  unsigned int speciesNumber = speciesTree.getTree().getNodeNumber();
-  std::vector<double> speciesFrequencies;
-  for (unsigned int e = 0; e < speciesNumber; ++e) {
-    auto &speciesEvents = perSpeciesEvents.events[e];
-    speciesFrequencies.push_back(speciesEvents.speciesFrequency());
-  }
+  evaluator.getTransferInformation(speciesTree, frequencies, perSpeciesEvents,
+                                   potentialTransfers);
   unsigned int transfers = 0;
-  ParallelContext::barrier();
   StringToUint labelToId;
   speciesTree.getLabelToId(labelToId);
-  for (unsigned int from = 0; from < frequencies.count.size(); ++from) {
-    for (unsigned int to = 0; to < frequencies.count.size(); ++to) {
+  auto N = frequencies.count.size();
+  for (unsigned int from = 0; from < N; ++from) {
+    for (unsigned int to = 0; to < N; ++to) {
       auto regraft = labelToId[frequencies.idToLabel[from]];
       auto prune = labelToId[frequencies.idToLabel[to]];
       auto count = frequencies.count[from][to];
@@ -66,37 +60,30 @@ void SpeciesTransferSearch::getSortedTransferList(
         continue;
       }
       TransferMove move(prune, regraft, count);
-      double factor = 1.0;
-      if (false) { // evaluation.pruneSpeciesTree()) {
-        factor /= (1.0 + sqrt(speciesFrequencies[prune]));
-        factor /= (1.0 + sqrt(speciesFrequencies[regraft]));
-      }
-      if (true) {
-        factor = 1.0 / double(potentialTransfers.getPotentialTransfers(regraft,
-                                                                       prune));
-      }
-      if (!blacklist.isBlackListed(move)) {
-        transferMoves.push_back(TransferMove(prune, regraft, factor * count));
+      if (true || !blacklist.isBlackListed(move)) { // disable the check for now
+        // support: the proportion of regraft copies surviving in prune
+        move.support = static_cast<double>(count);
+        move.support /= static_cast<double>(
+            potentialTransfers.countPotentialTransfers(regraft, prune));
+        transferMoves.push_back(move);
       }
     }
   }
-  std::sort(transferMoves.begin(), transferMoves.end());
+  std::sort(transferMoves.rbegin(), transferMoves.rend());
   Logger::timed << "Inferred transfers: " << transfers << std::endl;
+  Logger::timed << "Selected transfer directions: " << transferMoves.size()
+                << std::endl;
 }
 
 static bool transferRound(SpeciesTree &speciesTree,
-                          SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+                          SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
                           SpeciesSearchState &searchState,
-                          MovesBlackList &blacklist,
-                          bool &maxImprovementsReached) {
+                          MovesBlackList &blacklist) {
   Logger::timed << "[Species search] Start new transfer-guided round"
                 << std::endl;
-  maxImprovementsReached = false;
-  auto hash1 = speciesTree.getNodeIndexHash();
-  unsigned int minTransfers = 1;
-  std::vector<TransferMove> transferMoves;
+  // update sprBoots on the current topology
   PerFamLL perFamLL;
-  evaluation.computeLikelihood(&perFamLL);
+  evaluator.computeLikelihood(&perFamLL);
   std::vector<unsigned int> affectedBranches;
   for (unsigned int i = 0; i < speciesTree.getTree().getNodeNumber(); ++i) {
     affectedBranches.push_back(i);
@@ -104,76 +91,74 @@ static bool transferRound(SpeciesTree &speciesTree,
   for (auto &bs : searchState.sprBoots) {
     bs.test(perFamLL, affectedBranches, true);
   }
+  // do transfer-guided SPR search
+  auto hash1 = speciesTree.getNodeIndexHash();
+  const unsigned int minTransfers = 1;
+  std::vector<TransferMove> transferMoves;
   SpeciesTransferSearch::getSortedTransferList(
-      speciesTree, evaluation, minTransfers, blacklist, transferMoves);
-  auto copyTransferMoves = transferMoves;
-  transferMoves.clear();
-  for (const auto &transferMove : copyTransferMoves) {
-    if (SpeciesTreeOperator::canApplySPRMove(speciesTree, transferMove.prune,
-                                             transferMove.regraft)) {
-      transferMoves.push_back(transferMove);
-    }
-  }
-  unsigned int speciesNumber = speciesTree.getTree().getNodeNumber();
-  unsigned int index = 0;
+      speciesTree, evaluator, minTransfers, blacklist, transferMoves);
+  const unsigned int speciesNumber = speciesTree.getTree().getNodeNumber();
+  const unsigned int minTrials = std::max(50u, speciesNumber / 2);
   const unsigned int stopAfterFailures = 50u;
   const unsigned int stopAfterImprovements = std::max(15u, speciesNumber / 4);
-  const unsigned int minTrial = std::max(50u, speciesNumber / 2);
+  unsigned int trials = 0;
   unsigned int failures = 0;
   unsigned int improvements = 0;
   std::unordered_set<unsigned int> alreadyPruned;
-  unsigned int trials = 0;
-  for (auto &transferMove : transferMoves) {
-    index++;
-    if (alreadyPruned.find(transferMove.prune) != alreadyPruned.end()) {
+  for (const auto &move : transferMoves) {
+    // check if this prune has already been regrafted with
+    // a move that has a higher transfer support
+    if (alreadyPruned.find(move.prune) != alreadyPruned.end()) {
       continue;
     }
-    if (SpeciesTreeOperator::canApplySPRMove(speciesTree, transferMove.prune,
-                                             transferMove.regraft)) {
-      blacklist.blacklist(transferMove);
-      trials++;
-      /*
-      Logger::info << "Test "
-          << speciesTree.getNode(transferMove.prune)->label
-          << " -> "
-          << speciesTree.getNode(transferMove.regraft)->label
-          << std::endl;
-          */
-      if (SpeciesSearchCommon::testSPR(speciesTree, evaluation, searchState,
-                                       transferMove.prune,
-                                       transferMove.regraft)) {
-        failures = 0;
-        improvements++;
-        alreadyPruned.insert(transferMove.prune);
-        auto pruneNode = speciesTree.getNode(transferMove.prune);
-        Logger::timed << "\tbetter tree "
-                      << "(support: " << transferMove.transfers
-                      << ", trial: " << trials << ", LL=" << searchState.bestLL
-                      << ", hash=" << speciesTree.getHash() << ") "
-                      << pruneNode->label << " -> "
-                      << speciesTree.getNode(transferMove.regraft)->label
+    // as the tree topology can be changed during the round,
+    // the precomputed transfer moves should be checked for validity
+    if (!SpeciesTreeOperator::canApplySPRMove(speciesTree, move.prune,
+                                              move.regraft)) {
+      continue;
+    }
+    blacklist.blackList(move);
+    trials++;
+    /*
+    Logger::info << "Test "
+                 << speciesTree.getNode(move.prune)->label << " -> "
+                 << speciesTree.getNode(move.regraft)->label << std::endl;
+    */
+    if (SpeciesSearchCommon::testSPR(speciesTree, evaluator, searchState,
+                                     move.prune, move.regraft)) {
+      failures = 0;
+      improvements++;
+      alreadyPruned.insert(move.prune);
+      Logger::timed << "\tbetter tree "
+                    << "(support: " << move.support << ", trial: " << trials
+                    << ", LL=" << searchState.bestLL
+                    << ", hash=" << speciesTree.getHash() << ") "
+                    << speciesTree.getNode(move.prune)->label << " -> "
+                    << speciesTree.getNode(move.regraft)->label << std::endl;
+      hash1 = speciesTree.getNodeIndexHash();
+      assert(ParallelContext::isIntEqual(hash1));
+      if (!searchState.farFromPlausible) {
+        SpeciesSearchCommon::veryLocalSearch(speciesTree, evaluator,
+                                             searchState, move.prune);
+      }
+    } else {
+      failures++;
+    }
+    // check if we've had enough failures to stop or enough improvements
+    // to recompute the new transfers
+    bool stop = (trials > minTrials) && (failures > stopAfterFailures);
+    bool maxImprovementsReached = (improvements > stopAfterImprovements);
+    stop |= maxImprovementsReached;
+    if (stop) { // end this round
+      if (searchState.farFromPlausible && !maxImprovementsReached) {
+        // the inspected transfers do not point to a better tree, so the tree
+        // is already near-optimal, we switch to a more thorough search mode,
+        // this will affect the ENTIRE downstream analysis
+        Logger::timed << "[Species search] Switch to hardToFindBetter mode"
                       << std::endl;
-        // we enough improvements to recompute the new transfers
-        hash1 = speciesTree.getNodeIndexHash();
-        assert(ParallelContext::isIntEqual(hash1));
-        if (!searchState.farFromPlausible) {
-          SpeciesSearchCommon::veryLocalSearch(speciesTree, evaluation,
-                                               searchState, transferMove.prune);
-        }
-      } else {
-        failures++;
+        searchState.farFromPlausible = false;
       }
-      bool stop = index > minTrial && failures > stopAfterFailures;
-      maxImprovementsReached = improvements > stopAfterImprovements;
-      stop |= maxImprovementsReached;
-      if (stop) {
-        if (searchState.farFromPlausible && !maxImprovementsReached) {
-          Logger::timed << "[Species search] Switch to hardToFindBetter mode"
-                        << std::endl;
-          searchState.farFromPlausible = false;
-        }
-        return improvements > 0;
-      }
+      return improvements > 0;
     }
   }
   return improvements > 0;
@@ -181,28 +166,31 @@ static bool transferRound(SpeciesTree &speciesTree,
 
 bool SpeciesTransferSearch::transferSearch(
     SpeciesTree &speciesTree,
-    SpeciesTreeLikelihoodEvaluatorInterface &evaluation,
+    SpeciesTreeLikelihoodEvaluatorInterface &evaluator,
     SpeciesSearchState &searchState) {
   Logger::timed
       << "[Species search] Starting species tree transfer-guided search "
       << "(bestLL=" << searchState.bestLL << ", hash=" << speciesTree.getHash()
       << ")" << std::endl;
-  MovesBlackList blacklist;
-  bool maxImprovementsReached = true;
-  bool stop = false;
+  assert(evaluator.computeLikelihood() == searchState.bestLL);
   bool better = false;
-  while (!stop) {
-    searchState.bestLL = evaluation.optimizeModelRates();
+  bool tryAgain = false;
+  MovesBlackList blacklist;
+  do {
+    // optimize model parameters
+    searchState.bestLL = evaluator.optimizeModelRates();
     PerFamLL perFamLL;
-    evaluation.computeLikelihood(&perFamLL);
+    evaluator.computeLikelihood(&perFamLL);
     searchState.betterLikelihoodCallback(searchState.bestLL, perFamLL);
-    stop = !transferRound(speciesTree, evaluation, searchState, blacklist,
-                          maxImprovementsReached);
-    if (!stop) {
-      better = true;
-    }
-  }
-  Logger::timed << "[Species search] After transfer search: LL="
+    // run a transfer-guided search round
+    tryAgain = transferRound(speciesTree, evaluator, searchState, blacklist);
+    better |= tryAgain;
+  } while (tryAgain);
+  // update bestLL due to possible precision changes
+  PerFamLL perFamLL;
+  double ll = evaluator.computeLikelihood(&perFamLL);
+  searchState.betterLikelihoodCallback(ll, perFamLL);
+  Logger::timed << "[Species search] After transfer-guided search: LL="
                 << searchState.bestLL << std::endl;
   return better;
 }
