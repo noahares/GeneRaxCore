@@ -232,6 +232,13 @@ public:
   PerBranchKH khBoots;
 
   /**
+   *  Check that the current state evaluates to bestLL. This condition
+   *  may fail during tree or parameter search rounds, but should
+   *  always hold in between such rounds
+   */
+  void checkCurrentState(double ll);
+
+  /**
    *  To call when a better tree is found
    */
   void betterTreeCallback(double ll, PerFamLL &perFamLL);

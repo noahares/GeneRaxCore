@@ -65,7 +65,7 @@ bool SpeciesSPRSearch::SPRSearch(
   Logger::timed << "[Species search] Starting species tree local SPR search, "
                 << "radius=" << radius << " (bestLL=" << searchState.bestLL
                 << ", hash=" << speciesTree.getHash() << ")" << std::endl;
-  assert(evaluator.computeLikelihood() == searchState.bestLL);
+  searchState.checkCurrentState(evaluator.computeLikelihood());
   bool better = false;
   bool tryAgain = false;
   do {

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <limits>
 
 #include <IO/Logger.hpp>
@@ -114,6 +115,10 @@ void RootLikelihoods::fillTreeBootstraps(PLLRootedTree &tree) {
     label += std::to_string(value);
     tree.setLabel(node->node_index, label);
   }
+}
+
+void SpeciesSearchState::checkCurrentState(double ll) {
+  assert(std::fabs(ll - bestLL) <= 1e-4);
 }
 
 void SpeciesSearchState::betterTreeCallback(double ll, PerFamLL &perFamLL) {

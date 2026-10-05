@@ -172,7 +172,7 @@ bool SpeciesTransferSearch::transferSearch(
       << "[Species search] Starting species tree transfer-guided search "
       << "(bestLL=" << searchState.bestLL << ", hash=" << speciesTree.getHash()
       << ")" << std::endl;
-  assert(evaluator.computeLikelihood() == searchState.bestLL);
+  searchState.checkCurrentState(evaluator.computeLikelihood());
   bool better = false;
   bool tryAgain = false;
   MovesBlackList blacklist;

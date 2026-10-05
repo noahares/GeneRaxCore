@@ -86,7 +86,7 @@ bool SpeciesRootSearch::rootSearch(
     RootLikelihoods *rootLikelihoods, TreePerFamLLVec *treePerFamLLVec) {
   Logger::timed << "[Species search] Root search with depth=" << maxDepth
                 << std::endl;
-  assert(evaluator.computeLikelihood() == searchState.bestLL);
+  searchState.checkCurrentState(evaluator.computeLikelihood());
   // optimize initial tree node dates
   double initialLL = DatedSpeciesTreeSearch::optimizeDates(
       speciesTree, evaluator, searchState, !searchState.farFromPlausible);
