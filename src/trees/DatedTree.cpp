@@ -149,7 +149,7 @@ void DatedTree::randomize() {
   toAdd.push_back(_rootedTree.getRoot());
   unsigned int currentRank = 0;
   while (toAdd.size()) {
-    unsigned int i = Random::getInt() % toAdd.size();
+    unsigned int i = Random::getUInt() % toAdd.size();
     auto node = toAdd[i];
     if (node->left) {
       _orderedSpeciations[currentRank] = node;

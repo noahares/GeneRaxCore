@@ -136,7 +136,7 @@ static bool transferRound(SpeciesTree &speciesTree,
                     << speciesTree.getNode(move.prune)->label << " -> "
                     << speciesTree.getNode(move.regraft)->label << std::endl;
       hash1 = speciesTree.getNodeIndexHash();
-      assert(ParallelContext::isIntEqual(hash1));
+      assert(ParallelContext::isUIntEqual(hash1));
       if (!searchState.farFromPlausible) {
         SpeciesSearchCommon::veryLocalSearch(speciesTree, evaluator,
                                              searchState, move.prune);

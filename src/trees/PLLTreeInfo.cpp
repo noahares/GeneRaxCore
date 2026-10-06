@@ -64,7 +64,7 @@ void PLLTreeInfo::buildTree(const std::string &newickStrOrFile,
     for (const auto &seq : sequences) {
       labels.push_back(seq->label);
     }
-    unsigned int seed = static_cast<unsigned int>(Random::getInt());
+    auto seed = Random::getUInt();
     _utree =
         std::unique_ptr<PLLUnrootedTree>(new PLLUnrootedTree(labels, seed));
   } else {

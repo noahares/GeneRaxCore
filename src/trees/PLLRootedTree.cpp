@@ -428,8 +428,7 @@ corax_rtree_t *PLLRootedTree::buildRandomTree(
       root = createNode(label, allNodes);
       continue;
     }
-    auto brother =
-        allNodes[static_cast<size_t>(Random::getInt()) % allNodes.size()];
+    auto brother = allNodes[Random::getUInt() % allNodes.size()];
     auto parent = createNode("", allNodes);
     auto node = createNode(label, allNodes);
     auto grandpa = brother->parent;
@@ -438,7 +437,7 @@ corax_rtree_t *PLLRootedTree::buildRandomTree(
     } else {
       root = parent;
     }
-    bool randBool = static_cast<bool>(Random::getInt() % 2);
+    bool randBool = Random::getBool();
     setSon(parent, brother, randBool);
     setSon(parent, node, !randBool);
   }
@@ -731,11 +730,11 @@ bool PLLRootedTree::areNodeIndicesParallelConsistent() const {
   std::vector<LabelNodeIndex> toSort;
   for (auto node : getPostOrderNodes()) {
     toSort.push_back(LabelNodeIndex(node->label, node->node_index));
-    ok &= ParallelContext::isIntEqual(node->node_index);
+    ok &= ParallelContext::isUIntEqual(node->node_index);
   }
   std::sort(toSort.begin(), toSort.end());
   for (auto t : toSort) {
-    ok &= ParallelContext::isIntEqual(t.second);
+    ok &= ParallelContext::isUIntEqual(t.second);
   }
   return ok;
 }

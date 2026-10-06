@@ -158,7 +158,7 @@ void Family::filterFamilies(Families &families,
   ParallelContext::barrier();
   // at the end of this function, different ranks will have
   // a different rand state, so we save a seed
-  auto consistentSeed = Random::getInt();
+  auto consistentSeed = Random::getUInt();
   Families copy = families;
   unsigned int initialFamilySize = static_cast<unsigned int>(copy.size());
   families.clear();

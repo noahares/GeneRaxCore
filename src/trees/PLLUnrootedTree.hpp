@@ -77,9 +77,8 @@ public:
   /**
    *  Construct a random tree from a set of taxa labels
    */
-  PLLUnrootedTree(
-      const std::vector<const char *> &labels,
-      unsigned int seed = static_cast<unsigned int>(Random::getInt()));
+  PLLUnrootedTree(const std::vector<const char *> &labels,
+                  unsigned int seed = Random::getUInt());
 
   /**
    * Forbid copy

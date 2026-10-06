@@ -12,7 +12,7 @@ void Scheduler::schedule(const std::string &outputDir,
                          const std::string &commandFile, bool splitImplem,
                          const std::string &execPath) {
   assert(ParallelContext::isRandConsistent());
-  auto consistentSeed = Random::getInt();
+  auto consistentSeed = Random::getUInt();
   std::vector<char *> argv;
   std::string exec = "mpi-scheduler";
   std::string implem = splitImplem ? "--split-scheduler" : "--fork-scheduler";

@@ -433,20 +433,20 @@ bool ParallelContext::allowSchedulerSplitImplementation() {
 }
 
 bool ParallelContext::isRandConsistent() {
-  return isIntEqual(Random::getInt());
+  return isUIntEqual(Random::getUInt());
 }
 
 void ParallelContext::makeRandConsistent() {
-  auto seed = Random::getInt();
-  ParallelContext::broadcastInt(0, seed);
+  auto seed = Random::getUInt();
+  ParallelContext::broadcastUInt(0, seed);
   Random::setSeed(seed);
   assert(isRandConsistent());
 }
 
-bool ParallelContext::isIntEqual(int value) {
+bool ParallelContext::isUIntEqual(unsigned int value) {
 #ifdef WITH_MPI
-  std::vector<int> rands(getSize());
-  allGatherInt(value, rands);
+  std::vector<unsigned int> rands(getSize());
+  allGatherUInt(value, rands);
   for (auto v : rands) {
     if (v != rands[0]) {
       return false;

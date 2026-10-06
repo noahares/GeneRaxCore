@@ -144,7 +144,7 @@ void Routines::inferAndGetReconciliationScenarios(
     unsigned int reconciliationSamples, bool optimizeRates,
     std::vector<std::shared_ptr<Scenario>> &scenarios) {
   // initialization
-  auto consistentSeed = Random::getInt();
+  auto consistentSeed = Random::getUInt();
   auto modelParameters = initialModelRates;
   ParallelContext::barrier();
   std::string forcedRootedGeneTree;
@@ -292,9 +292,9 @@ void Routines::computeSuperMatrixFromOrthoGroups(
     const std::string &speciesTreeFile, Families &families,
     const std::string &outputDir, const std::string &outputFasta,
     bool largestOnly, bool masterOnly) {
-  auto savedSeed = Random::getInt(); // for some reason, parsing
-                                     // the Model calls rand, so we
-                                     // have so ensure seed consistency
+  auto savedSeed = Random::getUInt(); // for some reason, parsing
+                                      // the Model calls rand, so we
+                                      // have so ensure seed consistency
   Random::setSeed(savedSeed);
   if (masterOnly && ParallelContext::getRank() != 0) {
     return;
@@ -364,7 +364,7 @@ bool Routines::createRandomTrees(const std::string &geneRaxOutputDir,
   std::string startingTreesDir =
       FileSystem::joinPaths(geneRaxOutputDir, "startingTrees");
   bool startingTreesDirCreated = false;
-  auto consistentSeed = Random::getInt();
+  auto consistentSeed = Random::getUInt();
   for (auto &family : families) {
     if (family.startingGeneTree == "__random__") {
       if (!startingTreesDirCreated) {

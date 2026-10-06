@@ -262,7 +262,7 @@ void SpeciesTreeOptimizer::_computeAllGeneClades() {
       _geneClades.insert(clade);
     }
   }
-  assert(ParallelContext::isIntEqual(_geneClades.size()));
+  assert(ParallelContext::isUIntEqual(_geneClades.size()));
   ParallelContext::barrier();
   std::remove(getCladesSetPath(_outputDir, ParallelContext::getRank()).c_str());
 }

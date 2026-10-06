@@ -77,9 +77,9 @@ static void perturbateDates(SpeciesTree &speciesTree,
   maxDisplacement = std::max(2u, maxDisplacement);
   for (unsigned int i = 0; i < perturbations; ++i) {
     bool isUp = Random::getBool();
-    unsigned int rank = Random::getInt() % N;
-    unsigned int displacement = 1 + (Random::getInt() % maxDisplacement);
-    unsigned int nodesToMove = 1 + (Random::getInt() % 10);
+    unsigned int rank = Random::getUInt() % N;
+    unsigned int displacement = 1 + (Random::getUInt() % maxDisplacement);
+    unsigned int nodesToMove = 1 + (Random::getUInt() % 10);
     bool ok;
     for (unsigned int k = 0; k < nodesToMove; ++k) {
       for (unsigned int j = 0; j < displacement; ++j) {

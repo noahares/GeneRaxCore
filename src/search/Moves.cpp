@@ -105,7 +105,7 @@ void SPRMove::optimizeMove(JointTree &tree) {
 }
 
 void SPRMove::reOptimizeMove(JointTree &tree) {
-  if (!ParallelContext::isIntEqual(_optimizedBranches.size())) {
+  if (!ParallelContext::isUIntEqual(_optimizedBranches.size())) {
     synchronizeOptimizedBL(tree);
   }
   for (unsigned int i = 0; i < _optimizedBranches.size(); ++i) {

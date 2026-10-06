@@ -49,7 +49,7 @@ static bool SPRRound(SpeciesTree &speciesTree,
                       << speciesTree.getNode(prune)->label << " -> "
                       << speciesTree.getNode(regraft)->label << std::endl;
         hash1 = speciesTree.getNodeIndexHash();
-        assert(ParallelContext::isIntEqual(hash1));
+        assert(ParallelContext::isUIntEqual(hash1));
         SpeciesSearchCommon::veryLocalSearch(speciesTree, evaluator,
                                              searchState, prune);
       }
