@@ -1,39 +1,7 @@
 #include "HighwayCandidateParser.hpp"
 #include <IO/IO.hpp>
-#include <algorithm>
 #include <sstream>
-
-bool readTaxa(
-    std::stringstream &iss, std::vector<corax_rnode_t *> &nodes,
-    const std::string &candidateFile, unsigned int lineNumber,
-    const std::unordered_map<std::string, corax_rnode_t *> &labelToNode,
-    bool from) {
-  std::string str;
-  char delimiter = from ? ',' : '\n';
-  std::string fromToString = from ? "from" : "to";
-  if (!std::getline(iss, str, delimiter)) {
-    Logger::info << "Error: can't read the " << fromToString
-                 << " from species at line " << lineNumber << " of file "
-                 << candidateFile << std::endl;
-    return false;
-  }
-  IO::removeSpaces(str);
-  if (str == "*") {
-    for (auto it : labelToNode) {
-      nodes.push_back(it.second);
-    }
-    return true;
-  }
-  auto it = labelToNode.find(str);
-  if (it == labelToNode.end()) {
-    Logger::info << "Error: " << fromToString << " label " << str
-                 << " not found in the species tree. Check line " << lineNumber
-                 << " of file " << candidateFile << std::endl;
-    return false;
-  }
-  nodes.push_back(it->second);
-  return true;
-}
+#include <string>
 
 bool isParent(corax_rnode_t *parent, corax_rnode_t *child) {
   while (child) {
@@ -43,6 +11,50 @@ bool isParent(corax_rnode_t *parent, corax_rnode_t *child) {
     child = child->parent;
   }
   return false;
+}
+
+bool readTaxa(
+    std::stringstream &iss, std::vector<Highway> &highways,
+    const std::unordered_map<std::string, corax_rnode_t *> &labelToNode) {
+  std::string source, target, rate_s;
+  std::vector<corax_rnode_t *> source_nodes;
+  std::vector<corax_rnode_t *> target_nodes;
+  double rate = 0.01;
+
+  if (!std::getline(iss, source, ',') || !std::getline(iss, target, ',')) {
+    return false;
+  }
+  auto parse_node = [&](std::string &str, std::vector<corax_rnode_t *> &nodes) {
+    IO::removeSpaces(str);
+    if (str == "*") {
+      for (auto it : labelToNode) {
+        nodes.push_back(it.second);
+      }
+    } else {
+      auto node = labelToNode.find(str);
+      if (node == labelToNode.end()) {
+        return false;
+      }
+      nodes.push_back(node->second);
+    }
+    return true;
+  };
+  if (!parse_node(source, source_nodes) || !parse_node(target, target_nodes))
+    return false;
+  if (std::getline(iss, rate_s, '\n')) {
+    try {
+      rate = std::stod(rate_s);
+    } catch (std::exception &err) {
+    }
+  }
+  for (auto from : source_nodes) {
+    for (auto to : target_nodes) {
+      if (!isParent(to, from)) {
+        highways.push_back(Highway(from, to, rate));
+      }
+    }
+  }
+  return true;
 }
 
 std::vector<Highway>
@@ -62,25 +74,12 @@ HighwayCandidateParser::parse(const std::string &candidateFile,
     if (line[0] == '#') {
       continue;
     }
-    bool ok = true;
     std::stringstream iss(line);
-    std::vector<corax_rnode_t *> froms;
-    std::vector<corax_rnode_t *> tos;
-    ok &= readTaxa(iss, froms, candidateFile, lineNumber, labelToNode, true);
-
-    ok &= readTaxa(iss, tos, candidateFile, lineNumber, labelToNode, false);
-    if (!ok) {
-      candidates.clear();
-      return candidates;
-    }
-    for (auto from : froms) {
-      for (auto to : tos) {
-        if (!isParent(to, from)) {
-          candidates.push_back(Highway(from, to));
-        }
-      }
+    if (!readTaxa(iss, candidates, labelToNode)) {
+      Logger::info << "Failed to parse line " << lineNumber
+                   << " of highways file " << candidateFile
+                   << "! Continuing with next line" << std::endl;
     }
   }
-
   return candidates;
 }

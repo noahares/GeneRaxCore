@@ -5,8 +5,8 @@
 struct Highway {
   Highway() : src(nullptr), dest(nullptr), proba(0.0) {}
 
-  Highway(corax_rnode_t *src, corax_rnode_t *dest)
-      : src(src), dest(dest), proba(0.1) {}
+  Highway(corax_rnode_t *src, corax_rnode_t *dest, double proba = 0.01)
+      : src(src), dest(dest), proba(proba) {}
   corax_rnode_t *src;
   corax_rnode_t *dest;
   double proba;
@@ -27,7 +27,7 @@ struct Highway {
  *
  *  from1,to1
  *  from2,to2
- *  from3,to3
+ *  from3,to3,rate
  */
 class HighwayCandidateParser {
 public:
