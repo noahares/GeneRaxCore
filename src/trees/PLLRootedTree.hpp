@@ -1,16 +1,13 @@
 #pragma once
 
-#include <IO/LibpllParsers.hpp>
-#include <corax/corax.h>
 #include <memory>
-#include <set>
-#include <string>
-#include <unordered_set>
-#include <util/CArrayRange.hpp>
-#include <util/enums.hpp>
-#include <util/types.hpp>
-#include <vector>
 
+#include <util/CArrayRange.hpp>
+#include <util/types.hpp>
+
+/**
+ *  Data types and functions not provided in coraxlib
+ */
 typedef struct corax_rnode_s {
   char *label;
   double length;
@@ -21,7 +18,6 @@ typedef struct corax_rnode_s {
   struct corax_rnode_s *left;
   struct corax_rnode_s *right;
   struct corax_rnode_s *parent;
-
   void *data;
 } corax_rnode_t;
 
@@ -29,11 +25,8 @@ typedef struct corax_rtree_s {
   unsigned int tip_count;
   unsigned int inner_count;
   unsigned int edge_count;
-
   corax_rnode_t **nodes;
-
   corax_rnode_t *root;
-
 } corax_rtree_t;
 
 void corax_rtree_destroy(corax_rtree_t *tree, void (*cb_destroy)(void *));
@@ -57,6 +50,19 @@ public:
    */
   PLLRootedTree(const std::unordered_set<std::string> &labels);
 
+  // forbid copy and move
+  PLLRootedTree(const PLLRootedTree &) = delete;
+  PLLRootedTree &operator=(const PLLRootedTree &) = delete;
+  PLLRootedTree(PLLRootedTree &&) = delete;
+  PLLRootedTree &operator=(PLLRootedTree &&) = delete;
+  ~PLLRootedTree() = default;
+
+  /**
+   *  Construct a tree from either a path to a newick file
+   *  or a newick string.
+   *  We first try to open it as a file path, and if it fails, as
+   *  a newick string
+   */
   static std::unique_ptr<PLLRootedTree>
   buildFromStrOrFile(const std::string &strOrFile);
 
@@ -68,65 +74,64 @@ public:
   static std::string getRootedNewickFromOutgroup(corax_unode_t *outgroup);
 
   /**
-   * Forbid copy
-   */
-  PLLRootedTree(const PLLRootedTree &) = delete;
-  PLLRootedTree &operator=(const PLLRootedTree &) = delete;
-  PLLRootedTree(PLLRootedTree &&) = delete;
-  PLLRootedTree &operator=(PLLRootedTree &&) = delete;
-
-  /**
    *  Tree comparison
    */
   bool operator==(const PLLRootedTree &other) const {
     return areIsomorphic(*this, other);
   }
 
-  /*
-   * Tree dimension
+  /**
+   *  Tree dimensions
    */
   unsigned int getNodeNumber() const;
   unsigned int getLeafNumber() const;
   unsigned int getInnerNodeNumber() const;
 
-  /*
-   * Node access
+  /**
+   *  Node access
    */
   corax_rnode_t *getRoot() const;
   corax_rnode_t *getAnyInnerNode() const;
-  corax_rnode_t *getNode(unsigned int node_index) const;
-  corax_rnode_t *getParent(unsigned int node_index) const;
-  corax_rnode_t *getNeighbor(unsigned int node_index) const;
+  corax_rnode_t *getNode(unsigned int nodeIndex) const;
+  corax_rnode_t *getParent(unsigned int nodeIndex) const;
+  corax_rnode_t *getNeighbor(unsigned int nodeIndex) const;
 
   /**
-   * labels
+   *  Labels
    */
   std::unordered_set<std::string> getLabels(bool leavesOnly) const;
-
   static void getLeafLabelsUnder(corax_rnode_t *node,
                                  std::unordered_set<std::string> &labels);
 
   /**
-   *  Get a mapping from a leaf label to the leaf node index
+   *  Get a mapping from leaf label to integer
    */
   StringToUint getLeafLabelToId() const;
 
-  /*
-   * Save the tree in newick format in filename
+  /**
+   *  Save the tree in the newick format to fileName
    */
-  void save(const std::string &fileName) const;
+  void save(const std::string &fileName, bool append = false) const;
 
+  /**
+   *  Convert the tree into a newick string
+   */
   std::string getNewickString() const;
 
   /**
-   *  Replace null branch lengths with minBL
+   *  Replace non-positive branch lengths with stdBL
    */
-  void setMissingBranchLengths(double minBL = 1.0);
+  void setMissingBranchLengths(double stdBL = 1.0);
 
   /**
    *  Set all branch lengths to stdBL
    */
   void equalizeBranchLengths(double stdBL = 1.0);
+
+  /**
+   *  Change the label of the node indexed with nodeIndex
+   */
+  void setLabel(unsigned int nodeIndex, const std::string &label);
 
   /**
    *  Rename internal nodes having invalidated, missing or duplicated names
@@ -135,19 +140,22 @@ public:
       const std::unordered_set<corax_rnode_t *> *nodesToInvalidate = nullptr);
 
   /**
-   *  Change the label of the node indexed with nodeIndex
-   */
-  void setLabel(unsigned int nodeIndex, const std::string &label);
-
-  /**
    *  Direct access to the libpll structure
    */
   corax_rtree_t *getRawPtr() { return _tree.get(); }
   const corax_rtree_t *getRawPtr() const { return _tree.get(); }
 
+  /**
+   *  C++11 range for accessing nodes
+   */
   CArrayRange<corax_rnode_t *> getLeaves() const;
   CArrayRange<corax_rnode_t *> getInnerNodes() const;
   CArrayRange<corax_rnode_t *> getNodes() const;
+
+  /**
+   *  Create a vector of nodes, such that a node always comes after
+   *  its children
+   */
   std::vector<corax_rnode_t *> getPostOrderNodes() const;
 
   /**
@@ -158,14 +166,6 @@ public:
   static void labelRootedTree(const std::string &unlabelledNewickFile,
                               const std::string &labelledNewickFile);
   static void setSon(corax_rnode_t *parent, corax_rnode_t *newSon, bool left);
-
-  friend std::ostream &operator<<(std::ostream &os, const PLLRootedTree &tree) {
-    char *newick = corax_rtree_export_newick(tree.getRawPtr()->root, 0);
-    std::string str(newick);
-    os << str;
-    free(newick);
-    return os;
-  }
 
   /**
    * Get lowest common ancestor
@@ -217,10 +217,11 @@ public:
    *  and the input tree. Both trees must have the same
    *  leaf labels and topology.
    */
-  std::vector<unsigned int> getNodeIndexMapping(PLLRootedTree &otherTree);
+  std::vector<unsigned int>
+  getNodeIndexMapping(const PLLRootedTree &otherTree) const;
 
   std::unordered_map<std::string, corax_rnode_t *>
-  getLabelToNode(bool leafOnly);
+  getLabelToNode(bool leafOnly) const;
 
   bool areNodeIndicesParallelConsistent() const;
 

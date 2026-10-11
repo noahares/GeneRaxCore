@@ -1,15 +1,20 @@
 #include "PLLUnrootedTree.hpp"
 
-#include <IO/LibpllException.hpp>
-#include <IO/Logger.hpp>
-#include <corax/io/newick.hpp>
-#include <corax/tree/utree_compare.h>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <deque>
-#include <fstream>
 #include <functional>
 #include <sstream>
 #include <stack>
-#include <trees/PLLRootedTree.hpp>
+
+#include "PLLRootedTree.hpp"
+#include <IO/LibpllParsers.hpp>
+#include <corax/tree/utree_compare.h>
+#include <corax/tree/utree_random.h>
+#include <maths/Random.hpp>
 
 void defaultUnodePrinter(corax_unode_t *node, std::stringstream &ss) {
   if (node->label) {
@@ -26,33 +31,21 @@ void utreeDestroy(corax_utree_t *utree) {
   corax_utree_destroy(utree, destroyNodeData);
 }
 
-static corax_utree_t *readNewickFromStr(const std::string &str) {
-  corax_newick_parser_t parser(str);
-  auto utree = parser.parse(true, true);
-  // auto utree = corax_utree_parse_newick_string_unroot(str.c_str());
-  if (!utree)
-    throw LibpllException("Error while reading tree from std::string: ", str);
-  return utree;
-}
-
-static corax_utree_t *readNewickFromFile(const std::string &str) {
-  std::ifstream is(str);
-  if (!is) {
-    throw LibpllException("Can't open file: ", str);
-  }
-  std::string newick;
-  if (!std::getline(is, newick)) {
-    throw LibpllException("Error while reading tree from file: ", str);
-  }
-  return readNewickFromStr(newick);
-}
-
 static corax_utree_t *buildUtree(const std::string &str, bool isFile) {
   if (isFile) {
-    return readNewickFromFile(str);
+    return LibpllParsers::readUnrootedFromFile(str);
   } else {
-    return readNewickFromStr(str);
+    return LibpllParsers::readUnrootedFromStr(str);
   }
+}
+
+static corax_utree_t *
+buildRandomUtree(const std::vector<const char *> &leafLabels) {
+  assert(leafLabels.size() >= 3);
+  unsigned int seed = Random::getUInt();
+  unsigned int leafNumber = leafLabels.size();
+  auto utree = corax_utree_random_create(leafNumber, &leafLabels[0], seed);
+  return utree;
 }
 
 PLLUnrootedTree::PLLUnrootedTree(const std::string &str, bool isFile)
@@ -64,6 +57,12 @@ PLLUnrootedTree::PLLUnrootedTree(PLLRootedTree &rootedTree)
     : _tree(corax_rtree_unroot(rootedTree.getRawPtr()), utreeDestroy) {
   corax_unode_t *root = _tree->nodes[_tree->tip_count + _tree->inner_count - 1];
   corax_utree_reset_template_indices(root, _tree->tip_count);
+  setMissingBranchLengths();
+}
+
+PLLUnrootedTree::PLLUnrootedTree(const std::vector<const char *> &labels)
+    : _tree(buildRandomUtree(labels), utreeDestroy) {
+  setMissingBranchLengths();
 }
 
 std::unique_ptr<PLLUnrootedTree>
@@ -160,34 +159,22 @@ std::string PLLUnrootedTree::buildConsensusTree(
   return newick;
 }
 
-PLLUnrootedTree::PLLUnrootedTree(const std::vector<const char *> &labels,
-                                 unsigned int seed)
-    : _tree(corax_utree_random_create(static_cast<unsigned int>(labels.size()),
-                                      &labels[0], seed),
-            utreeDestroy) {}
-
-void PLLUnrootedTree::save(const std::string &fileName) {
-  std::ofstream os(fileName, std::ofstream::out);
-  char *newick = corax_utree_export_newick_rooted(getRawPtr()->nodes[0], 0);
-  os << newick;
-  os.close();
-  free(newick);
+void PLLUnrootedTree::save(const std::string &fileName, bool append) const {
+  LibpllParsers::saveUtree(_tree->nodes[0], fileName, append);
 }
 
-void PLLUnrootedTree::setMissingBranchLengths(double minBL) {
-  for (auto node : getLeaves()) {
-    if (0.0 >= node->length) {
-      node->length = minBL;
-    }
+void PLLUnrootedTree::setMissingBranchLengths(double stdBL) {
+  if (stdBL < 0.0) {
+    return;
   }
-  for (unsigned int i = _tree->tip_count;
-       i < _tree->tip_count + _tree->inner_count; ++i) {
-    if (0.0 >= _tree->nodes[i]->length)
-      _tree->nodes[i]->length = minBL;
-    if (0.0 >= _tree->nodes[i]->next->length)
-      _tree->nodes[i]->next->length = minBL;
-    if (0.0 >= _tree->nodes[i]->next->next->length)
-      _tree->nodes[i]->next->next->length = minBL;
+  for (auto node : getNodes()) {
+    auto temp = node;
+    do { // for all components of a node
+      if (temp->length <= 0.0) {
+        temp->length = stdBL;
+      }
+      temp = temp->next;
+    } while (temp && temp != node);
   }
 }
 

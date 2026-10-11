@@ -1,13 +1,17 @@
 #include "PLLRootedTree.hpp"
 
-#include <IO/Logger.hpp>
+#include <algorithm>
+#include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <iostream>
+#include <sstream>
+
+#include "PLLUnrootedTree.hpp"
+#include <IO/LibpllParsers.hpp>
 #include <maths/Random.hpp>
 #include <parallelization/ParallelContext.hpp>
-#include <set>
-#include <sstream>
-#include <trees/PLLUnrootedTree.hpp>
 
 static void *xmalloc(size_t size) {
   void *t;
@@ -31,18 +35,14 @@ static void dealloc_data(corax_rnode_t *node, void (*cb_destroy)(void *)) {
 void corax_rtree_destroy(corax_rtree_t *tree, void (*cb_destroy)(void *)) {
   unsigned int i;
   corax_rnode_t *node;
-
   /* deallocate all nodes */
   for (i = 0; i < tree->tip_count + tree->inner_count; ++i) {
     node = tree->nodes[i];
     dealloc_data(node, cb_destroy);
-
     if (node->label)
       free(node->label);
-
     free(node);
   }
-
   /* deallocate tree structure */
   free(tree->nodes);
   free(tree);
@@ -66,11 +66,9 @@ static void fill_nodes_recursive(corax_unode_t *node, corax_unode_t **array,
                            inner_index, level + 1);
       snode = snode->next;
     } while (snode != node);
-
     index = *inner_index;
     *inner_index += 1;
   }
-
   assert(index < array_size);
   array[index] = node;
 }
@@ -84,16 +82,13 @@ static unsigned int utree_count_nodes_recursive(corax_unode_t *node,
     return 1;
   } else {
     unsigned int count = 0;
-
     corax_unode_t *snode = level ? node->next : node;
     do {
       count += utree_count_nodes_recursive(snode->back, tip_count, inner_count,
                                            level + 1);
       snode = snode->next;
     } while (snode != node);
-
     *inner_count += 1;
-
     return count + 1;
   }
 }
@@ -202,7 +197,7 @@ void rtreeDestroy(corax_rtree_t *rtree) {
   corax_rtree_destroy(rtree, destroyNodeData);
 }
 
-static corax_rtree_t *buildUtree(const std::string &str, bool isFile) {
+static corax_rtree_t *buildRtree(const std::string &str, bool isFile) {
   if (isFile) {
     return LibpllParsers::readRootedFromFile(str);
   } else {
@@ -211,7 +206,7 @@ static corax_rtree_t *buildUtree(const std::string &str, bool isFile) {
 }
 
 PLLRootedTree::PLLRootedTree(const std::string &str, bool isFile)
-    : _tree(buildUtree(str, isFile), rtreeDestroy) {
+    : _tree(buildRtree(str, isFile), rtreeDestroy) {
   ensureUniqueLabels();
   setMissingBranchLengths();
 }
@@ -249,8 +244,9 @@ PLLRootedTree::buildFromOutgroup(corax_unode_t *outgroup) {
   auto rootedNewick = getRootedNewickFromOutgroup(outgroup);
   return std::make_unique<PLLRootedTree>(rootedNewick, false);
 }
-void PLLRootedTree::save(const std::string &fileName) const {
-  LibpllParsers::saveRtree(_tree->root, fileName);
+
+void PLLRootedTree::save(const std::string &fileName, bool append) const {
+  LibpllParsers::saveRtree(_tree->root, fileName, append);
 }
 
 std::string PLLRootedTree::getNewickString() const {
@@ -260,12 +256,13 @@ std::string PLLRootedTree::getNewickString() const {
   return newick;
 }
 
-void PLLRootedTree::setMissingBranchLengths(double minBL) {
-  if (minBL < 0.0)
+void PLLRootedTree::setMissingBranchLengths(double stdBL) {
+  if (stdBL < 0.0) {
     return;
+  }
   for (auto node : getNodes()) {
     if (node->length <= 0.0) {
-      node->length = minBL;
+      node->length = stdBL;
     }
   }
 }
@@ -373,16 +370,16 @@ unsigned int PLLRootedTree::getInnerNodeNumber() const {
 
 corax_rnode_t *PLLRootedTree::getRoot() const { return _tree->root; }
 
-corax_rnode_t *PLLRootedTree::getNode(unsigned int node_index) const {
-  return _tree->nodes[node_index];
+corax_rnode_t *PLLRootedTree::getNode(unsigned int nodeIndex) const {
+  return _tree->nodes[nodeIndex];
 }
 
-corax_rnode_t *PLLRootedTree::getParent(unsigned int node_index) const {
-  return getNode(node_index)->parent;
+corax_rnode_t *PLLRootedTree::getParent(unsigned int nodeIndex) const {
+  return getNode(nodeIndex)->parent;
 }
 
-corax_rnode_t *PLLRootedTree::getNeighbor(unsigned int node_index) const {
-  auto node = getNode(node_index);
+corax_rnode_t *PLLRootedTree::getNeighbor(unsigned int nodeIndex) const {
+  auto node = getNode(nodeIndex);
   auto parent = node->parent;
   assert(parent);
   return parent->left == node ? parent->right : parent->left;
@@ -451,7 +448,6 @@ corax_rtree_t *PLLRootedTree::buildRandomTree(
   res->tip_count = static_cast<unsigned int>(allNodes.size()) / 2 + 1;
   res->inner_count = static_cast<unsigned int>(allNodes.size()) / 2;
   res->edge_count = static_cast<unsigned int>(allNodes.size()) - 1;
-
   return res;
 }
 
@@ -624,7 +620,7 @@ std::vector<std::string> PLLRootedTree::getDeterministicIdToLabel() const {
 }
 
 std::vector<unsigned int>
-PLLRootedTree::getNodeIndexMapping(PLLRootedTree &otherTree) {
+PLLRootedTree::getNodeIndexMapping(const PLLRootedTree &otherTree) const {
   assert(otherTree.getNodeNumber() == getNodeNumber());
   std::map<std::string, corax_rnode_t *> otherTreeLabelToNode;
   for (auto node : otherTree.getLeaves()) {
@@ -656,40 +652,29 @@ static corax_unode_t *rtree_unroot(corax_rnode_t *root, corax_unode_t *back) {
   uroot->back = back;
   uroot->label = (root->label) ? xstrdup(root->label) : NULL;
   uroot->length = uroot->back->length;
-
   if (!root->left) {
     uroot->next = NULL;
     return uroot;
   }
-
   uroot->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
-
   uroot->next->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
   uroot->next->next->next = uroot;
-
   uroot->next->length = root->left->length;
   uroot->next->back = rtree_unroot(root->left, uroot->next);
   uroot->next->next->length = root->right->length;
   uroot->next->next->back = rtree_unroot(root->right, uroot->next->next);
-
   return uroot;
 }
 
 corax_utree_t *corax_rtree_unroot(corax_rtree_t *tree) {
   corax_rnode_t *root = tree->root;
-
   corax_rnode_t *new_root;
-
   corax_unode_t *uroot = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
-
   uroot->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
-
   uroot->next->next = (corax_unode_t *)calloc(1, sizeof(corax_unode_t));
-
   uroot->next->next->next = uroot;
   uroot->length = root->left->length + root->right->length;
-
-  /* get the first root child that has descendants and make  it the new root */
+  /* get the first root child that has descendants and make it the new root */
   if (root->left->left) {
     new_root = root->left;
     uroot->back = rtree_unroot(root->right, uroot);
@@ -703,23 +688,19 @@ corax_utree_t *corax_rtree_unroot(corax_rtree_t *tree) {
     if (!uroot->back)
       return NULL;
   }
-
   uroot->label = (new_root->label) ? xstrdup(new_root->label) : NULL;
-
   uroot->next->label = uroot->label;
   uroot->next->length = new_root->left->length;
   uroot->next->back = rtree_unroot(new_root->left, uroot->next);
   /* TODO: Need to clean uroot in case of error*/
   if (!uroot->next->back)
     return NULL;
-
   uroot->next->next->label = uroot->label;
   uroot->next->next->length = new_root->right->length;
   uroot->next->next->back = rtree_unroot(new_root->right, uroot->next->next);
   /* TODO: Need to clean uroot in case of error*/
   if (!uroot->next->next->back)
     return NULL;
-
   return corax_utree_wraptree(uroot, 0);
 }
 
@@ -781,7 +762,7 @@ std::vector<corax_rnode_t *> PLLRootedTree::getOrderedSpeciations() const {
 }
 
 std::unordered_map<std::string, corax_rnode_t *>
-PLLRootedTree::getLabelToNode(bool leafOnly) {
+PLLRootedTree::getLabelToNode(bool leafOnly) const {
   std::unordered_map<std::string, corax_rnode_t *> res;
   for (auto node : getNodes()) {
     if (leafOnly && node->right) {
@@ -796,7 +777,7 @@ PLLRootedTree::getLabelToNode(bool leafOnly) {
 std::string
 PLLRootedTree::buildConsensusTree(const std::vector<std::string> &strOrFiles,
                                   double threshold) {
-  const std::string OUTGROUP_LABEL = "alerax_internal_str_for_outgroup";
+  const std::string OUTGROUP_LABEL = "PLLRootedTree_internal_str_for_outgroup";
   std::vector<std::shared_ptr<PLLUnrootedTree>> outgroupTrees;
   for (auto &str : strOrFiles) {
     auto tree = PLLRootedTree::buildFromStrOrFile(str);
@@ -810,7 +791,6 @@ PLLRootedTree::buildConsensusTree(const std::vector<std::string> &strOrFiles,
   // convert it to rooted consensus string
   auto rootedStr = PLLRootedTree::getRootedNewickFromOutgroup(
       consensus.findLeaf(OUTGROUP_LABEL));
-
   return rootedStr;
 }
 

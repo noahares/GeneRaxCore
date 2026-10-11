@@ -1,7 +1,10 @@
 #include "HighwayCandidateParser.hpp"
-#include <IO/IO.hpp>
-#include <algorithm>
+
+#include <fstream>
 #include <sstream>
+
+#include <IO/IO.hpp>
+#include <IO/Logger.hpp>
 
 bool readTaxa(
     std::stringstream &iss, std::vector<corax_rnode_t *> &nodes,

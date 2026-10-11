@@ -71,40 +71,53 @@ char *corax_rtree_export_newick(const corax_rnode_t *root,
 }
 
 corax_utree_t *
-LibpllParsers::readNewickFromFile(const std::string &newickFilename) {
-  std::ifstream is(newickFilename);
-  if (!is)
-    throw LibpllException("Could not load open newick file ", newickFilename);
-
+LibpllParsers::readUnrootedFromFile(const std::string &newickFile) {
+  std::string errorMessage =
+      "Error while reading unrooted tree from file " + newickFile + "\n";
+  errorMessage += "Error help message: ";
+  std::ifstream is(newickFile);
+  if (!is) {
+    errorMessage += "could not open newick file";
+    throw LibpllException(errorMessage);
+  }
   std::string line;
-  if (!std::getline(is, line)) {
-    throw LibpllException(
-        "Error while reading tree (file is empty) from file: ", newickFilename);
+  if (!std::getline(is, line) || line.empty()) {
+    errorMessage += "file is empty";
+    throw LibpllException(errorMessage);
   }
   if (line[0] == '#') {
     // we are reading a .ale file: the newick string is the next line
-    if (!std::getline(is, line)) {
-      throw LibpllException(
-          "Error while reading tree (file is empty) from .ale file: ",
-          newickFilename);
+    if (!std::getline(is, line) || line.empty()) {
+      errorMessage += ".ale file is empty";
+      throw LibpllException(errorMessage);
     }
   }
-  corax_utree_t *res = nullptr;
+  corax_utree_t *utree = nullptr;
   try {
-    res = readNewickFromStr(line);
+    utree = readUnrootedFromStr(line);
   } catch (...) {
-    throw LibpllException("Error while reading tree from file: ",
-                          newickFilename);
+    errorMessage += "newick string parsing error";
+    if (corax_errno) {
+      errorMessage += "\n";
+      errorMessage += corax_errmsg;
+    }
+    throw LibpllException(errorMessage);
   }
-  return res;
+  return utree;
 }
 
 corax_utree_t *
-LibpllParsers::readNewickFromStr(const std::string &newickString) {
+LibpllParsers::readUnrootedFromStr(const std::string &newickString) {
   auto utree = corax_utree_parse_newick_string_unroot(newickString.c_str());
-  if (!utree)
-    throw LibpllException("Error while reading tree from std::string: ",
-                          newickString);
+  if (!utree) {
+    std::string errorMessage =
+        "Error while reading unrooted tree from string " + newickString;
+    if (corax_errno) {
+      errorMessage += "\n";
+      errorMessage += corax_errmsg;
+    }
+    throw LibpllException(errorMessage);
+  }
   return utree;
 }
 
@@ -144,20 +157,19 @@ LibpllParsers::readRootedFromStr(const std::string &newickString) {
   return readRooted(newickString, false);
 }
 
-void LibpllParsers::saveUtree(const corax_unode_t *utree,
+void LibpllParsers::saveUtree(const corax_unode_t *root,
                               const std::string &fileName, bool append) {
-  std::ofstream os(fileName,
-                   (append ? std::ofstream::app : std::ofstream::out));
-  char *newick = corax_utree_export_newick_rooted(utree, utree->length);
+  std::ofstream os(fileName, (append) ? std::ios::app : std::ios::out);
+  char *newick = corax_utree_export_newick_rooted(root, root->length);
   os << newick << std::endl;
   os.close();
   free(newick);
 }
 
-void LibpllParsers::saveRtree(const corax_rnode_t *rtree,
-                              const std::string &fileName) {
-  std::ofstream os(fileName, std::ofstream::out);
-  char *newick = corax_rtree_export_newick(rtree, 0);
+void LibpllParsers::saveRtree(const corax_rnode_t *root,
+                              const std::string &fileName, bool append) {
+  std::ofstream os(fileName, (append) ? std::ios::app : std::ios::out);
+  char *newick = corax_rtree_export_newick(root, 0);
   os << newick << std::endl;
   os.close();
   free(newick);
@@ -212,7 +224,7 @@ LibpllParsers::parallelGetTreeSizes(const Families &families) {
   for (auto i = ParallelContext::getBegin(treesNumber);
        i < ParallelContext::getEnd(treesNumber); i++) {
     corax_utree_t *tree =
-        LibpllParsers::readNewickFromFile(families[i].startingGeneTree);
+        LibpllParsers::readUnrootedFromFile(families[i].startingGeneTree);
     unsigned int taxa = tree->tip_count;
     localTreeSizes[i - ParallelContext::getBegin(treesNumber)] = taxa;
     corax_utree_destroy(tree, 0);

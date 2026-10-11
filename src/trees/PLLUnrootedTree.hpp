@@ -1,21 +1,16 @@
 #pragma once
 
-#include <corax/corax.h>
-
-#include <cstring>
 #include <functional>
-#include <maths/Random.hpp>
 #include <memory>
-#include <string>
-#include <unordered_set>
+#include <sstream>
+
+#include <corax/tree/utree.h>
 #include <util/CArrayRange.hpp>
 #include <util/types.hpp>
-#include <vector>
 
 class PLLRootedTree;
 
 using UnodePrinter = std::function<void(corax_unode_t *, std::stringstream &)>;
-
 void defaultUnodePrinter(corax_unode_t *node, std::stringstream &ss);
 
 /**
@@ -25,8 +20,8 @@ void defaultUnodePrinter(corax_unode_t *node, std::stringstream &ss);
 class PLLUnrootedTree {
 public:
   /**
-   * Construct from a string that is either a path
-   * to a newick file or a newick string
+   *  Construct a tree from either a path to a newick file
+   *  or a newick string
    */
   PLLUnrootedTree(const std::string &str, bool isFile = true);
 
@@ -37,8 +32,20 @@ public:
   PLLUnrootedTree(PLLRootedTree &rootedTree);
 
   /**
+   *  Construct a random tree from a set of taxa labels
+   */
+  PLLUnrootedTree(const std::vector<const char *> &labels);
+
+  // forbid copy and move
+  PLLUnrootedTree(const PLLUnrootedTree &) = delete;
+  PLLUnrootedTree &operator=(const PLLUnrootedTree &) = delete;
+  PLLUnrootedTree(PLLUnrootedTree &&) = delete;
+  PLLUnrootedTree &operator=(PLLUnrootedTree &&) = delete;
+  ~PLLUnrootedTree() = default;
+
+  /**
    *  Construct a tree from either a path to a newick file
-   *  or a newick string
+   *  or a newick string.
    *  We first try to open it as a file path, and if it fails, as
    *  a newick string
    */
@@ -75,20 +82,6 @@ public:
                      double threshold = 0.51);
 
   /**
-   *  Construct a random tree from a set of taxa labels
-   */
-  PLLUnrootedTree(const std::vector<const char *> &labels,
-                  unsigned int seed = Random::getUInt());
-
-  /**
-   * Forbid copy
-   */
-  PLLUnrootedTree(const PLLUnrootedTree &) = delete;
-  PLLUnrootedTree &operator=(const PLLUnrootedTree &) = delete;
-  PLLUnrootedTree(PLLUnrootedTree &&) = delete;
-  PLLUnrootedTree &operator=(PLLUnrootedTree &&) = delete;
-
-  /**
    *  Tree comparison
    */
   bool operator==(const PLLUnrootedTree &other) const {
@@ -123,10 +116,14 @@ public:
   std::unordered_set<std::string> getLeafLabels();
   std::unordered_set<std::string> getAllLabels();
 
-  /*
-   * Save the tree in newick format in filename
+  /**
+   *  Save the tree in the newick format to fileName
    */
-  void save(const std::string &fileName);
+  void save(const std::string &fileName, bool append = false) const;
+
+  /**
+   *  Convert the tree into a newick string
+   */
   std::string getNewickString(UnodePrinter f = defaultUnodePrinter,
                               corax_unode_t *root = nullptr,
                               bool rooted = false);
@@ -137,9 +134,9 @@ public:
                                       UnodePrinter f = defaultUnodePrinter);
 
   /**
-   * Replace null branch lengths with minBL
+   *  Replace non-positive branch lengths with stdBL
    */
-  void setMissingBranchLengths(double minBL = 0.1);
+  void setMissingBranchLengths(double stdBL = 0.1);
 
   size_t getUnrootedTreeHash() const;
   size_t getRootedTreeHash(corax_unode_t *root) const;

@@ -1,13 +1,13 @@
-#include "util/Scenario.hpp"
-#include "util/enums.hpp"
+#include "Scenario.hpp"
+
+#include <algorithm>
+#include <cassert>
+#include <sstream>
+
 #include <IO/FileSystem.hpp>
-#include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <IO/ReconciliationWriter.hpp>
-#include <map>
-#include <sstream>
-#include <string>
-#include <vector>
+#include <parallelization/ParallelContext.hpp>
 
 const char *Scenario::eventNames[] = {"S",  "SL", "D",    "DL",     "T",
                                       "TL", "L",  "Leaf", "Invalid"};

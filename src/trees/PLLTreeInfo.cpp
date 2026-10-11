@@ -3,11 +3,9 @@
 #include <IO/LibpllException.hpp>
 #include <IO/Logger.hpp>
 #include <fstream>
-#include <maths/Random.hpp>
 #include <sstream>
 
 #include <corax/corax.h>
-const double DEFAULT_BL = 0.1;
 
 static unsigned int getBestLibpllAttribute() {
   corax_hardware_probe();
@@ -56,6 +54,7 @@ void PLLTreeInfo::buildModel(const std::string &modelStrOrFile) {
   _model = std::make_unique<Model>(modelStr);
   assert(_model->num_submodels() == 1);
 }
+
 void PLLTreeInfo::buildTree(const std::string &newickStrOrFile,
                             bool isNewickAFile,
                             const PLLSequencePtrs &sequences) {
@@ -64,14 +63,10 @@ void PLLTreeInfo::buildTree(const std::string &newickStrOrFile,
     for (const auto &seq : sequences) {
       labels.push_back(seq->label);
     }
-    auto seed = Random::getUInt();
-    _utree =
-        std::unique_ptr<PLLUnrootedTree>(new PLLUnrootedTree(labels, seed));
+    _utree = std::make_unique<PLLUnrootedTree>(labels);
   } else {
-    _utree = std::unique_ptr<PLLUnrootedTree>(
-        new PLLUnrootedTree(newickStrOrFile, isNewickAFile));
+    _utree = std::make_unique<PLLUnrootedTree>(newickStrOrFile, isNewickAFile);
   }
-  _utree->setMissingBranchLengths(DEFAULT_BL);
 }
 
 corax_partition_t *PLLTreeInfo::buildPartition(const PLLSequencePtrs &sequences,
