@@ -1,14 +1,6 @@
 #pragma once
 
-#include <IO/Families.hpp>
-#include <string>
-#include <trees/PLLUnrootedTree.hpp>
-#include <unordered_set>
-#include <util/types.hpp>
-#include <vector>
-
-#include <DistanceMethods/Astrid.hpp>
-#include <IO/Logger.hpp>
+#include "Astrid.hpp"
 
 class Asteroid : public BMEEvaluator {
 public:
@@ -84,7 +76,7 @@ private:
   // _belongsToPruned[i][k] == true if the node i belongs to
   // the species tree induced by the family k
   BoolMatrix _belongsToPruned;
-  // _pows[i] == pow(2, i) (precomputed to speedup computations)
+  // _pows[i] == pow(0.5, i) (precomputed to speedup computations)
   std::vector<double> _pows;
 
   struct SubBMEToUpdate {

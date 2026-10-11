@@ -1,14 +1,15 @@
 #pragma once
 
-#include <IO/Families.hpp>
 #include <memory>
-#include <string>
+
+#include <IO/Families.hpp>
 #include <trees/PLLRootedTree.hpp>
 #include <util/types.hpp>
-#include <vector>
 
 class NeighborJoining {
 public:
+  NeighborJoining() = delete;
+
   /**
    *  Apply Neighbor Joining algorithm
    *  @param DistanceMatrix a symetric distance matrix

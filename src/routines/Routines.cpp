@@ -27,12 +27,12 @@ Routines::computeInitialSpeciesTree(Families &families,
   std::string cladeOutput =
       FileSystem::joinPaths(globalOutputDir, "cladesSpeciesTree");
   switch (algo) {
-  case SpeciesTreeAlgorithm::MiniNJ:
-    return MiniNJ::runMiniNJ(families);
   case SpeciesTreeAlgorithm::NJst:
     return MiniNJ::runNJst(families);
-  case SpeciesTreeAlgorithm::WMinNJ:
-    return MiniNJ::runWMinNJ(families);
+  case SpeciesTreeAlgorithm::MiniNJ:
+    return MiniNJ::runMiniNJ(families);
+  case SpeciesTreeAlgorithm::WMiniNJ:
+    return MiniNJ::runWMiniNJ(families);
   case SpeciesTreeAlgorithm::Ustar:
     return MiniNJ::runUstar(families);
   case SpeciesTreeAlgorithm::Cherry:

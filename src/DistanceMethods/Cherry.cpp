@@ -1,14 +1,14 @@
 #include "Cherry.hpp"
 
+#include <algorithm>
+#include <cassert>
+#include <fstream>
+
 #include "MiniNJ.hpp"
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
-#include <memory>
-#include <set>
 #include <trees/PLLUnrootedTree.hpp>
-#include <unordered_map>
 #include <util/types.hpp>
-#include <vector>
 
 using GeneIdsSet = std::unordered_set<int>;
 using SpeciesIdToGeneIds = std::unordered_map<int, GeneIdsSet>;

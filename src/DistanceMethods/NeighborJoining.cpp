@@ -1,4 +1,9 @@
 #include "NeighborJoining.hpp"
+
+#include <algorithm>
+#include <cassert>
+#include <limits>
+
 #include <IO/Logger.hpp>
 
 using Cherry = std::pair<unsigned int, unsigned int>;
