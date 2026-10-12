@@ -3,21 +3,7 @@
 #include <algorithm>
 #include <cassert>
 
-#include <IO/GeneSpeciesMapping.hpp>
 #include <parallelization/ParallelContext.hpp>
-
-static std::unordered_set<std::string>
-getLabelsFromFamilies(const Families &families) {
-  std::unordered_set<std::string> leafLabels;
-  for (const auto &family : families) {
-    GeneSpeciesMapping mapping;
-    mapping.fill(family.mappingFile, family.startingGeneTree);
-    for (const auto &p : mapping.getMap()) {
-      leafLabels.insert(p.second);
-    }
-  }
-  return leafLabels;
-}
 
 SpeciesTree::SpeciesTree(const std::string &str, bool isFile, bool useBLs)
     : _speciesTree(str, isFile), _datedTree(_speciesTree, useBLs) {}
@@ -26,7 +12,7 @@ SpeciesTree::SpeciesTree(const std::unordered_set<std::string> &labels)
     : _speciesTree(labels), _datedTree(_speciesTree, false) {}
 
 SpeciesTree::SpeciesTree(const Families &families)
-    : _speciesTree(getLabelsFromFamilies(families)),
+    : _speciesTree(Family::getLabelsFromFamilies(families)),
       _datedTree(_speciesTree, false) {}
 
 std::unique_ptr<SpeciesTree> SpeciesTree::buildRandomTree() const {

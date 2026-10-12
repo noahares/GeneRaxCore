@@ -41,8 +41,7 @@ Routines::computeInitialSpeciesTree(Families &families,
     return CherryPro::geneTreeCherryPro(families);
   case SpeciesTreeAlgorithm::Random:
     return std::make_unique<PLLRootedTree>(
-        std::make_unique<SpeciesTree>(families)->getTree().getNewickString(),
-        false);
+        Family::getLabelsFromFamilies(families));
   case SpeciesTreeAlgorithm::User:
     assert(false);
   }
