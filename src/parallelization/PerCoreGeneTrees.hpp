@@ -1,9 +1,9 @@
 #pragma once
 
-#include <IO/FamiliesFileParser.hpp>
+#include <IO/Families.hpp>
 #include <IO/GeneSpeciesMapping.hpp>
-#include <likelihoods/LibpllEvaluation.hpp>
-#include <trees/PLLUnrootedTree.hpp>
+
+class PLLUnrootedTree;
 
 /**
  * Holds the gene trees (with there mappings to the species tree)
@@ -15,18 +15,13 @@
 class PerCoreGeneTrees {
 public:
   struct GeneTree {
-
     std::string name;
     std::string startingGeneTreeFile;
     unsigned int familyIndex;
     GeneSpeciesMapping mapping;
     PLLUnrootedTree *geneTree;
     bool ownTree; // If true, I am responsible for destroying the tree
-    ~GeneTree() {
-      if (ownTree) {
-        delete geneTree;
-      }
-    }
+    ~GeneTree();
   };
 
   /**
@@ -49,10 +44,12 @@ public:
   PerCoreGeneTrees(const GeneSpeciesMapping &mapping,
                    PLLUnrootedTree &geneTree);
 
+  // forbid copy and move
   PerCoreGeneTrees(const PerCoreGeneTrees &) = delete;
   PerCoreGeneTrees &operator=(const PerCoreGeneTrees &) = delete;
   PerCoreGeneTrees(PerCoreGeneTrees &&) = delete;
   PerCoreGeneTrees &operator=(PerCoreGeneTrees &&) = delete;
+  ~PerCoreGeneTrees() = default;
 
   /**
    *  @return Trees allocated to the current core
@@ -66,8 +63,20 @@ public:
    */
   bool checkMappings(const std::string &speciesTreeFile);
 
-  static void getPerCoreFamilies(const Families &allFamilies,
+  /**
+   *  @param families All families
+   *  @param[out] perCoreFamilies Families allocated to the current core
+   */
+  static void getPerCoreFamilies(const Families &families,
                                  Families &perCoreFamilies);
+
+  /**
+   *  @param families All families
+   *  @param ccpMode To count clades in CCP files or leaves in gene trees
+   *  @return The number of observed clades or gene leaves per family
+   */
+  static std::vector<unsigned int>
+  parallelGetTreeSizes(const Families &families, bool ccpMode = false);
 
 private:
   std::vector<GeneTree> _geneTrees;

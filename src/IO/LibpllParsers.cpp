@@ -1,16 +1,14 @@
 #include "LibpllParsers.hpp"
-#include <IO/LibpllException.hpp>
-#include <IO/Logger.hpp>
-#include <IO/RootedNewickParser.hpp>
-#include <algorithm>
-#include <array>
-#include <corax/corax.h>
-#include <cstring>
+
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
-#include <parallelization/ParallelContext.hpp>
+#include <iostream>
 #include <sstream>
-#include <stack>
-#include <streambuf>
+
+#include "RootedNewickParser.hpp"
+#include <corax/corax.h>
 
 char *corax_rtree_export_newick(const corax_rnode_t *root,
                                 char *(*cb_serialize)(const corax_rnode_t *)) {
@@ -221,27 +219,6 @@ void LibpllParsers::getRtreeHierarchicalString(const corax_rtree_t *rtree,
   std::vector<bool> lefts;
   rtreeHierarchicalStringAux(rtree->root, lefts, os);
   newick = os.str();
-}
-
-std::vector<unsigned int>
-LibpllParsers::parallelGetTreeSizes(const Families &families) {
-  unsigned int treesNumber = static_cast<unsigned int>(families.size());
-  std::vector<unsigned int> localTreeSizes(
-      (treesNumber - 1) / ParallelContext::getSize() + 1, 0);
-  for (auto i = ParallelContext::getBegin(treesNumber);
-       i < ParallelContext::getEnd(treesNumber); i++) {
-    corax_utree_t *tree =
-        LibpllParsers::readUnrootedFromFile(families[i].startingGeneTree);
-    unsigned int taxa = tree->tip_count;
-    localTreeSizes[i - ParallelContext::getBegin(treesNumber)] = taxa;
-    corax_utree_destroy(tree, 0);
-  }
-  std::vector<unsigned int> treeSizes;
-  ParallelContext::concatenateUIntVectors(localTreeSizes, treeSizes);
-  treeSizes.erase(remove(treeSizes.begin(), treeSizes.end(), 0),
-                  treeSizes.end());
-  assert(treeSizes.size() == families.size());
-  return treeSizes;
 }
 
 void LibpllParsers::fillLeavesFromUtree(

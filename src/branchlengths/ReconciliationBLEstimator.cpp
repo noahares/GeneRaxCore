@@ -1,11 +1,18 @@
 #include "ReconciliationBLEstimator.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <memory>
 
+#include <IO/LibpllParsers.hpp>
+#include <IO/Logger.hpp>
 #include <maths/ModelParameters.hpp>
+#include <parallelization/ParallelContext.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <routines/Routines.hpp>
+#include <trees/PLLRootedTree.hpp>
+#include <trees/PLLUnrootedTree.hpp>
+#include <util/Scenario.hpp>
 
 static void getAverageDepthRec(corax_rnode_t *speciesNode, double currentDepth,
                                double &sumDepths, unsigned int &count) {

@@ -1,10 +1,10 @@
 #include "GeneRaxMaster.hpp"
 
 #include <IO/FileSystem.hpp>
-#include <IO/LibpllParsers.hpp>
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <maths/Parameters.hpp>
+#include <parallelization/PerCoreGeneTrees.hpp>
 #include <parallelization/Scheduler.hpp>
 #include <sstream>
 #include <util/RecModelInfo.hpp>
@@ -28,7 +28,7 @@ void GeneRaxMaster::optimizeGeneTrees(
   FileSystem::mkdir(outputDir, true);
   std::string commandFile =
       FileSystem::joinPaths(outputDir, "opt_genes_command.txt");
-  auto geneTreeSizes = LibpllParsers::parallelGetTreeSizes(families);
+  auto geneTreeSizes = PerCoreGeneTrees::parallelGetTreeSizes(families);
   ParallelOfstream os(commandFile);
   std::string ratesFile = FileSystem::joinPaths(outputDir, "dtl_rates.txt");
   rates.save(ratesFile);
