@@ -12,129 +12,123 @@
 #include <stack>
 #include <streambuf>
 
-static char *
-rtree_export_newick_recursive(const corax_rnode_t *root,
-                              char *(*cb_serialize)(const corax_rnode_t *)) {
+char *corax_rtree_export_newick(const corax_rnode_t *root,
+                                char *(*cb_serialize)(const corax_rnode_t *)) {
   char *newick;
-  assert(root != NULL);
-  if (!(root->left) || !(root->right)) {
+  int size_alloced = 0;
+  if (!root) {
+    corax_set_error(CORAX_ERROR_INVALID_TREE, "an empty subtree");
+    return NULL;
+  }
+  if (!root->left && !root->right) {
+    if (!root->parent) {
+      corax_set_error(CORAX_ERROR_INVALID_TREE, "a leaf has no parent");
+      return NULL;
+    }
+    if (!root->label) {
+      corax_set_error(CORAX_ERROR_INVALID_TREE, "a leaf has no label");
+      return NULL;
+    }
     if (cb_serialize) {
       newick = cb_serialize(root);
+      size_alloced = (int)strlen(newick);
     } else {
-      asprintf(&newick, "%s:%f", root->label, root->length);
+      size_alloced = asprintf(&newick, "%s:%f", root->label, root->length);
     }
   } else {
-    char *subtree1 = rtree_export_newick_recursive(root->left, cb_serialize);
-    char *subtree2 = rtree_export_newick_recursive(root->right, cb_serialize);
+    char *subtree1 = corax_rtree_export_newick(root->left, cb_serialize);
+    char *subtree2 = corax_rtree_export_newick(root->right, cb_serialize);
+    if (subtree1 == NULL || subtree2 == NULL) {
+      free(subtree1);
+      free(subtree2);
+      return NULL;
+    }
+    const char *endchar = (root->parent) ? "" : ";";
     if (cb_serialize) {
       char *temp = cb_serialize(root);
-      asprintf(&newick, "(%s,%s)%s", subtree1, subtree2, temp);
+      size_alloced =
+          asprintf(&newick, "(%s,%s)%s%s", subtree1, subtree2, temp, endchar);
       free(temp);
     } else {
-      asprintf(&newick, "(%s,%s)%s:%f", subtree1, subtree2,
-               root->label ? root->label : "", root->length);
+      size_alloced =
+          asprintf(&newick, "(%s,%s)%s:%f%s", subtree1, subtree2,
+                   (root->label) ? root->label : "", root->length, endchar);
     }
     free(subtree1);
     free(subtree2);
+  }
+  if (size_alloced < 0) {
+    corax_set_error(CORAX_ERROR_MEM_ALLOC,
+                    "memory allocation during newick export failed");
+    return NULL;
   }
   return newick;
 }
 
-char *corax_rtree_export_newick(const corax_rnode_t *root,
-                                char *(*cb_serialize)(const corax_rnode_t *)) {
-  char *newick;
-  if (!root)
-    return NULL;
-
-  if (!(root->left) || !(root->right)) {
-    if (cb_serialize) {
-      newick = cb_serialize(root);
-    } else {
-      asprintf(&newick, "%s:%f", root->label, root->length);
-    }
-  } else {
-    char *subtree1 = rtree_export_newick_recursive(root->left, cb_serialize);
-    char *subtree2 = rtree_export_newick_recursive(root->right, cb_serialize);
-    if (cb_serialize) {
-      char *temp = cb_serialize(root);
-      asprintf(&newick, "(%s,%s)%s", subtree1, subtree2, temp);
-      free(temp);
-    } else {
-      asprintf(&newick, "(%s,%s)%s:%f;", subtree1, subtree2,
-               root->label ? root->label : "", root->length);
-    }
-    free(subtree1);
-    free(subtree2);
+static void append_corax_errmsg(std::string &errorMessage) {
+  if (corax_errno) {
+    errorMessage += ".\n";
+    errorMessage += "Error help message: ";
+    errorMessage += corax_errmsg;
   }
+}
 
-  return newick;
+static corax_utree_t *readUnrooted(const std::string &newick, bool isFile) {
+  std::string newickString;
+  std::string entryName = ((isFile) ? "file " : "string ") + newick;
+  std::string errorMessage =
+      "Error while reading unrooted tree from " + entryName;
+  errorMessage += ".\n";
+  errorMessage += "Error name: ";
+  if (isFile) {
+    std::ifstream is(newick);
+    if (!is) {
+      errorMessage += "could not open newick file";
+      throw LibpllException(errorMessage);
+    }
+    std::string line;
+    if (!std::getline(is, line) || line.empty()) {
+      errorMessage += "file is empty";
+      throw LibpllException(errorMessage);
+    }
+    if (line[0] == '#') {
+      // we are reading a .ale file: the newick string is the next line
+      if (!std::getline(is, line) || line.empty()) {
+        errorMessage += ".ale file is empty";
+        throw LibpllException(errorMessage);
+      }
+    }
+    newickString = line;
+  } else {
+    newickString = newick;
+  }
+  auto utree = corax_utree_parse_newick_string_unroot(newickString.c_str());
+  if (!utree) {
+    errorMessage += "newick string parsing error";
+    append_corax_errmsg(errorMessage);
+    throw LibpllException(errorMessage);
+  }
+  return utree;
 }
 
 corax_utree_t *
 LibpllParsers::readUnrootedFromFile(const std::string &newickFile) {
-  std::string errorMessage =
-      "Error while reading unrooted tree from file " + newickFile + "\n";
-  errorMessage += "Error help message: ";
-  std::ifstream is(newickFile);
-  if (!is) {
-    errorMessage += "could not open newick file";
-    throw LibpllException(errorMessage);
-  }
-  std::string line;
-  if (!std::getline(is, line) || line.empty()) {
-    errorMessage += "file is empty";
-    throw LibpllException(errorMessage);
-  }
-  if (line[0] == '#') {
-    // we are reading a .ale file: the newick string is the next line
-    if (!std::getline(is, line) || line.empty()) {
-      errorMessage += ".ale file is empty";
-      throw LibpllException(errorMessage);
-    }
-  }
-  corax_utree_t *utree = nullptr;
-  try {
-    utree = readUnrootedFromStr(line);
-  } catch (...) {
-    errorMessage += "newick string parsing error";
-    if (corax_errno) {
-      errorMessage += "\n";
-      errorMessage += corax_errmsg;
-    }
-    throw LibpllException(errorMessage);
-  }
-  return utree;
+  return readUnrooted(newickFile, true);
 }
 
 corax_utree_t *
 LibpllParsers::readUnrootedFromStr(const std::string &newickString) {
-  auto utree = corax_utree_parse_newick_string_unroot(newickString.c_str());
-  if (!utree) {
-    std::string errorMessage =
-        "Error while reading unrooted tree from string " + newickString;
-    if (corax_errno) {
-      errorMessage += "\n";
-      errorMessage += corax_errmsg;
-    }
-    throw LibpllException(errorMessage);
-  }
-  return utree;
+  return readUnrooted(newickString, false);
 }
 
 static corax_rtree_t *readRooted(const std::string &newick, bool isFile) {
   ParsingError error;
-  auto tree = custom_rtree_parse_newick(newick.c_str(), isFile, &error);
-  if (error.type == PET_NOERROR) {
-    return tree;
-  } else {
-    std::string errorMessage;
-    if (isFile) {
-      errorMessage =
-          "Error while reading rooted tree from file " + newick + ".\n";
-    } else {
-      errorMessage =
-          "Error while reading rooted tree from string " + newick + ".\n";
-    }
+  auto rtree = custom_rtree_parse_newick(newick.c_str(), isFile, &error);
+  if (error.type != PET_NOERROR) {
+    std::string entryName = ((isFile) ? "file " : "string ") + newick;
+    std::string errorMessage =
+        "Error while reading rooted tree from " + entryName;
+    errorMessage += ".\n";
     errorMessage += "Error name: ";
     errorMessage += std::string(get_parsing_error_name(error.type));
     errorMessage += ".\n";
@@ -142,9 +136,10 @@ static corax_rtree_t *readRooted(const std::string &newick, bool isFile) {
     errorMessage += std::string(get_parsing_error_diagnostic(error.type));
     errorMessage += ".\n";
     errorMessage += "The parsing error was detected at character ";
-    errorMessage += std::to_string(error.offset) + ".";
+    errorMessage += std::to_string(error.offset);
     throw LibpllException(errorMessage);
   }
+  return rtree;
 }
 
 corax_rtree_t *
@@ -157,21 +152,33 @@ LibpllParsers::readRootedFromStr(const std::string &newickString) {
   return readRooted(newickString, false);
 }
 
-void LibpllParsers::saveUtree(const corax_unode_t *root,
-                              const std::string &fileName, bool append) {
+static void saveNewick(const char *newick, bool rooted,
+                       const std::string &fileName, bool append) {
+  if (!newick) {
+    std::string treeType = (rooted) ? "rooted" : "unrooted";
+    std::string errorMessage =
+        "Error while saving " + treeType + " tree to " + fileName;
+    append_corax_errmsg(errorMessage);
+    throw LibpllException(errorMessage);
+  }
   std::ofstream os(fileName, (append) ? std::ios::app : std::ios::out);
-  char *newick = corax_utree_export_newick_rooted(root, root->length);
   os << newick << std::endl;
   os.close();
+}
+
+void LibpllParsers::saveUtree(const corax_unode_t *root,
+                              const std::string &fileName, bool append) {
+  assert(root);
+  char *newick = corax_utree_export_newick_rooted(root, root->length);
+  saveNewick(newick, false, fileName, append);
   free(newick);
 }
 
 void LibpllParsers::saveRtree(const corax_rnode_t *root,
                               const std::string &fileName, bool append) {
-  std::ofstream os(fileName, (append) ? std::ios::app : std::ios::out);
+  assert(root);
   char *newick = corax_rtree_export_newick(root, 0);
-  os << newick << std::endl;
-  os.close();
+  saveNewick(newick, true, fileName, append);
   free(newick);
 }
 
@@ -236,8 +243,9 @@ LibpllParsers::parallelGetTreeSizes(const Families &families) {
   assert(treeSizes.size() == families.size());
   return treeSizes;
 }
+
 void LibpllParsers::fillLeavesFromUtree(
-    corax_utree_t *utree, std::unordered_set<std::string> &leaves) {
+    const corax_utree_t *utree, std::unordered_set<std::string> &leaves) {
   for (unsigned int i = 0; i < utree->tip_count + utree->inner_count; ++i) {
     auto node = utree->nodes[i];
     if (!node->next) {
@@ -247,7 +255,7 @@ void LibpllParsers::fillLeavesFromUtree(
 }
 
 void LibpllParsers::fillLeavesFromRtree(
-    corax_rtree_t *rtree, std::unordered_set<std::string> &leaves) {
+    const corax_rtree_t *rtree, std::unordered_set<std::string> &leaves) {
   for (unsigned int i = 0; i < rtree->tip_count + rtree->inner_count; ++i) {
     auto node = rtree->nodes[i];
     if (!node->left) {

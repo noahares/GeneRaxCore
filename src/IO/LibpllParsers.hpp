@@ -51,9 +51,9 @@ public:
    */
   static double getMSAEntropy(const std::string &alignmentFilename,
                               const std::string &modelStrOrFilename);
-  static void fillLeavesFromUtree(corax_utree_t *utree,
+  static void fillLeavesFromUtree(const corax_utree_t *utree,
                                   std::unordered_set<std::string> &leaves);
-  static void fillLeavesFromRtree(corax_rtree_t *rtree,
+  static void fillLeavesFromRtree(const corax_rtree_t *rtree,
                                   std::unordered_set<std::string> &leaves);
 
   /**
