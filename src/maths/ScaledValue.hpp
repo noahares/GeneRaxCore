@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <type_traits>
 
 #define JS_SCALE_FACTOR                                                        \
   115792089237316195423570985008687907853269984665640564039457584007913129639936.0 /*  2**256 (exactly)  */
@@ -63,11 +64,19 @@ public:
    *  ScaledValue sum operator
    */
   inline ScaledValue operator+(const ScaledValue &v) const {
-    if (v.scaler == scaler) {
+    int scaler_diff = scaler - v.scaler;
+    if (scaler_diff == 0) {
       return ScaledValue(v.value + value, scaler);
-    } else if (v.scaler < scaler) {
+    } else if (scaler_diff == 1) {
+      // v's scale is 1 smaller, but the difference between v and this could be
+      // very small (v is upper bound of the scale, this is lower bound).
+      return ScaledValue(v.value + value * JS_SCALE_THRESHOLD, v.scaler);
+    } else if (scaler_diff == -1) {
+      return ScaledValue(value + v.value * JS_SCALE_THRESHOLD, scaler);
+    } else if (scaler_diff >= 2) {
       return v;
     } else {
+      assert(scaler_diff <= -2);
       return *this;
     }
   }
@@ -76,9 +85,17 @@ public:
    *  ScaledValue sum operator
    */
   inline ScaledValue &operator+=(const ScaledValue &v) {
-    if (v.scaler == scaler) {
+    int scaler_diff = scaler - v.scaler;
+    if (scaler_diff == 0) {
       value += v.value;
-    } else if (v.scaler < scaler) {
+    } else if (scaler_diff == 1) {
+      // value and v.value could be close, so scale value down to v.value
+      value *= JS_SCALE_THRESHOLD;
+      value += v.value;
+      scaler = v.scaler;
+    } else if (scaler_diff == -1) {
+      value += v.value * JS_SCALE_THRESHOLD;
+    } else if (scaler_diff >= 2) {
       value = v.value;
       scaler = v.scaler;
     }
@@ -89,7 +106,8 @@ public:
    *  ScaledValue minus operator
    */
   inline ScaledValue operator-(const ScaledValue &v) const {
-    if (v.scaler == scaler) {
+    int scaler_diff = scaler - v.scaler;
+    if (scaler_diff == 0) {
       if (value - v.value < 0.0) {
         if (fabs(value - v.value) < 0.0000000001) {
           return ScaledValue();
@@ -99,6 +117,13 @@ public:
       }
       assert(value - v.value >= 0);
       auto res = ScaledValue(value - v.value, scaler);
+      res.scale();
+      return res;
+    } else if (scaler_diff == 1) {
+      double r = value * JS_SCALE_THRESHOLD - v.value;
+      return r > 0.0 ? ScaledValue(r, v.scaler) : ScaledValue();
+    } else if (scaler_diff == -1) {
+      auto res = ScaledValue(value - v.value * JS_SCALE_THRESHOLD, scaler);
       res.scale();
       return res;
     } else if (v.scaler < scaler) {

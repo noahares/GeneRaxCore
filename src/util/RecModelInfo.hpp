@@ -47,6 +47,8 @@ struct RecModelInfo {
   // use less RAM, but likelihood evaluation might be slower
   // (specific to AleRax)
   bool memorySavings;
+  // Fix-point iterations
+  unsigned int recIterations;
 
   /**
    *  Default constructor
@@ -58,7 +60,7 @@ struct RecModelInfo {
         rootedGeneTree(true), forceGeneTreeRoot(false), madRooting(false),
         branchLengthThreshold(-1.0),
         transferConstraint(TransferConstaint::PARENTS), noDup(false),
-        noDL(false), noTL(false), memorySavings(false) {}
+        noDL(false), noTL(false), memorySavings(false), recIterations(4) {}
 
   /**
    *  Constructor
@@ -70,7 +72,7 @@ struct RecModelInfo {
                double branchLengthThreshold,
                TransferConstaint transferConstraint, bool noDup, bool noDL,
                bool noTL, const std::string &fractionMissingFile,
-               bool memorySavings)
+               bool memorySavings, unsigned int recIterations = 4)
       : model(model), recOpt(recOpt), perFamilyRates(perFamilyRates),
         gammaCategories(gammaCategories),
         originationStrategy(originationStrategy),
@@ -79,7 +81,7 @@ struct RecModelInfo {
         branchLengthThreshold(branchLengthThreshold),
         transferConstraint(transferConstraint), noDup(noDup), noDL(noDL),
         noTL(noTL), fractionMissingFile(fractionMissingFile),
-        memorySavings(memorySavings) {}
+        memorySavings(memorySavings), recIterations(recIterations) {}
 
   void readFromArgv(char **argv, int &i) {
     model = RecModel(atoi(argv[i++]));
@@ -101,6 +103,7 @@ struct RecModelInfo {
       fractionMissingFile = std::string();
     }
     memorySavings = bool(atoi(argv[i++]));
+    recIterations = atoi(argv[i++]);
   }
 
   std::vector<std::string> getArgv() const {
@@ -126,10 +129,11 @@ struct RecModelInfo {
       argv.push_back(std::string("NONE"));
     }
     argv.push_back(std::to_string(static_cast<int>(memorySavings)));
+    argv.push_back(std::to_string(recIterations));
     return argv;
   }
 
-  static int getArgc() { return 15; }
+  static int getArgc() { return 16; }
 
   std::vector<char> getParamTypes() const {
     std::vector<char> res;
