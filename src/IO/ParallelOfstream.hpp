@@ -1,9 +1,11 @@
 #pragma once
 
 #include <fstream>
+#include <iostream>
 #include <memory>
-#include <parallelization/ParallelContext.hpp>
 #include <string>
+
+#include <parallelization/ParallelContext.hpp>
 
 class ParallelOfstream {
 public:
@@ -18,12 +20,18 @@ public:
 
   ~ParallelOfstream() { close(); }
 
+  // forbid copy, allow move
+  ParallelOfstream(const ParallelOfstream &) = delete;
+  ParallelOfstream &operator=(const ParallelOfstream &) = delete;
+  ParallelOfstream(ParallelOfstream &&) = default;
+  ParallelOfstream &operator=(ParallelOfstream &&) = default;
+
   void close() {
     // force the _os destruction if it holds an ofstream
     _os = std::make_unique<std::ostream>(nullptr);
   }
 
-  template <typename T> std::ostream &operator<<(T input) {
+  template <typename T> std::ostream &operator<<(const T &input) {
     *_os << input;
     return *_os;
   }

@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <numeric>
 
-#include <IO/Logger.hpp>
 #include <maths/Random.hpp>
 
 std::ofstream ParallelContext::sink("/dev/null");
@@ -15,11 +15,10 @@ std::stack<bool> ParallelContext::_ownsMPIContextStack;
 bool ParallelContext::_mpiEnabled = false;
 
 void ParallelContext::init(void *commPtr) {
-  if (commPtr && *static_cast<int *>(commPtr) == -1) {
+  if (commPtr && (*static_cast<int *>(commPtr) == -1)) {
     _mpiEnabled = false;
-    Logger::info << "Warning: this program was compiled without MPI. Make sure "
-                    "you are not running it with mpiexec or mpirun."
-                 << std::endl;
+    std::cout << "Warning: this program was compiled without MPI. Make sure "
+              << "you are not running it with mpiexec or mpirun." << std::endl;
     return;
   }
 #ifdef WITH_MPI
