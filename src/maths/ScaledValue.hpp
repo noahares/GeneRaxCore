@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <climits>
 #include <cmath>
@@ -23,6 +24,16 @@ template <class REAL> void scale(REAL &) {}
  *  (apply std::log)
  */
 template <class REAL> double getLog(const REAL &v) { return std::log(v); }
+
+/**
+ *  getCheckedLog function for a general type: the log, or -inf when the value
+ *  is zero or subnormal. Below the normal range a double has lost significant
+ *  bits, so -inf tells the caller to recompute the value with ScaledValue.
+ */
+template <class REAL> double getCheckedLog(const REAL &v) {
+  return std::isnormal(v) ? std::log(v)
+                          : -std::numeric_limits<double>::infinity();
+}
 
 /**
  *  Class representing a double value with a high precision.
@@ -61,11 +72,22 @@ public:
 
   /**
    *  ScaledValue sum operator
+   *
+   *  A band is 2^256 wide, so two values one scaler apart can have the same
+   * magnitude (one at the bottom of its band, the other at the top of the
+   * next): they are added at the smaller scaler. Two or more scalers apart the
+   * smaller value is below 2^-256 of the larger one, far below double's
+   * rounding, and is dropped exactly as before.
    */
   inline ScaledValue operator+(const ScaledValue &v) const {
-    if (v.scaler == scaler) {
+    int scaler_diff = scaler - v.scaler;
+    if (scaler_diff == 0) {
       return ScaledValue(v.value + value, scaler);
-    } else if (v.scaler < scaler) {
+    } else if (scaler_diff == 1) {
+      return ScaledValue(v.value + value * JS_SCALE_THRESHOLD, v.scaler);
+    } else if (scaler_diff == -1) {
+      return ScaledValue(value + v.value * JS_SCALE_THRESHOLD, scaler);
+    } else if (scaler_diff >= 2) {
       return v;
     } else {
       return *this;
@@ -73,12 +95,18 @@ public:
   }
 
   /**
-   *  ScaledValue sum operator
+   *  ScaledValue sum operator (see operator+)
    */
   inline ScaledValue &operator+=(const ScaledValue &v) {
-    if (v.scaler == scaler) {
+    int scaler_diff = scaler - v.scaler;
+    if (scaler_diff == 0) {
       value += v.value;
-    } else if (v.scaler < scaler) {
+    } else if (scaler_diff == 1) {
+      value = v.value + value * JS_SCALE_THRESHOLD;
+      scaler = v.scaler;
+    } else if (scaler_diff == -1) {
+      value += v.value * JS_SCALE_THRESHOLD;
+    } else if (scaler_diff >= 2) {
       value = v.value;
       scaler = v.scaler;
     }
@@ -87,27 +115,50 @@ public:
 
   /**
    *  ScaledValue minus operator
+   *
+   *  Precondition: *this >= v. ScaledValues are probabilities, so a difference
+   * below zero is a bug, except for rounding when the two are equal in exact
+   * arithmetic (returned as 0). AleRax subtracts only a sum over all species
+   *  minus a sum over a subset of the same stored terms (the transfer-forbidden
+   * species), both accumulated with +=, which keeps the smallest scaler of its
+   * terms; the minuend's scaler therefore never exceeds the subtrahend's there.
+   *  Values one scaler apart are subtracted at the smaller scaler (see
+   * operator+).
    */
   inline ScaledValue operator-(const ScaledValue &v) const {
-    if (v.scaler == scaler) {
-      if (value - v.value < 0.0) {
-        if (fabs(value - v.value) < 0.0000000001) {
-          return ScaledValue();
-        }
-        std::cerr.precision(17);
-        std::cerr << *this << " - " << v << std::endl;
-      }
-      assert(value - v.value >= 0);
-      auto res = ScaledValue(value - v.value, scaler);
-      res.scale();
-      return res;
-    } else if (v.scaler < scaler) {
+    int scaler_diff = scaler - v.scaler;
+    double a = value; // both at the smaller scaler s
+    double b = v.value;
+    int s = scaler;
+    if (scaler_diff == 1) {
+      a *= JS_SCALE_THRESHOLD;
+      s = v.scaler;
+    } else if (scaler_diff == -1) {
+      b *= JS_SCALE_THRESHOLD;
+    } else if (scaler_diff <= -2) {
+      return *this; // v is below 2^-256 of *this
+    } else if (scaler_diff >= 2) {
       std::cerr << *this << " - " << v << std::endl;
       assert(false); // negative values not allowed
-      return v;
-    } else {
-      return *this;
+      return ScaledValue();
     }
+    const double r = a - b;
+    if (r < 0.0) {
+      // Rounding between two values equal in exact arithmetic, relative to the
+      // operands (a mantissa can be as small as 2^-256, so an absolute
+      // tolerance would accept a true negative).
+      if (-r <= 0.0000000001 * std::max(a, b)) {
+        return ScaledValue();
+      }
+      std::cerr.precision(17);
+      std::cerr << *this << " - " << v << std::endl;
+      assert(false); // negative values not allowed
+      return ScaledValue();
+    }
+    auto res = ScaledValue(r, s);
+    res.scale();
+    res.checkNull();
+    return res;
   }
 
   /**
@@ -165,40 +216,38 @@ public:
   inline bool isNull() const { return value == 0.0; }
 
   /**
-   *  Comparison with ScaledValue operators
+   *  Comparison with ScaledValue operators. As for the sum, values one scaler
+   * apart can have the same magnitude and are compared at the smaller scaler;
+   * two or more apart the scaler decides. Zero is below every positive value.
    */
-  inline bool operator<(const ScaledValue &v) const {
-    if (isNull()) {
-      return !v.isNull();
+  inline int compare(const ScaledValue &v) const {
+    if (isNull() || v.isNull()) {
+      return isNull() ? (v.isNull() ? 0 : -1) : 1;
     }
-    if (scaler != v.scaler) {
-      return scaler > v.scaler;
+    int scaler_diff = scaler - v.scaler;
+    double a = value;
+    double b = v.value;
+    if (scaler_diff == 1) {
+      a *= JS_SCALE_THRESHOLD;
+    } else if (scaler_diff == -1) {
+      b *= JS_SCALE_THRESHOLD;
+    } else if (scaler_diff != 0) {
+      return scaler_diff > 0 ? -1 : 1;
     }
-    return value < v.value;
+    return a < b ? -1 : (b < a ? 1 : 0);
   }
 
-  inline bool operator>(const ScaledValue &v) const { return !(*this <= v); }
+  inline bool operator<(const ScaledValue &v) const { return compare(v) < 0; }
 
-  inline bool operator==(const ScaledValue &v) const {
-    if (isNull()) {
-      return v.isNull();
-    }
-    return (scaler == v.scaler) && (value == v.value);
-  }
+  inline bool operator>(const ScaledValue &v) const { return compare(v) > 0; }
 
-  inline bool operator!=(const ScaledValue &v) const { return !(*this == v); }
+  inline bool operator==(const ScaledValue &v) const { return compare(v) == 0; }
 
-  inline bool operator<=(const ScaledValue &v) const {
-    if (isNull()) {
-      return true;
-    }
-    if (scaler != v.scaler) {
-      return scaler > v.scaler;
-    }
-    return value <= v.value;
-  }
+  inline bool operator!=(const ScaledValue &v) const { return compare(v) != 0; }
 
-  inline bool operator>=(const ScaledValue &v) const { return !(*this < v); }
+  inline bool operator<=(const ScaledValue &v) const { return compare(v) <= 0; }
+
+  inline bool operator>=(const ScaledValue &v) const { return compare(v) >= 0; }
 
   /**
    *  std::ostream << operator
@@ -252,4 +301,12 @@ template <> inline double getLog<ScaledValue>(const ScaledValue &v) {
     return -std::numeric_limits<double>::infinity();
   }
   return std::log(v.value) + v.scaler * std::log(JS_SCALE_THRESHOLD);
+}
+
+/**
+ *  getCheckedLog function for the ScaledValue type: a ScaledValue keeps its
+ *  precision near zero, so this is getLog
+ */
+template <> inline double getCheckedLog<ScaledValue>(const ScaledValue &v) {
+  return getLog(v);
 }

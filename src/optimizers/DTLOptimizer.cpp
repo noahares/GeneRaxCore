@@ -69,6 +69,7 @@ struct TargetParam {
   FunctionToOptimize *function;
   unsigned int n;
   bool verbose;
+  double shift;
 };
 
 double myTargetFunction(void *function, double *value) {
@@ -76,9 +77,10 @@ double myTargetFunction(void *function, double *value) {
   auto f = (FunctionToOptimize *)(targetParam->function);
   unsigned int n = targetParam->n;
   bool verbose = targetParam->verbose;
+  double shift = targetParam->shift;
   Parameters param(n);
   for (unsigned int i = 0; i < n; ++i) {
-    param[i] = value[i];
+    param[i] = value[i] - shift;
   }
   auto v = f->evaluate(param);
   if (verbose) {
@@ -93,17 +95,24 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
   unsigned int n = startingParameters.dimensions();
   float lb = 1.0e-10;
   float ub = 2.0;
-  std::vector<double> xmin(n, lb);
-  std::vector<double> xmax(n, ub);
+  // lb of 1.0e-10 is so small, that rounding noise dominates near the optimum,
+  // resulting in a stop-condition lottery. Changing lb to 1.0e-4 would prevent
+  // us from expressing rates under 1.0e-4, so the workaround is to optimize
+  // for rates shifted by a constant, since LBFGS-B is invariant under
+  // constant translation.
+  double shift = CORAX_ALGO_LBFGSB_ERROR;
+  std::vector<double> xmin(n, lb + shift);
+  std::vector<double> xmax(n, ub + shift);
   std::vector<double> x(n, 0.5);
   for (unsigned int i = 0; i < n; ++i) {
-    x[i] = startingParameters[i];
+    x[i] = startingParameters[i] + shift;
   }
   std::vector<int> bound(n, CORAX_OPT_LBFGSB_BOUND_BOTH);
   TargetParam targetFunction;
   targetFunction.function = &function;
   targetFunction.n = startingParameters.dimensions();
   targetFunction.verbose = settings.verbose;
+  targetFunction.shift = shift;
   void *params = &targetFunction;
   // float factr = parser.getValue("lbfgsb.factr");
   // float pgtol = parser.getValue("lbfgsb.pgtol");
@@ -118,7 +127,8 @@ Parameters optimizeParametersLBFGSB(FunctionToOptimize &function,
                             params, myTargetFunction);
   Parameters res(n);
   for (unsigned int i = 0; i < n; ++i) {
-    res[i] = x[i];
+    // Undo the shift
+    res[i] = x[i] - shift;
   }
   function.evaluate(res);
   if (settings.verbose) {
