@@ -26,6 +26,16 @@ template <class REAL> void scale(REAL &) {}
 template <class REAL> double getLog(const REAL &v) { return std::log(v); }
 
 /**
+ *  getCheckedLog function for a general type: the log, or -inf when the value
+ *  is zero or subnormal. Below the normal range a double has lost significant
+ *  bits, so -inf tells the caller to recompute the value with ScaledValue.
+ */
+template <class REAL> double getCheckedLog(const REAL &v) {
+  return std::isnormal(v) ? std::log(v)
+                          : -std::numeric_limits<double>::infinity();
+}
+
+/**
  *  Class representing a double value with a high precision.
  *  It stores a double and a scaling integer to represent very
  *  small double values
@@ -291,4 +301,12 @@ template <> inline double getLog<ScaledValue>(const ScaledValue &v) {
     return -std::numeric_limits<double>::infinity();
   }
   return std::log(v.value) + v.scaler * std::log(JS_SCALE_THRESHOLD);
+}
+
+/**
+ *  getCheckedLog function for the ScaledValue type: a ScaledValue keeps its
+ *  precision near zero, so this is getLog
+ */
+template <> inline double getCheckedLog<ScaledValue>(const ScaledValue &v) {
+  return getLog(v);
 }
