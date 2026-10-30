@@ -93,7 +93,7 @@ static void printEventALE(const Scenario::Event &event,
   switch (event.type) {
   case ReconciliationEventType::EVENT_S:
   case ReconciliationEventType::EVENT_SL:
-    os << species->label;
+    os << "S@" << species->label;
     break;
   case ReconciliationEventType::EVENT_D:
     os << "D@" << species->label;
@@ -103,6 +103,9 @@ static void printEventALE(const Scenario::Event &event,
     speciesDest = speciesTree->nodes[event.destSpeciesNode];
     assert(speciesDest->label);
     os << "T@" << species->label << "->" << speciesDest->label;
+    break;
+  case ReconciliationEventType::EVENT_None:
+    os << "Leaf@" << species->label << "...";
     break;
   default:
     break;
@@ -124,12 +127,11 @@ static void recursivelySaveReconciliationsALE(
                                       geneToEvents, os);
     os << ")";
   }
+  for (const auto &event : geneToEvents[node->node_index]) {
+    printEventALE(event, speciesTree, os);
+  }
   if (!node->next) {
     os << (node->label ? node->label : "null");
-  } else {
-    for (const auto &event : geneToEvents[node->node_index]) {
-      printEventALE(event, speciesTree, os);
-    }
   }
   // divide the root BL by two to place the root
   // at the middle of this branch

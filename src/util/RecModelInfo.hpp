@@ -44,6 +44,8 @@ struct RecModelInfo {
   // path to a file which sets for each species the probability of
   // a gene copy to be not lost if not observed in the data
   std::string fractionMissingFile;
+  // iterations of the extinction and clade fixed points (default 4)
+  unsigned int fixedPointIterations;
   // use less RAM, but likelihood evaluation might be slower
   // (specific to AleRax)
   bool memorySavings;
@@ -58,7 +60,8 @@ struct RecModelInfo {
         rootedGeneTree(true), forceGeneTreeRoot(false), madRooting(false),
         branchLengthThreshold(-1.0),
         transferConstraint(TransferConstaint::PARENTS), noDup(false),
-        noDL(false), noTL(false), memorySavings(false) {}
+        noDL(false), noTL(false), fixedPointIterations(4),
+        memorySavings(false) {}
 
   /**
    *  Constructor
@@ -70,7 +73,7 @@ struct RecModelInfo {
                double branchLengthThreshold,
                TransferConstaint transferConstraint, bool noDup, bool noDL,
                bool noTL, const std::string &fractionMissingFile,
-               bool memorySavings)
+               bool memorySavings, unsigned int fixedPointIterations = 4)
       : model(model), recOpt(recOpt), perFamilyRates(perFamilyRates),
         gammaCategories(gammaCategories),
         originationStrategy(originationStrategy),
@@ -79,6 +82,7 @@ struct RecModelInfo {
         branchLengthThreshold(branchLengthThreshold),
         transferConstraint(transferConstraint), noDup(noDup), noDL(noDL),
         noTL(noTL), fractionMissingFile(fractionMissingFile),
+        fixedPointIterations(fixedPointIterations),
         memorySavings(memorySavings) {}
 
   void readFromArgv(char **argv, int &i) {
@@ -100,6 +104,7 @@ struct RecModelInfo {
     if (fractionMissingFile == "NONE") {
       fractionMissingFile = std::string();
     }
+    fixedPointIterations = static_cast<unsigned int>(atoi(argv[i++]));
     memorySavings = bool(atoi(argv[i++]));
   }
 
@@ -125,11 +130,12 @@ struct RecModelInfo {
     } else {
       argv.push_back(std::string("NONE"));
     }
+    argv.push_back(std::to_string(fixedPointIterations));
     argv.push_back(std::to_string(static_cast<int>(memorySavings)));
     return argv;
   }
 
-  static int getArgc() { return 15; }
+  static int getArgc() { return 16; }
 
   std::vector<char> getParamTypes() const {
     std::vector<char> res;
