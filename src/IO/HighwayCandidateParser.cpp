@@ -1,7 +1,10 @@
 #include "HighwayCandidateParser.hpp"
-#include <IO/IO.hpp>
+
+#include <fstream>
 #include <sstream>
-#include <string>
+
+#include <IO/IO.hpp>
+#include <IO/Logger.hpp>
 
 bool isParent(corax_rnode_t *parent, corax_rnode_t *child) {
   while (child) {

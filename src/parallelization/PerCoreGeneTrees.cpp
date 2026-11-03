@@ -4,12 +4,18 @@
 #include <sstream>
 
 #include <IO/FileSystem.hpp>
-#include <IO/LibpllParsers.hpp>
 #include <IO/Logger.hpp>
 #include <ccp/ConditionalClades.hpp>
 #include <parallelization/ParallelContext.hpp>
 #include <trees/PLLRootedTree.hpp>
+#include <trees/PLLUnrootedTree.hpp>
 #include <util/utils.hpp>
+
+PerCoreGeneTrees::GeneTree::~GeneTree() {
+  if (ownTree) {
+    delete geneTree;
+  }
+}
 
 static std::vector<size_t>
 getMyIndices(const std::vector<unsigned int> &treeSizes) {
@@ -47,31 +53,10 @@ static void splitLines(const std::string &input,
   }
 }
 
-std::vector<unsigned int> getCCPSizes(const Families &families) {
-  unsigned int treesNumber = static_cast<unsigned int>(families.size());
-  std::vector<unsigned int> localTreeSizes(
-      (treesNumber - 1) / ParallelContext::getSize() + 1, 0);
-  for (auto i = ParallelContext::getBegin(treesNumber);
-       i < ParallelContext::getEnd(treesNumber); i++) {
-    ConditionalClades cc;
-    cc.unserialize(families[i].ccpFile);
-    localTreeSizes[i - ParallelContext::getBegin(treesNumber)] =
-        cc.getCladesNumber();
-  }
-  std::vector<unsigned int> treeSizes;
-  ParallelContext::concatenateUIntVectors(localTreeSizes, treeSizes);
-  treeSizes.erase(remove(treeSizes.begin(), treeSizes.end(), 0),
-                  treeSizes.end());
-  assert(treeSizes.size() == families.size());
-  return treeSizes;
-}
-
 PerCoreGeneTrees::PerCoreGeneTrees(const Families &families,
                                    bool acceptMultipleTrees, bool ccpMode) {
-  auto treeSizes = ccpMode ? getCCPSizes(families)
-                           : LibpllParsers::parallelGetTreeSizes(families);
+  auto treeSizes = parallelGetTreeSizes(families, ccpMode);
   auto myIndices = getMyIndices(treeSizes);
-
   _geneTrees.resize(myIndices.size());
   unsigned int index = 0;
   for (auto i : myIndices) {
@@ -122,23 +107,48 @@ PerCoreGeneTrees::PerCoreGeneTrees(const GeneSpeciesMapping &mapping,
 
 bool PerCoreGeneTrees::checkMappings(const std::string &speciesTreeFile) {
   bool ok = true;
-  auto *speciesTree = LibpllParsers::readRootedFromFile(speciesTreeFile);
+  PLLRootedTree speciesTree(speciesTreeFile, true);
   for (auto &tree : _geneTrees) {
-    if (!tree.mapping.check(tree.geneTree->getRawPtr(), speciesTree)) {
+    if (!tree.mapping.check(tree.geneTree->getRawPtr(),
+                            speciesTree.getRawPtr())) {
       ok = false;
       Logger::error << "Invalid mapping for tree " << tree.name << std::endl;
     }
   }
-  corax_rtree_destroy(speciesTree, 0);
   ParallelContext::parallelAnd(ok);
   return ok;
 }
 
-void PerCoreGeneTrees::getPerCoreFamilies(const Families &allFamilies,
+void PerCoreGeneTrees::getPerCoreFamilies(const Families &families,
                                           Families &perCoreFamilies) {
   perCoreFamilies.clear();
-  PerCoreGeneTrees geneTrees(allFamilies);
+  PerCoreGeneTrees geneTrees(families);
   for (const auto &geneTree : geneTrees.getTrees()) {
-    perCoreFamilies.push_back(allFamilies[geneTree.familyIndex]);
+    perCoreFamilies.push_back(families[geneTree.familyIndex]);
   }
+}
+
+std::vector<unsigned int>
+PerCoreGeneTrees::parallelGetTreeSizes(const Families &families, bool ccpMode) {
+  auto N = families.size();
+  std::vector<unsigned int> localTreeSizes;
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
+       ++i) {
+    unsigned int treeSize = 0;
+    if (ccpMode) {
+      ConditionalClades ccp;
+      ccp.unserialize(families[i].ccpFile);
+      treeSize = ccp.getCladesNumber();
+    } else {
+      PLLUnrootedTree geneTree(families[i].startingGeneTree, true);
+      treeSize = geneTree.getLeafNumber();
+    }
+    assert(treeSize > 0);
+    localTreeSizes.push_back(treeSize);
+  }
+  std::vector<unsigned int> treeSizes;
+  ParallelContext::concatenateHeterogeneousUIntVectors(localTreeSizes,
+                                                       treeSizes);
+  assert(treeSizes.size() == families.size());
+  return treeSizes;
 }

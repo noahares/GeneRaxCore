@@ -1,10 +1,11 @@
 #include "MiniNJ.hpp"
 
-#include "NeighborJoining.hpp"
-#include <IO/Families.hpp>
+#include <algorithm>
+#include <cassert>
+#include <fstream>
+
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
-#include <algorithm>
 #include <parallelization/ParallelContext.hpp>
 #include <parallelization/PerCoreGeneTrees.hpp>
 #include <trees/PLLUnrootedTree.hpp>
@@ -108,16 +109,16 @@ std::unique_ptr<PLLRootedTree> MiniNJ::runNJst(const Families &families) {
   return geneTreeNJ(families, false);
 }
 
-std::unique_ptr<PLLRootedTree> MiniNJ::runWMinNJ(const Families &families) {
+std::unique_ptr<PLLRootedTree> MiniNJ::runMiniNJ(const Families &families) {
+  return geneTreeNJ(families, true);
+}
+
+std::unique_ptr<PLLRootedTree> MiniNJ::runWMiniNJ(const Families &families) {
   return geneTreeNJ(families, true, false, true);
 }
 
 std::unique_ptr<PLLRootedTree> MiniNJ::runUstar(const Families &families) {
   return geneTreeNJ(families, false, true, false);
-}
-
-std::unique_ptr<PLLRootedTree> MiniNJ::runMiniNJ(const Families &families) {
-  return geneTreeNJ(families, true);
 }
 
 std::unique_ptr<PLLRootedTree> MiniNJ::geneTreeNJ(const Families &families,

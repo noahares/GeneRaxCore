@@ -1,9 +1,9 @@
 #pragma once
 
-#include <IO/Families.hpp>
 #include <memory>
+
+#include <IO/Families.hpp>
 #include <trees/PLLRootedTree.hpp>
-#include <vector>
 
 class CherryPro {
 public:

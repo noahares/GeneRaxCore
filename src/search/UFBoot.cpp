@@ -11,6 +11,7 @@ Bootstrap::Bootstrap(unsigned int samples) {
   // samples is the number of samples local to the current core
   // we need to subsample over the total number of samples over
   // all cores
+  assert(samples);
   auto totalSamples = samples;
   ParallelContext::sumUInt(totalSamples);
   std::vector<unsigned int> perCoreSamples;
@@ -21,7 +22,7 @@ Bootstrap::Bootstrap(unsigned int samples) {
   }
   auto end = begin + samples;
   for (unsigned int i = 0; i < totalSamples; ++i) {
-    unsigned int v = Random::getInt(0, totalSamples - 1);
+    auto v = Random::getUInt(0, totalSamples - 1);
     if (v >= begin && v < end) {
       indices.push_back(v - begin);
     }

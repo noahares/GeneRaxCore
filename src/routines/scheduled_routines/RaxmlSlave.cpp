@@ -36,10 +36,8 @@ static bool optimizeTopology(LibpllEvaluation &evaluation,
   return ll > initialLL + 0.1;
 }
 
-int RaxmlSlave::runRaxmlOptimization(int argc, char **argv, void *comm) {
+int RaxmlSlave::runRaxmlOptimization(int argc, char **argv) {
   assert(argc == 8);
-  ParallelContext::init(comm);
-  Logger::init();
   int i = 2;
   std::string startingGeneTreeFile(argv[i++]);
   std::string alignmentFile(argv[i++]);
@@ -93,6 +91,5 @@ int RaxmlSlave::runRaxmlOptimization(int argc, char **argv, void *comm) {
   modelWriter << modelStr << std::endl;
   modelWriter.close();
   LibpllParsers::saveUtree(evaluation.getTreeInfo()->root, outputGeneTree);
-  ParallelContext::finalize();
   return 0;
 }

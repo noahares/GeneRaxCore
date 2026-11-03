@@ -55,7 +55,7 @@ public:
 
   static bool isRandConsistent();
   static void makeRandConsistent();
-  static bool isIntEqual(int value);
+  static bool isUIntEqual(unsigned int value);
   static bool isDoubleEqual(double value);
 
   /**

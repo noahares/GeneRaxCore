@@ -1,10 +1,10 @@
 #include "RaxmlMaster.hpp"
 
 #include <IO/FileSystem.hpp>
-#include <IO/LibpllParsers.hpp>
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
 #include <functional>
+#include <parallelization/PerCoreGeneTrees.hpp>
 #include <parallelization/Scheduler.hpp>
 #include <sstream>
 
@@ -23,7 +23,7 @@ void RaxmlMaster::runRaxmlOptimization(Families &families,
   FileSystem::mkdir(outputDir, true);
   std::string commandFile =
       FileSystem::joinPaths(outputDir, "raxml_light_command.txt");
-  auto geneTreeSizes = LibpllParsers::parallelGetTreeSizes(families);
+  auto geneTreeSizes = PerCoreGeneTrees::parallelGetTreeSizes(families);
   ParallelOfstream os(commandFile);
   for (size_t i = 0; i < families.size(); ++i) {
     auto &family = families[i];

@@ -1,17 +1,11 @@
 #pragma once
 
-#include <IO/FamiliesFileParser.hpp>
-#include <IO/Model.hpp>
 #include <memory>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
-typedef struct corax_utree_s corax_utree_t;
-typedef struct corax_unode_s corax_unode_t;
-typedef struct corax_rtree_s corax_rtree_t;
-typedef struct corax_rnode_s corax_rnode_t;
+#include "LibpllException.hpp"
+#include "Model.hpp"
+#include <util/types.hpp>
+
 typedef unsigned long long corax_state_t;
 
 char *corax_rtree_export_newick(const corax_rnode_t *root,
@@ -36,10 +30,10 @@ class LibpllParsers {
 public:
   LibpllParsers() = delete;
 
-  static corax_utree_t *readNewickFromFile(const std::string &newickFile);
-  static corax_utree_t *readNewickFromStr(const std::string &newickSTring);
+  static corax_utree_t *readUnrootedFromFile(const std::string &newickFile);
+  static corax_utree_t *readUnrootedFromStr(const std::string &newickString);
   static corax_rtree_t *readRootedFromFile(const std::string &newickFile);
-  static corax_rtree_t *readRootedFromStr(const std::string &newickFile);
+  static corax_rtree_t *readRootedFromStr(const std::string &newickString);
   static void parseMSA(const std::string &alignmentFilename,
                        const corax_state_t *stateMap,
                        PLLSequencePtrs &sequences, unsigned int *&weights);
@@ -51,9 +45,9 @@ public:
    */
   static double getMSAEntropy(const std::string &alignmentFilename,
                               const std::string &modelStrOrFilename);
-  static void fillLeavesFromUtree(corax_utree_t *utree,
+  static void fillLeavesFromUtree(const corax_utree_t *utree,
                                   std::unordered_set<std::string> &leaves);
-  static void fillLeavesFromRtree(corax_rtree_t *rtree,
+  static void fillLeavesFromRtree(const corax_rtree_t *rtree,
                                   std::unordered_set<std::string> &leaves);
 
   /**
@@ -65,12 +59,10 @@ public:
 
   static bool areLabelsValid(std::unordered_set<std::string> &leaves);
 
-  static std::vector<unsigned int>
-  parallelGetTreeSizes(const Families &families);
-  static void saveUtree(const corax_unode_t *utree, const std::string &fileName,
+  static void saveUtree(const corax_unode_t *root, const std::string &fileName,
                         bool append = false);
-  static void saveRtree(const corax_rnode_t *rtree,
-                        const std::string &fileName);
+  static void saveRtree(const corax_rnode_t *root, const std::string &fileName,
+                        bool append = false);
   static void getUnodeNewickString(const corax_unode_t *rnode,
                                    std::string &newick);
   static void getRtreeHierarchicalString(const corax_rtree_t *rtree,

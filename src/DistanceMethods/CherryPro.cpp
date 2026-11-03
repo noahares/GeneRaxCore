@@ -1,16 +1,15 @@
 #include "CherryPro.hpp"
 
-#include "MiniNJ.hpp"
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <fstream>
+#include <numeric>
+
 #include <IO/GeneSpeciesMapping.hpp>
 #include <IO/Logger.hpp>
-#include <algorithm>
-#include <array>
-#include <memory>
-#include <set>
 #include <trees/PLLUnrootedTree.hpp>
-#include <unordered_map>
 #include <util/types.hpp>
-#include <vector>
 
 using GeneIdsSet = std::unordered_set<int>;
 using SpeciesIdToGeneIds = std::unordered_map<int, GeneIdsSet>;
@@ -347,7 +346,7 @@ static std::pair<int, int> getMaxInMatrix(MatrixDouble &m) {
 }
 
 static double getRatio(const MatrixDouble m, int i, int j, double bestScore) {
-  return fabs(bestScore - m[i][j]) / (bestScore + m[i][j]);
+  return std::fabs(bestScore - m[i][j]) / (bestScore + m[i][j]);
 }
 
 static double lineSupport(const MatrixDouble &neighborMatrix,

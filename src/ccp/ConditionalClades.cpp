@@ -1,8 +1,10 @@
 #include "ConditionalClades.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 
 #include <IO/Logger.hpp>

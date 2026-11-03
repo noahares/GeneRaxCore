@@ -13,7 +13,9 @@ public:
   SpeciesTree(const std::unordered_set<std::string> &labels);
   SpeciesTree(const Families &families);
 
-  // forbid copy
+  ~SpeciesTree() = default;
+
+  // forbid copy and move
   SpeciesTree(const SpeciesTree &) = delete;
   SpeciesTree &operator=(const SpeciesTree &) = delete;
   SpeciesTree(SpeciesTree &&) = delete;
@@ -29,6 +31,9 @@ public:
     return _speciesTree.getNode(nodeIndex);
   }
 
+  size_t getHash() const { return _speciesTree.getTreeHash(); }
+  size_t getNodeIndexHash() const { return _speciesTree.getTreeHash(false); }
+
   const PLLRootedTree &getTree() const { return _speciesTree; }
   const DatedTree &getDatedTree() const { return _datedTree; }
   PLLRootedTree &getTree() { return _speciesTree; }
@@ -36,12 +41,9 @@ public:
 
   void getLabelToId(StringToUint &labelToId) const;
 
-  size_t getHash() const;
-  size_t getNodeIndexHash() const;
-
   class Listener {
   public:
-    virtual ~Listener() {}
+    virtual ~Listener() = default;
     virtual void onSpeciesDatesChange() = 0;
     virtual void onSpeciesTreeChange(
         const std::unordered_set<corax_rnode_t *> *nodesToInvalidate) = 0;
@@ -63,34 +65,65 @@ private:
 
 class SpeciesTreeOperator {
 public:
+  SpeciesTreeOperator() = delete;
+
+  /**
+   *  restoreDates operation:
+   *  speciesTree branch lenghts, node ranks and speciation order are changed
+   *  in accordance with the ranks in backup
+   */
   static void restoreDates(SpeciesTree &speciesTree, const DatedBackup &backup);
+
+  /**
+   *  changeRoot operation:
+   *  speciesTree is changed in such a way that one of root's children becomes
+   *  the new root, one of the new root's children is swapped with root and
+   *  itself takes the place of root's original child
+   *
+   *  direction shows on which branch to place the new root relative to root:
+   *  0 == right-right, 1 == left-right, 2 == right-left, 3 == left-left
+   */
   static bool canChangeRoot(const SpeciesTree &speciesTree,
                             unsigned int direction);
-  /**
-   * Change the root to the neighboring branch described by direction where
-   * direction is in [0:4[
-   */
   static void changeRoot(SpeciesTree &speciesTree, unsigned int direction);
   static void revertChangeRoot(SpeciesTree &speciesTree,
                                unsigned int direction);
+
+  /**
+   *  applySPRMove operation:
+   *  speciesTree is changed in such a way that prune's brother takes the place
+   *  of prune's father, prune's father takes the place of regraft, and regraft
+   *  becomes prune's new brother
+   */
   static bool canApplySPRMove(SpeciesTree &speciesTree, unsigned int prune,
                               unsigned int regraft);
-  /**
-   *  Add to affectedBranches all branches that would be affected (whose
-   * bipartition would change) if we prune prune and regraft it to regraft on
-   * speciesTree
-   */
-  static void getAffectedBranches(SpeciesTree &speciesTree, unsigned int prune,
-                                  unsigned int regraft,
-                                  std::vector<unsigned int> &affectedBranches);
   static unsigned int applySPRMove(SpeciesTree &speciesTree, unsigned int prune,
                                    unsigned int regraft);
   static void reverseSPRMove(SpeciesTree &speciesTree, unsigned int prune,
                              unsigned int applySPRMoveReturnValue);
-  static void getPossiblePrunes(SpeciesTree &speciesTree,
-                                std::vector<unsigned int> &prunes,
-                                std::vector<double> support, double maxSupport);
-  static void getPossibleRegrafts(SpeciesTree &speciesTree, unsigned int prune,
-                                  unsigned int radius,
+
+  /**
+   *  Get nodes that can be moved in speciesTree based on precomputed branch
+   *  quartet supports
+   */
+  static void getPossiblePrunes(const SpeciesTree &speciesTree,
+                                const std::vector<double> &supportValues,
+                                double maxSupport,
+                                std::vector<unsigned int> &prunes);
+
+  /**
+   *  Get possible destination nodes to move prune to in speciesTree based on
+   *  the SPR radius and basic topological constraints
+   */
+  static void getPossibleRegrafts(const SpeciesTree &speciesTree,
+                                  unsigned int prune, unsigned int radius,
                                   std::vector<unsigned int> &regrafts);
+
+  /**
+   *  Add to affectedBranches all branches whose bipartition would change if
+   *  we pruned prune and regrafted it to regraft in speciesTree
+   */
+  static void getAffectedBranches(SpeciesTree &speciesTree, unsigned int prune,
+                                  unsigned int regraft,
+                                  std::vector<unsigned int> &affectedBranches);
 };

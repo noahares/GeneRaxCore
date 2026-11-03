@@ -1,9 +1,11 @@
 #include "Astrid.hpp"
-#include <DistanceMethods/MiniNJ.hpp>
-#include <IO/Logger.hpp>
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <limits>
-#include <parallelization/PerCoreGeneTrees.hpp>
-#include <trees/PLLUnrootedTree.hpp>
+
+#include <DistanceMethods/MiniNJ.hpp>
 
 using DistanceVectorMatrix = std::vector<DistanceMatrix>;
 
@@ -84,7 +86,7 @@ double Astrid::computeBME(const PLLUnrootedTree &speciesTree) {
   double res = 0.0;
   for (unsigned int i = 0; i < N; ++i) {
     for (unsigned int j = 0; j < i; ++j) {
-      double weight = pow(2.0, speciesDistanceMatrix[i][j]);
+      double weight = std::pow(2.0, speciesDistanceMatrix[i][j]);
       res += _geneDistanceMatrices[0][i][j] / weight;
     }
   }
@@ -159,8 +161,8 @@ static void getBestSPRRec(unsigned int s, corax_unode_t *W0, corax_unode_t *Wp,
     deltaAB = 0.5 * (delta_Vsminus2_Wp +
                      subBMEs[Wsminus1->node_index][Wp->node_index][0]);
     deltaAC = subBMEs[Vsminus1->node_index][Ws->node_index][0];
-    deltaAC -= pow(0.5, s) * subBMEs[Wp->node_index][Ws->node_index][0];
-    deltaAC += pow(0.5, s) * subBMEs[W0->node_index][Ws->node_index][0];
+    deltaAC -= std::pow(0.5, s) * subBMEs[Wp->node_index][Ws->node_index][0];
+    deltaAC += std::pow(0.5, s) * subBMEs[W0->node_index][Ws->node_index][0];
   }
   diff = 0.125 * (deltaAB + deltaCD - deltaAC - deltaBD);
   double Ls = Lsminus1 + diff;

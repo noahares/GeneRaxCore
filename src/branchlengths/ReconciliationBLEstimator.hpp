@@ -1,5 +1,7 @@
+#pragma once
+
 #include <IO/Families.hpp>
-#include <string>
+
 class ModelParameters;
 
 class ReconciliationBLEstimator {
@@ -8,12 +10,12 @@ public:
 
   /**
    *  Estimate the branch lengths of a species tree by
-   *  reconciliating the gene trees (in families) using
+   *  reconciling the gene trees (from the families) using
    *  the model of reconciliation described in modelParameters
-   *  and then averaging over the gene tree branch lengths
+   *  and then averaging over the lengths of gene tree branches
    *  that represent a branch in the species tree.
    *  The exact procedure is formally described in the SpeciesRax
-   *  paper.
+   *  paper
    */
   static void estimate(const std::string &speciesTreeFile,
                        const Families &families,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 struct FamilyInfo {
@@ -26,8 +27,7 @@ struct FamilyInfo {
     likelihoodFile = "";
   }
 };
-
-typedef std::vector<FamilyInfo> Families;
+using Families = std::vector<FamilyInfo>;
 
 class Family {
 public:
@@ -35,7 +35,10 @@ public:
   static void filterFamilies(Families &families,
                              const std::string &speciesTreeFile,
                              bool checkAlignments, bool checkSpeciesTree);
-  static void printStats(Families &families, const std::string &speciesTreeFile,
+  static void printStats(const Families &families,
+                         const std::string &speciesTreeFile,
                          const std::string &coverageFile,
                          const std::string &fractionMissingFile);
+  static std::unordered_set<std::string>
+  getLabelsFromFamilies(const Families &families);
 };

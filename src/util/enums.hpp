@@ -6,8 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-using StringToUintMap = std::unordered_map<std::string, unsigned int>;
-
 /**
  *  Reconciliation models
  */
@@ -84,12 +82,12 @@ enum class PartialLikelihoodMode {
 
 enum class SpeciesTreeAlgorithm {
   User = 0,
+  NJst,
   MiniNJ,
+  WMiniNJ,
+  Ustar,
   Cherry,
   CherryPro,
-  NJst,
-  WMinNJ,
-  Ustar,
   Random
 };
 
@@ -191,19 +189,19 @@ public:
   }
 
   static SpeciesTreeAlgorithm strToSpeciesTree(const std::string &str) {
-    if (str == std::string("MiniNJ")) {
-      return SpeciesTreeAlgorithm::MiniNJ;
-    } else if (str == std::string("NJst")) {
+    if (str == std::string("NJst")) {
       return SpeciesTreeAlgorithm::NJst;
+    } else if (str == std::string("MiniNJ")) {
+      return SpeciesTreeAlgorithm::MiniNJ;
     } else if (str == std::string("WMiniNJ")) {
-      return SpeciesTreeAlgorithm::WMinNJ;
+      return SpeciesTreeAlgorithm::WMiniNJ;
     } else if (str == std::string("Ustar")) {
       return SpeciesTreeAlgorithm::Ustar;
     } else if (str == std::string("Cherry")) {
       return SpeciesTreeAlgorithm::Cherry;
     } else if (str == std::string("CherryPro")) {
       return SpeciesTreeAlgorithm::CherryPro;
-    } else if (str == std::string("Random") || str == std::string("random")) {
+    } else if (str == std::string("Random")) {
       return SpeciesTreeAlgorithm::Random;
     } else {
       return SpeciesTreeAlgorithm::User;

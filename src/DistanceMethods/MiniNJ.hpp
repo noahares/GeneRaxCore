@@ -1,15 +1,8 @@
 #pragma once
 
-#include <IO/Families.hpp>
-#include <memory>
-#include <string>
-#include <trees/PLLRootedTree.hpp>
-#include <unordered_map>
-#include <util/types.hpp>
-#include <vector>
+#include "NeighborJoining.hpp"
 
 class PLLUnrootedTree;
-class PLLRootedTree;
 class GeneSpeciesMapping;
 
 /*
@@ -20,19 +13,21 @@ class GeneSpeciesMapping;
  */
 class MiniNJ {
 public:
-  /**
-   * Infer a NJ tree, using the gene tree internode distances to compute
-   * the distance matrix. The distance matrix is very similar to the one
-   * built in NJst (another NJ took).
-   */
-  static std::unique_ptr<PLLRootedTree> runMiniNJ(const Families &families);
+  MiniNJ() = delete;
 
   /**
    *  Run the original NJst algorithm
    */
   static std::unique_ptr<PLLRootedTree> runNJst(const Families &families);
+
+  /**
+   *  Infer a NJ tree, using the gene tree internode distances to compute
+   *  the distance matrix. The distance matrix is very similar to the one
+   *  built in NJst
+   */
+  static std::unique_ptr<PLLRootedTree> runMiniNJ(const Families &families);
+  static std::unique_ptr<PLLRootedTree> runWMiniNJ(const Families &families);
   static std::unique_ptr<PLLRootedTree> runUstar(const Families &families);
-  static std::unique_ptr<PLLRootedTree> runWMinNJ(const Families &families);
 
   static std::unique_ptr<PLLRootedTree>
   applyNJ(DistanceMatrix &distanceMatrix,

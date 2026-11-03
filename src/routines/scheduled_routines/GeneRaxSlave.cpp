@@ -106,9 +106,8 @@ static std::string getArg(const std::string &str) {
   return (str == "NONE" ? std::string() : str);
 }
 
-int GeneRaxSlave::optimizeGeneTreesMain(int argc, char **argv, void *comm) {
+int GeneRaxSlave::optimizeGeneTreesMain(int argc, char **argv) {
   assert(argc == 18 + RecModelInfo::getArgc());
-  ParallelContext::init(comm);
   Logger::timed << "Starting optimizeGeneTreesSlave" << std::endl;
   int i = 2;
   std::string startingGeneTreeFile(argv[i++]);
@@ -141,7 +140,6 @@ int GeneRaxSlave::optimizeGeneTreesMain(int argc, char **argv, void *comm) {
                          recOpt, madRooting, supportThreshold, recWeight,
                          enableRec, enableLibpll, sprRadius, outputGeneTree,
                          outputStats, checkpointPath);
-  ParallelContext::finalize();
   Logger::timed << "End of optimizeGeneTreesSlave" << std::endl;
   return 0;
 }

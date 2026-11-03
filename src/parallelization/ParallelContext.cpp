@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <numeric>
 
-#include <IO/Logger.hpp>
 #include <maths/Random.hpp>
 
 std::ofstream ParallelContext::sink("/dev/null");
@@ -15,11 +15,10 @@ std::stack<bool> ParallelContext::_ownsMPIContextStack;
 bool ParallelContext::_mpiEnabled = false;
 
 void ParallelContext::init(void *commPtr) {
-  if (commPtr && *static_cast<int *>(commPtr) == -1) {
+  if (commPtr && (*static_cast<int *>(commPtr) == -1)) {
     _mpiEnabled = false;
-    Logger::info << "Warning: this program was compiled without MPI. Make sure "
-                    "you are not running it with mpiexec or mpirun."
-                 << std::endl;
+    std::cout << "Warning: this program was compiled without MPI. Make sure "
+              << "you are not running it with mpiexec or mpirun." << std::endl;
     return;
   }
 #ifdef WITH_MPI
@@ -135,10 +134,19 @@ void ParallelContext::sumDouble(double &value) {
   if (!_mpiEnabled) {
     return;
   }
-  double sum = 0;
+  // Summed on rank 0 in rank order and broadcast: MPI_Allreduce may combine
+  // the ranks in any order, so its result could change between calls. The sum
+  // still depends on the number of ranks.
   barrier();
-  MPI_Allreduce(&value, &sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-  value = sum;
+  std::vector<double> values(getRank() == 0 ? getSize() : 0);
+  MPI_Gather(&value, 1, MPI_DOUBLE, values.data(), 1, MPI_DOUBLE, 0, getComm());
+  if (getRank() == 0) {
+    value = 0.0;
+    for (auto v : values) {
+      value += v;
+    }
+  }
+  MPI_Bcast(&value, 1, MPI_DOUBLE, 0, getComm());
 #endif
 }
 
@@ -433,20 +441,20 @@ bool ParallelContext::allowSchedulerSplitImplementation() {
 }
 
 bool ParallelContext::isRandConsistent() {
-  return isIntEqual(Random::getInt());
+  return isUIntEqual(Random::getUInt());
 }
 
 void ParallelContext::makeRandConsistent() {
-  auto seed = Random::getInt();
-  ParallelContext::broadcastInt(0, seed);
+  auto seed = Random::getUInt();
+  ParallelContext::broadcastUInt(0, seed);
   Random::setSeed(seed);
   assert(isRandConsistent());
 }
 
-bool ParallelContext::isIntEqual(int value) {
+bool ParallelContext::isUIntEqual(unsigned int value) {
 #ifdef WITH_MPI
-  std::vector<int> rands(getSize());
-  allGatherInt(value, rands);
+  std::vector<unsigned int> rands(getSize());
+  allGatherUInt(value, rands);
   for (auto v : rands) {
     if (v != rands[0]) {
       return false;

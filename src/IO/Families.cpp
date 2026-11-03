@@ -1,14 +1,17 @@
 #include "Families.hpp"
+
+#include <algorithm>
+#include <cassert>
+
 #include <IO/FileSystem.hpp>
 #include <IO/GeneSpeciesMapping.hpp>
-#include <IO/LibpllException.hpp>
+#include <IO/LibpllParsers.hpp>
 #include <IO/Logger.hpp>
 #include <IO/ParallelOfstream.hpp>
-#include <algorithm>
-#include <likelihoods/LibpllEvaluation.hpp>
 #include <maths/Random.hpp>
-#include <parallelization/PerCoreGeneTrees.hpp>
+#include <parallelization/ParallelContext.hpp>
 #include <trees/PLLRootedTree.hpp>
+#include <trees/PLLUnrootedTree.hpp>
 
 enum FamilyErrorCode {
   ERROR_OK = 0,
@@ -158,7 +161,7 @@ void Family::filterFamilies(Families &families,
   ParallelContext::barrier();
   // at the end of this function, different ranks will have
   // a different rand state, so we save a seed
-  auto consistentSeed = Random::getInt();
+  auto consistentSeed = Random::getUInt();
   Families copy = families;
   unsigned int initialFamilySize = static_cast<unsigned int>(copy.size());
   families.clear();
@@ -219,7 +222,8 @@ void Family::filterFamilies(Families &families,
   Random::setSeed(consistentSeed);
 }
 
-void Family::printStats(Families &families, const std::string &speciesTreeFile,
+void Family::printStats(const Families &families,
+                        const std::string &speciesTreeFile,
                         const std::string &coverageFile,
                         const std::string &fractionMissingFile) {
   PLLRootedTree speciesTree(speciesTreeFile);
@@ -238,17 +242,21 @@ void Family::printStats(Families &families, const std::string &speciesTreeFile,
     perSpeciesCoveringFamilies.insert({species, 0});
   }
   // locally
-  PerCoreGeneTrees geneTrees(families);
-  for (auto &tree : geneTrees.getTrees()) {
-    for (auto species : tree.mapping.getCoveredSpecies()) {
-      perSpeciesCoveringFamilies[species]++;
+  auto N = families.size();
+  for (auto i = ParallelContext::getBegin(N); i < ParallelContext::getEnd(N);
+       ++i) {
+    const auto &family = families[i];
+    GeneSpeciesMapping mapping;
+    mapping.fill(family.mappingFile, family.startingGeneTree);
+    for (const auto &species : mapping.getCoveredSpecies()) {
+      perSpeciesCoveringFamilies.at(species)++;
     }
-    for (auto geneSpecies : tree.mapping.getMap()) {
-      perSpeciesGenes[geneSpecies.second]++;
+    for (const auto &geneSpecies : mapping.getMap()) {
+      perSpeciesGenes.at(geneSpecies.second)++;
     }
-    unsigned int geneNumber = tree.mapping.getMap().size();
+    unsigned int geneNumber = mapping.getMap().size();
     totalGeneNumber += geneNumber;
-    maxGeneNumber = std::max(geneNumber, maxGeneNumber);
+    maxGeneNumber = std::max(maxGeneNumber, geneNumber);
   }
   // gather parallel values
   ParallelContext::sumUInt(totalGeneNumber);
@@ -262,32 +270,39 @@ void Family::printStats(Families &families, const std::string &speciesTreeFile,
       minCoveredSpecies = species;
     }
   }
-  // coverage file
-  ParallelOfstream covOs(coverageFile, true);
-  typedef std::pair<double, std::string> Coverage;
-  std::vector<Coverage> coverageVector;
+  // write coverage file
+  std::vector<std::pair<double, std::string>> coverageVector;
+  assert(families.size() > 0);
   for (const auto &species : speciesLabels) {
-    double d = static_cast<double>(perSpeciesCoveringFamilies[species]);
-    d /= static_cast<double>(families.size());
-    coverageVector.push_back({d, species});
+    double cov = static_cast<double>(perSpeciesCoveringFamilies[species]);
+    cov /= static_cast<double>(families.size());
+    coverageVector.push_back({cov, species});
   }
   std::sort(coverageVector.begin(), coverageVector.end());
+  ParallelOfstream covOs(coverageFile, true);
   covOs << "species\tcoverage" << std::endl;
-  for (auto &coverage : coverageVector) {
-    covOs << coverage.second << "\t" << coverage.first << std::endl;
+  for (const auto &p : coverageVector) {
+    covOs << p.second << "\t" << p.first << std::endl;
   }
   covOs.close();
-  // fraction missing file
+  // write fraction missing file
+  std::vector<std::pair<double, std::string>> fractionVector;
   unsigned int maxGenes = 0;
-  for (auto &species : speciesLabels) {
+  for (const auto &species : speciesLabels) {
     maxGenes = std::max(maxGenes, perSpeciesGenes[species]);
   }
+  assert(maxGenes > 0);
+  for (const auto &species : speciesLabels) {
+    unsigned int genes = perSpeciesGenes[species];
+    double fm = static_cast<double>(maxGenes - genes);
+    fm /= static_cast<double>(maxGenes);
+    fractionVector.push_back({fm, species});
+  }
+  std::sort(fractionVector.begin(), fractionVector.end());
   ParallelOfstream fmOs(fractionMissingFile, true);
   fmOs << "species\tmissing" << std::endl;
-  for (auto &species : speciesLabels) {
-    unsigned int genes = perSpeciesGenes[species];
-    double fm = double(maxGenes - genes) / double(maxGenes);
-    fmOs << species << "\t" << fm << std::endl;
+  for (const auto &p : fractionVector) {
+    fmOs << p.second << "\t" << p.first << std::endl;
   }
   fmOs.close();
   // print logs
@@ -306,4 +321,17 @@ void Family::printStats(Families &families, const std::string &speciesTreeFile,
   Logger::info << "- Average (over species) species family coverage: "
                << totalSpeciesCoverage / speciesLabels.size() << std::endl;
   Logger::info << std::endl;
+}
+
+std::unordered_set<std::string>
+Family::getLabelsFromFamilies(const Families &families) {
+  std::unordered_set<std::string> leafLabels;
+  for (const auto &family : families) {
+    GeneSpeciesMapping mapping;
+    mapping.fill(family.mappingFile, family.startingGeneTree);
+    for (const auto &geneSpecies : mapping.getMap()) {
+      leafLabels.insert(geneSpecies.second);
+    }
+  }
+  return leafLabels;
 }
