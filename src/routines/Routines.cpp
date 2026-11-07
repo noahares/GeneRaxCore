@@ -79,18 +79,24 @@ void Routines::exportPerSpeciesRates(const std::string &speciesTreeFile,
                                      const std::string &outputFile) {
   Logger::info << "Exporting per-species rates into " << outputFile
                << std::endl;
-  ParallelOfstream os(outputFile);
   PLLRootedTree speciesTree(speciesTreeFile);
+  auto parameterNames = recModelInfo.getParamTypes();
   auto freeParameters = recModelInfo.modelFreeParameters();
   auto speciesNodesNumber = speciesTree.getNodeNumber();
   assert(speciesNodesNumber * freeParameters == rates.dimensions());
+  ParallelOfstream ratesOs(outputFile, true);
+  ratesOs << "species";
+  for (auto name : parameterNames) {
+    ratesOs << "\t" << name;
+  }
+  ratesOs << std::endl;
   for (auto node : speciesTree.getNodes()) {
+    ratesOs << node->label;
     auto e = node->node_index;
-    os << node->label;
     for (unsigned int i = 0; i < freeParameters; ++i) {
-      os << " " << rates[e * freeParameters + i];
+      ratesOs << "\t" << rates[e * freeParameters + i];
     }
-    os << "\n";
+    ratesOs << std::endl;
   }
 }
 
@@ -120,24 +126,6 @@ void Routines::optimizeRates(bool userDTLRates,
   sumElapsed += elapsed;
 }
 
-static std::string getSpeciesEventCountFile(const std::string &outputDir,
-                                            const std::string &familyName) {
-  return FileSystem::joinPaths(
-      outputDir, FileSystem::joinPaths("reconciliations",
-                                       familyName + "_speciesEventCounts.tsv"));
-}
-
-static std::string getTransfersFile(const std::string &outputDir,
-                                    const std::string &familyName,
-                                    int sample = -1) {
-  auto res = FileSystem::joinPaths(
-      outputDir, FileSystem::joinPaths("reconciliations", familyName));
-  if (sample >= 0) {
-    res += std::string("_") + std::to_string(sample);
-  }
-  res += std::string("_transfers.tsv");
-  return res;
-}
 void Routines::inferAndGetReconciliationScenarios(
     PLLRootedTree &speciesTree, const PerCoreGeneTrees &geneTrees,
     const ModelParameters &initialModelRates,
@@ -193,79 +181,90 @@ void Routines::inferReconciliation(const std::string &speciesTreeFile,
                                    bool bestReconciliation,
                                    unsigned int reconciliationSamples,
                                    bool optimizeRates) {
-  PerCoreGeneTrees geneTrees(families);
-  std::string reconciliationsDir =
-      FileSystem::joinPaths(outputDir, "reconciliations");
-  FileSystem::mkdir(reconciliationsDir, true);
+  auto recDir = FileSystem::joinPaths(outputDir, "reconciliations");
+  FileSystem::mkdir(recDir, true);
+  ParallelContext::barrier();
   PLLRootedTree speciesTree(speciesTreeFile);
+  PerCoreGeneTrees geneTrees(families);
+  const auto &localFamilies = geneTrees.getTrees();
   if (bestReconciliation) {
     std::vector<std::shared_ptr<Scenario>> scenarios;
     inferAndGetReconciliationScenarios(
         speciesTree, geneTrees, initialModelRates, 0, optimizeRates, scenarios);
-    assert(scenarios.size() == geneTrees.getTrees().size());
-    for (unsigned int i = 0; i < geneTrees.getTrees().size(); ++i) {
-      auto &tree = geneTrees.getTrees()[i];
-      std::string eventCountsFile = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_eventCounts.tsv");
-      std::string speciesEventCountsFile =
-          getSpeciesEventCountFile(outputDir, tree.name);
-      std::string transfersFile = getTransfersFile(outputDir, tree.name);
-      std::string orthoGroupFile = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_orthogroups.txt");
-      std::string allOrthoGroupFile = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_orthogroups_all.txt");
-      std::string treeWithEventsFileNHX = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_reconciliated.nhx");
-      std::string treeWithEventsFileRecPhyloXML = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_reconciliated.xml");
-      std::string treeWithEventsFileNewickEvents = FileSystem::joinPaths(
-          reconciliationsDir, tree.name + "_events.newick");
-      auto &scenario = *scenarios[i];
-      ParallelOfstream eventCountsOs(eventCountsFile, false);
-      Scenario::saveEventsHeader(eventCountsOs);
-      scenario.saveEventsCounts(eventCountsOs, reconciliationSamples);
-      ParallelOfstream perSpeciesEventCountsOs(speciesEventCountsFile, false);
-      Scenario::dumpSpeciesToEventCountHeader(perSpeciesEventCountsOs);
-      scenario.savePerSpeciesEventsCounts(perSpeciesEventCountsOs, reconciliationSamples);
-      scenario.saveReconciliation(treeWithEventsFileRecPhyloXML,
-                                  ReconciliationFormat::RecPhyloXML, false);
-      scenario.saveReconciliation(treeWithEventsFileNHX,
-                                  ReconciliationFormat::NHX, false);
-      scenario.saveLargestOrthoGroup(orthoGroupFile, false);
-      scenario.saveAllOrthoGroups(allOrthoGroupFile, false);
-      scenario.saveReconciliation(treeWithEventsFileNewickEvents,
+    assert(scenarios.size() == localFamilies.size());
+    const auto labelToId = speciesTree.getDeterministicLabelToId();
+    const unsigned int N = labelToId.size();
+    MatrixUint transferCounts(N, VectorUint(N, 0));
+    for (unsigned int i = 0; i < localFamilies.size(); ++i) {
+      const auto &familyName = localFamilies[i].name;
+      auto geneTreePath =
+          FileSystem::joinPaths(recDir, familyName + "_sample_ml.newick");
+      auto geneTreeAlePath =
+          FileSystem::joinPaths(recDir, familyName + "_sample_ml.alerec");
+      auto geneTreeNHXPath =
+          FileSystem::joinPaths(recDir, familyName + "_sample_ml.nhx");
+      auto geneTreeXMLPath =
+          FileSystem::joinPaths(recDir, familyName + "_sample_ml.xml");
+      auto eventCountsFile =
+          FileSystem::joinPaths(recDir, familyName + "_eventCounts_ml.tsv");
+      auto speciesEventCountsFile = FileSystem::joinPaths(
+          recDir, familyName + "_speciesEventCounts_ml.tsv");
+      auto transfersFile =
+          FileSystem::joinPaths(recDir, familyName + "_transfers_ml.tsv");
+      auto rootOrthoGroupFile =
+          FileSystem::joinPaths(recDir, familyName + "_rootOrthogroup_ml.txt");
+      auto allOrthoGroupsFile =
+          FileSystem::joinPaths(recDir, familyName + "_allOrthogroups_ml.txt");
+      const auto &scenario = *scenarios[i];
+      scenario.saveReconciliation(geneTreePath,
                                   ReconciliationFormat::NewickEvents, false);
-      scenario.saveReconciliation(treeWithEventsFileNHX,
-                                  ReconciliationFormat::NHX, false);
-      ParallelOfstream transferOs(transfersFile, false);
-      scenario.saveTransfers(transferOs, reconciliationSamples);
+      scenario.saveReconciliation(geneTreeAlePath, ReconciliationFormat::ALE,
+                                  false);
+      scenario.saveReconciliation(geneTreeNHXPath, ReconciliationFormat::NHX,
+                                  false);
+      scenario.saveReconciliation(geneTreeXMLPath,
+                                  ReconciliationFormat::RecPhyloXML, false);
+      scenario.saveLargestOrthoGroup(rootOrthoGroupFile, false);
+      scenario.saveAllOrthoGroups(allOrthoGroupsFile, false);
+      ParallelOfstream eventCountsOs(eventCountsFile, false);
+      Scenario::writeEventCountsHeader(eventCountsOs);
+      scenario.saveEventCounts(eventCountsOs);
+      ParallelOfstream speciesEventCountsOs(speciesEventCountsFile, false);
+      Scenario::writePerSpeciesEventCountsHeader(speciesEventCountsOs);
+      scenario.savePerSpeciesEventCounts(speciesEventCountsOs);
+      ParallelOfstream transfersOs(transfersFile, false);
+      Scenario::writeTransfersHeader(transfersOs);
+      scenario.saveTransfers(transfersOs);
+      scenario.countTransfers(labelToId, transferCounts);
     }
-    std::string transferPairGlobalFile(
-        FileSystem::joinPaths(outputDir, "per_species_pair_transfers.txt"));
-    Scenario::saveTransferPairCountGlobal(speciesTree, scenarios,
-                                          transferPairGlobalFile);
+    auto transferPairsGlobalFile =
+        FileSystem::joinPaths(outputDir, "per_species_pair_transfers.tsv");
+    Scenario::saveTransfersGlobal(speciesTree, transferCounts,
+                                  transferPairsGlobalFile);
   }
   if (reconciliationSamples) {
     std::vector<std::shared_ptr<Scenario>> scenarios;
     inferAndGetReconciliationScenarios(speciesTree, geneTrees,
                                        initialModelRates, reconciliationSamples,
                                        optimizeRates, scenarios);
-    assert(scenarios.size() ==
-           geneTrees.getTrees().size() * reconciliationSamples);
-    for (unsigned int i = 0; i < geneTrees.getTrees().size(); ++i) {
-      auto &tree = geneTrees.getTrees()[i];
-      std::string nhxSamples =
-          FileSystem::joinPaths(reconciliationsDir, tree.name + "_samples.nhx");
-      ParallelOfstream nhxOs(nhxSamples, false);
+    assert(scenarios.size() == localFamilies.size() * reconciliationSamples);
+    for (unsigned int i = 0; i < localFamilies.size(); ++i) {
+      const auto &familyName = localFamilies[i].name;
+      auto geneTreesAlePath =
+          FileSystem::joinPaths(recDir, familyName + "_samples.alerec");
+      ParallelOfstream geneTreesAleOs(geneTreesAlePath, false);
+      auto geneTreesNHXPath =
+          FileSystem::joinPaths(recDir, familyName + "_samples.nhx");
+      ParallelOfstream geneTreesNHXOs(geneTreesNHXPath, false);
+      auto transfersFile =
+          FileSystem::joinPaths(recDir, familyName + "_transfers.tsv");
+      ParallelOfstream transfersOs(transfersFile, false);
+      Scenario::writeTransfersHeader(transfersOs, true);
       for (unsigned int sample = 0; sample < reconciliationSamples; ++sample) {
-        auto &scenario = *scenarios[i * reconciliationSamples + sample];
-        std::string transfersFile =
-            getTransfersFile(outputDir, tree.name, sample);
-        scenario.saveReconciliation(nhxOs, ReconciliationFormat::NHX);
-        ParallelOfstream transferOs(transfersFile, false);
-        scenario.saveTransfers(transferOs, reconciliationSamples);
-        scenario.resetBlackList();
-        nhxOs << "\n";
+        const auto &scenario = *scenarios[i * reconciliationSamples + sample];
+        scenario.saveReconciliation(geneTreesAleOs, ReconciliationFormat::ALE);
+        scenario.saveReconciliation(geneTreesNHXOs, ReconciliationFormat::NHX);
+        scenario.saveTransfers(transfersOs, sample);
       }
     }
   }
@@ -319,9 +318,9 @@ void Routines::computeSuperMatrixFromOrthoGroups(
     std::string orthoGroupFile =
         FileSystem::joinPaths(reconciliationsDir, family.name);
     if (largestOnly) {
-      orthoGroupFile += "_orthogroups.txt";
+      orthoGroupFile += "_rootOrthogroup_ml.txt";
     } else {
-      orthoGroupFile += "_orthogroups_all.txt";
+      orthoGroupFile += "_allOrthogroups_ml.txt";
     }
     OrthoGroups orthoGroups;
     parseOrthoGroups(orthoGroupFile, orthoGroups);
@@ -449,7 +448,7 @@ void Routines::getPerSpeciesEvents(PLLRootedTree &speciesTree,
   inferAndGetReconciliationScenarios(
       speciesTree, geneTrees, transfersModelParameter, reconciliationSamples,
       optimizeRates, scenarios);
-  for (auto &scenario : scenarios) {
+  for (const auto &scenario : scenarios) {
     scenario->gatherReconciliationStatistics(events);
   }
   ParallelContext::barrier();
@@ -480,7 +479,7 @@ void Routines::getTransfersFrequencies(
   inferAndGetReconciliationScenarios(
       speciesTree, geneTrees, transfersModelParameter, reconciliationSamples,
       optimizeRates, scenarios);
-  for (auto &scenario : scenarios) {
+  for (const auto &scenario : scenarios) {
     potentialTransfers.addScenario(*scenario);
   }
   const auto labelToId = speciesTree.getDeterministicLabelToId();
@@ -488,7 +487,7 @@ void Routines::getTransfersFrequencies(
   const unsigned int N = idToLabel.size();
   transferFrequencies.count = MatrixUint(N, VectorUint(N, 0));
   transferFrequencies.idToLabel = idToLabel;
-  for (auto &scenario : scenarios) {
+  for (const auto &scenario : scenarios) {
     scenario->countTransfers(labelToId, transferFrequencies.count);
   }
   for (unsigned int i = 0; i < N; ++i) {

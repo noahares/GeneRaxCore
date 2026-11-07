@@ -132,50 +132,57 @@ public:
   /**
    * Various methods to save information from the Scenario
    */
-  void saveEventsCounts(ParallelOfstream &os, unsigned int sample);
-  static void saveEventsHeader(ParallelOfstream &os);
-  void saveTransfers(ParallelOfstream &os, unsigned int sample);
-  static void saveTransferHeader(ParallelOfstream &os);
-  double countTransfer(const std::string &from, const std::string &to);
+  void saveEventCounts(ParallelOfstream &os, int sample = -1) const;
+  static void writeEventCountsHeader(ParallelOfstream &os,
+                                     bool useSample = false);
+  void saveTransfers(ParallelOfstream &os, int sample = -1) const;
+  static void writeTransfersHeader(ParallelOfstream &os,
+                                   bool useSample = false);
+  void savePerSpeciesEventCounts(ParallelOfstream &os, int sample = -1) const;
+  static void writePerSpeciesEventCountsHeader(ParallelOfstream &os,
+                                               bool useSample = false);
+
   static void mergeTransfers(const PLLRootedTree &speciesTree,
-                             const std::string &filename,
-                             const std::vector<std::string> &filenames,
-                             unsigned int samples,
+                             const std::string &fileName,
+                             const std::vector<std::string> &fileNames,
                              bool parallel, bool normalize,
-                             bool contains_sample_id = false);
-
-  void saveReconciliation(const std::string &filename,
-                          ReconciliationFormat format,
-                          bool masterRankOnly = true);
-  void saveReconciliation(ParallelOfstream &os, ReconciliationFormat format);
-
-  static void
-  saveTransferPairCountGlobal(PLLRootedTree &speciesTree,
-                              std::vector<std::shared_ptr<Scenario>> &scenarios,
-                              const std::string &filename);
-
-  static void
-  saveOriginsGlobal(PLLRootedTree &speciesTree,
-                    std::vector<unsigned int> &fromS,
-                    std::vector<unsigned int> &fromSButL,
-                    MatrixUint &countMatrix,
-                    unsigned int samples, const std::string &filename);
-
-  void saveLargestOrthoGroup(std::string &filename,
-                             bool masterRankOnly = true) const;
-  void saveAllOrthoGroups(std::string &filename,
-                          bool masterRankOnly = true) const;
-  static void dumpSpeciesToEventCountHeader(ParallelOfstream &os);
-  void savePerSpeciesEventsCounts(ParallelOfstream &os,
-                                  unsigned int sample);
+                             unsigned int samples = 0);
   static void mergePerSpeciesEventCounts(
-      const PLLRootedTree &tree, const std::string &filename,
-      const std::vector<std::string> &filenames, unsigned int samples, bool parallel, bool normalize, bool contains_sample_id = false);
+      const PLLRootedTree &speciesTree, const std::string &fileName,
+      const std::vector<std::string> &fileNames, bool parallel, bool normalize,
+      unsigned int samples = 0);
+
+  void saveReconciliation(const std::string &fileName,
+                          ReconciliationFormat format,
+                          bool masterRankOnly = true) const;
+  void saveReconciliation(ParallelOfstream &os,
+                          ReconciliationFormat format) const;
+
+  static void saveTransfersGlobal(const PLLRootedTree &speciesTree,
+                                  const MatrixUint &transferCounts,
+                                  const std::string &fileName,
+                                  unsigned int samples = 0);
+  static void saveOriginsGlobal(const PLLRootedTree &speciesTree,
+                                const VectorUint &fromS,
+                                const VectorUint &fromSButL,
+                                const MatrixUint &transferCounts,
+                                const std::string &outputDir,
+                                unsigned int samples = 0);
+
+  void saveLargestOrthoGroup(const std::string &fileName,
+                             bool masterRankOnly = true) const;
+  void saveAllOrthoGroups(const std::string &fileName,
+                          bool masterRankOnly = true) const;
+
   void gatherReconciliationStatistics(PerSpeciesEvents &perSpeciesEvents) const;
-  void countTransfers(const StringToUint &labelToId, MatrixUint &count);
-  void countOrigins(const StringToUint &labelToId,
-                    std::vector<unsigned int> &fromS,
-                    std::vector<unsigned int> &fromSButL, MatrixUint &count);
+
+  void countTransfers(const StringToUint &labelToId,
+                      MatrixUint &transferCounts) const;
+  void countOrigins(const StringToUint &labelToId, VectorUint &fromS,
+                    VectorUint &fromSButL, MatrixUint &transferCounts) const;
+
+  unsigned int countTransfers(const std::string &from,
+                              const std::string &to) const;
 
   std::vector<unsigned int> getPerSpeciesCopies() const;
 
