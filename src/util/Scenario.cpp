@@ -107,16 +107,30 @@ void Scenario::writeTransfersHeader(ParallelOfstream &os, bool useSample) {
 }
 
 void Scenario::saveTransfers(ParallelOfstream &os, int sample) const {
+  auto N = _speciesTree->tip_count + _speciesTree->inner_count;
+  MatrixUint transferCounts(N, VectorUint(N, 0));
   for (const auto &event : _events) {
     if (event.type == ReconciliationEventType::EVENT_T ||
         event.type == ReconciliationEventType::EVENT_TL) {
-      if (sample > -1) {
-        os << sample << "\t";
-      }
-      os << _speciesTree->nodes[event.speciesNode]->label << "\t"
-         << _speciesTree->nodes[event.destSpeciesNode]->label << "\t" << 1
-         << std::endl;
+      transferCounts[event.speciesNode][event.destSpeciesNode]++;
     }
+  }
+  std::vector<TransferPair> transferPairs;
+  for (unsigned int i = 0; i < N; ++i) {
+    for (unsigned int j = 0; j < N; ++j) {
+      double transferCount = transferCounts[i][j];
+      if (transferCount > 0.0) {
+        transferPairs.push_back(TransferPair(transferCount, i, j));
+      }
+    }
+  }
+  std::sort(transferPairs.rbegin(), transferPairs.rend());
+  for (const auto &tp : transferPairs) {
+    if (sample > -1) {
+      os << sample << "\t";
+    }
+    os << _speciesTree->nodes[tp.src]->label << "\t"
+       << _speciesTree->nodes[tp.dest]->label << "\t" << tp.count << std::endl;
   }
 }
 
