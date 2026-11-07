@@ -162,12 +162,11 @@ public:
                                   const MatrixUint &transferCounts,
                                   const std::string &fileName,
                                   unsigned int samples = 0);
-  static void saveOriginsGlobal(const PLLRootedTree &speciesTree,
-                                const VectorUint &fromS,
-                                const VectorUint &fromSButL,
-                                const MatrixUint &transferCounts,
-                                const std::string &outputDir,
-                                unsigned int samples = 0);
+  static void
+  saveOriginsGlobal(const PLLRootedTree &speciesTree, const VectorUint &fromO,
+                    const VectorUint &fromS, const VectorUint &fromSButL,
+                    const MatrixUint &transferCounts,
+                    const std::string &outputDir, unsigned int samples = 0);
 
   void saveLargestOrthoGroup(const std::string &fileName,
                              bool masterRankOnly = true) const;
@@ -178,8 +177,9 @@ public:
 
   void countTransfers(const StringToUint &labelToId,
                       MatrixUint &transferCounts) const;
-  void countOrigins(const StringToUint &labelToId, VectorUint &fromS,
-                    VectorUint &fromSButL, MatrixUint &transferCounts) const;
+  void countOrigins(const StringToUint &labelToId, VectorUint &fromO,
+                    VectorUint &fromS, VectorUint &fromSButL,
+                    MatrixUint &transferCounts) const;
 
   unsigned int countTransfers(const std::string &from,
                               const std::string &to) const;

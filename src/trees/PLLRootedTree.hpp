@@ -220,7 +220,7 @@ public:
   std::vector<unsigned int> getNodeIndexMapping(PLLRootedTree &otherTree);
 
   std::unordered_map<std::string, corax_rnode_t *>
-  getLabelToNode(bool leafOnly);
+  getLabelToNode(bool leafOnly) const;
 
   bool areNodeIndicesParallelConsistent() const;
 

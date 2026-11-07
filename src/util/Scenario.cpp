@@ -436,11 +436,12 @@ void Scenario::countTransfers(const StringToUint &labelToId,
   }
 }
 
-void Scenario::countOrigins(const StringToUint &labelToId, VectorUint &fromS,
-                            VectorUint &fromSButL,
+void Scenario::countOrigins(const StringToUint &labelToId, VectorUint &fromO,
+                            VectorUint &fromS, VectorUint &fromSButL,
                             MatrixUint &transferCounts) const {
-  // origins come from S, SL, T, and TL events
-  countTransfers(labelToId, transferCounts);
+  // origins come from O, S, SL, T, and TL events
+  char *origLabel = getOriginationSpecies()->label;
+  fromO[labelToId.at(origLabel)]++;
   char *destLabel1 = nullptr;
   char *destLabel2 = nullptr;
   for (const auto &event : _events) {
@@ -461,6 +462,7 @@ void Scenario::countOrigins(const StringToUint &labelToId, VectorUint &fromS,
       break;
     }
   }
+  countTransfers(labelToId, transferCounts);
 }
 
 unsigned int Scenario::countTransfers(const std::string &from,
@@ -555,17 +557,29 @@ void Scenario::saveTransfersGlobal(const PLLRootedTree &speciesTree,
 }
 
 void Scenario::saveOriginsGlobal(const PLLRootedTree &speciesTree,
+                                 const VectorUint &fromO,
                                  const VectorUint &fromS,
                                  const VectorUint &fromSButL,
                                  const MatrixUint &transferCounts,
                                  const std::string &outputDir,
                                  unsigned int samples) {
+  const auto labelToNode = speciesTree.getLabelToNode(false);
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
   const unsigned int N = idToLabel.size();
   // iterate over all dest species and compute their origins
   for (unsigned int j = 0; j < N; ++j) {
+    // origins from O events
+    auto noLabel = std::string("-");
+    double originationCount = fromO[j];
+    ParallelContext::sumDouble(originationCount);
+    if (samples > 1) {
+      originationCount /= static_cast<double>(samples);
+    }
     // origins from S and SL events
+    auto speciesLabel = idToLabel[j];
+    auto parentNode = labelToNode.at(speciesLabel)->parent;
+    auto parentLabel = (parentNode) ? std::string(parentNode->label) : noLabel;
     double verticalCount = fromS[j] + fromSButL[j];
     ParallelContext::sumDouble(verticalCount);
     if (samples > 1) {
@@ -585,13 +599,13 @@ void Scenario::saveOriginsGlobal(const PLLRootedTree &speciesTree,
     }
     std::sort(transferPairs.rbegin(), transferPairs.rend());
     // save origins for the current species
-    std::string speciesLabel = idToLabel[j];
     auto fileName = FileSystem::joinPaths(outputDir, speciesLabel + ".tsv");
     ParallelOfstream os(fileName);
-    os << "species\torigins" << std::endl;
-    os << "vertical\t" << verticalCount << std::endl;
+    os << "src\ttype\torigins" << std::endl;
+    os << noLabel << "\torigination\t" << originationCount << std::endl;
+    os << parentLabel << "\tvertical\t" << verticalCount << std::endl;
     for (const auto &tp : transferPairs) {
-      os << idToLabel[tp.src] << "\t" << tp.count << std::endl;
+      os << idToLabel[tp.src] << "\thorizontal\t" << tp.count << std::endl;
     }
   }
 }
