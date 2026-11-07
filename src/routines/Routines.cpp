@@ -258,8 +258,7 @@ void Routines::inferReconciliation(const std::string &speciesTreeFile,
           FileSystem::joinPaths(reconciliationsDir, tree.name + "_samples.nhx");
       ParallelOfstream nhxOs(nhxSamples, false);
       for (unsigned int sample = 0; sample < reconciliationSamples; ++sample) {
-        auto scenarioIndex = sample * geneTrees.getTrees().size() + i;
-        auto &scenario = *scenarios[scenarioIndex];
+        auto &scenario = *scenarios[i * reconciliationSamples + sample];
         std::string transfersFile =
             getTransfersFile(outputDir, tree.name, sample);
         scenario.saveReconciliation(nhxOs, ReconciliationFormat::NHX);
@@ -486,19 +485,13 @@ void Routines::getTransfersFrequencies(
   }
   const auto labelToId = speciesTree.getDeterministicLabelToId();
   const auto idToLabel = speciesTree.getDeterministicIdToLabel();
-  const unsigned int labelsNumber = idToLabel.size();
-  const VectorUint zeros(labelsNumber, 0);
-  transferFrequencies.count = MatrixUint(labelsNumber, zeros);
+  const unsigned int N = idToLabel.size();
+  transferFrequencies.count = MatrixUint(N, VectorUint(N, 0));
   transferFrequencies.idToLabel = idToLabel;
-  unsigned int maxSample = std::max<unsigned int>(1u, reconciliationSamples);
-  for (unsigned int sample = 0; sample < maxSample; ++sample) {
-    for (unsigned int i = 0; i < geneTrees.getTrees().size(); ++i) {
-      auto index = sample * geneTrees.getTrees().size() + i;
-      auto &scenario = scenarios[index];
-      scenario->countTransfers(labelToId, transferFrequencies.count);
-    }
+  for (auto &scenario : scenarios) {
+    scenario->countTransfers(labelToId, transferFrequencies.count);
   }
-  for (unsigned int i = 0; i < labelsNumber; ++i) {
+  for (unsigned int i = 0; i < N; ++i) {
     ParallelContext::sumVectorUInt(transferFrequencies.count[i]);
   }
   ParallelContext::barrier();
