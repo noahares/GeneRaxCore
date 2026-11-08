@@ -134,10 +134,19 @@ void ParallelContext::sumDouble(double &value) {
   if (!_mpiEnabled) {
     return;
   }
-  double sum = 0;
+  // Summed on rank 0 in rank order and broadcast: MPI_Allreduce may combine
+  // the ranks in any order, so its result could change between calls. The sum
+  // still depends on the number of ranks.
   barrier();
-  MPI_Allreduce(&value, &sum, 1, MPI_DOUBLE, MPI_SUM, getComm());
-  value = sum;
+  std::vector<double> values(getRank() == 0 ? getSize() : 0);
+  MPI_Gather(&value, 1, MPI_DOUBLE, values.data(), 1, MPI_DOUBLE, 0, getComm());
+  if (getRank() == 0) {
+    value = 0.0;
+    for (auto v : values) {
+      value += v;
+    }
+  }
+  MPI_Bcast(&value, 1, MPI_DOUBLE, 0, getComm());
 #endif
 }
 
