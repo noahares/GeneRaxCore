@@ -280,8 +280,9 @@ void Family::printStats(const Families &families,
   }
   std::sort(coverageVector.begin(), coverageVector.end());
   ParallelOfstream covOs(coverageFile, true);
+  covOs << "species\tcoverage" << std::endl;
   for (const auto &p : coverageVector) {
-    covOs << p.second << " " << p.first << std::endl;
+    covOs << p.second << "\t" << p.first << std::endl;
   }
   covOs.close();
   // write fraction missing file
@@ -299,8 +300,9 @@ void Family::printStats(const Families &families,
   }
   std::sort(fractionVector.begin(), fractionVector.end());
   ParallelOfstream fmOs(fractionMissingFile, true);
+  fmOs << "species\tmissing" << std::endl;
   for (const auto &p : fractionVector) {
-    fmOs << p.second << " " << p.first << std::endl;
+    fmOs << p.second << "\t" << p.first << std::endl;
   }
   fmOs.close();
   // print logs
